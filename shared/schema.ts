@@ -179,6 +179,9 @@ export type TournamentSettings = {
   };
   seeded?: boolean;
   promotedPerGroup?: number;
+  pointsForWin?: number;
+  pointsForDraw?: number;
+  pointsForLoss?: number;
 };
 
 export type CreateTournamentRequest = {

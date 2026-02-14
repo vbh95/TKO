@@ -93,12 +93,47 @@ export default function TournamentDetail() {
 
   const getPlayer = (id: number | null) => players.find((p: Player) => p.id === id) || null;
 
-  const matchesByRound = matches.reduce((acc: Record<string, any[]>, match: any) => {
-    const key = match.groupId ? (groups.find((g: any) => g.id === match.groupId)?.name || 'Group') : match.roundKey;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(match);
-    return acc;
-  }, {} as Record<string, any[]>);
+  const groupMatchData = (() => {
+    const groupMatches = matches.filter((m: any) => m.stage === "GROUP");
+    const nonGroupMatches = matches.filter((m: any) => m.stage !== "GROUP");
+
+    const byGroup: { group: any; rounds: { roundKey: string; matches: any[] }[] }[] = [];
+
+    if (groups.length > 0) {
+      for (const group of groups) {
+        const gMatches = groupMatches.filter((m: any) => m.groupId === group.id);
+        const roundKeys = Array.from(new Set(gMatches.map((m: any) => m.roundKey))) as string[];
+        roundKeys.sort((a: string, b: string) => {
+          const numA = parseInt(a.replace("R", "")) || 0;
+          const numB = parseInt(b.replace("R", "")) || 0;
+          return numA - numB;
+        });
+        const rounds = roundKeys.map(rk => ({
+          roundKey: rk,
+          matches: gMatches.filter((m: any) => m.roundKey === rk).sort((a: any, b: any) => a.order - b.order),
+        }));
+        byGroup.push({ group, rounds });
+      }
+    }
+
+    const nonGroupRounds: { roundKey: string; matches: any[] }[] = [];
+    if (nonGroupMatches.length > 0) {
+      const roundKeys = Array.from(new Set(nonGroupMatches.map((m: any) => m.roundKey))) as string[];
+      for (const rk of roundKeys) {
+        nonGroupRounds.push({
+          roundKey: rk,
+          matches: nonGroupMatches.filter((m: any) => m.roundKey === rk).sort((a: any, b: any) => a.order - b.order),
+        });
+      }
+    }
+
+    return { byGroup, nonGroupRounds };
+  })();
+
+  const settings = (tournament.settings || {}) as any;
+  const ptsWin = settings.pointsForWin ?? 2;
+  const ptsDraw = settings.pointsForDraw ?? 1;
+  const ptsLoss = settings.pointsForLoss ?? 0;
 
   const calcStandings = (playerList: Player[], matchList: typeof matches) => {
     return playerList.map((player: Player) => {
@@ -106,7 +141,7 @@ export default function TournamentDetail() {
         (m.playerAId === player.id || m.playerBId === player.id) && m.status === 'COMPLETED'
       );
       
-      let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
+      let played = 0, won = 0, drawn = 0, lost = 0, legsFor = 0, legsAgainst = 0;
       
       playerMatches.forEach((m: any) => {
         played++;
@@ -118,14 +153,15 @@ export default function TournamentDetail() {
         legsAgainst += oppScore;
         
         if (m.winnerId === player.id) won++;
+        else if (m.winnerId === null && m.status === 'COMPLETED') drawn++;
         else lost++;
       });
 
       return {
         ...player,
-        played, won, lost, legsFor, legsAgainst,
+        played, won, drawn, lost, legsFor, legsAgainst,
         diff: legsFor - legsAgainst,
-        pts: won * 2
+        pts: (won * ptsWin) + (drawn * ptsDraw) + (lost * ptsLoss)
       };
     }).sort((a: any, b: any) => b.pts - a.pts || b.diff - a.diff);
   };
@@ -228,30 +264,94 @@ export default function TournamentDetail() {
             <TabsTrigger value="players">Players</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="matches" className="space-y-6">
-            {Object.entries(matchesByRound).map(([roundName, roundMatches]) => (
-              <Card key={roundName}>
+          <TabsContent value="matches" className="space-y-8">
+            {groupMatchData.byGroup.map(({ group, rounds }) => (
+              <div key={group.id} className="space-y-4">
+                <h2 className="text-xl font-bold text-primary" data-testid={`group-header-${group.id}`}>{group.name}</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {rounds.map(({ roundKey, matches: roundMatches }) => (
+                    <Card key={roundKey} className="overflow-hidden" data-testid={`round-card-${group.id}-${roundKey}`}>
+                      <div className="bg-primary px-4 py-2 flex items-center justify-between">
+                        <span className="text-primary-foreground font-bold text-sm">
+                          Round {roundKey.replace("R", "")}
+                        </span>
+                      </div>
+                      <CardContent className="p-3 space-y-2">
+                        {roundMatches.map((match: any) => {
+                          const playerA = getPlayer(match.playerAId);
+                          const playerB = getPlayer(match.playerBId);
+                          return (
+                            <div
+                              key={match.id}
+                              onClick={() => setSelectedMatch(match)}
+                              className={cn(
+                                "rounded-lg border p-3 cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
+                                match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
+                              )}
+                              data-testid={`match-card-${match.id}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 space-y-1">
+                                  <div className={cn(
+                                    "text-sm font-medium",
+                                    match.status === 'COMPLETED' && match.winnerId === playerA?.id && "text-primary font-bold"
+                                  )}>
+                                    {playerA?.name || "TBD"}
+                                  </div>
+                                  <div className={cn(
+                                    "text-sm font-medium",
+                                    match.status === 'COMPLETED' && match.winnerId === playerB?.id && "text-primary font-bold"
+                                  )}>
+                                    {playerB?.name || "TBD"}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-center gap-1 ml-3">
+                                  <div className={cn(
+                                    "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                                    match.status === 'COMPLETED' && match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
+                                  )}>
+                                    {match.scoreA || 0}
+                                  </div>
+                                  <div className={cn(
+                                    "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                                    match.status === 'COMPLETED' && match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
+                                  )}>
+                                    {match.scoreB || 0}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {groupMatchData.nonGroupRounds.map(({ roundKey, matches: roundMatches }) => (
+              <Card key={roundKey}>
                 <CardHeader>
-                  <CardTitle className="text-lg font-bold">{roundName}</CardTitle>
+                  <CardTitle className="text-lg font-bold">{roundKey}</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4">
-                  {(roundMatches as any[]).map((match: any) => {
+                  {roundMatches.map((match: any) => {
                     const playerA = getPlayer(match.playerAId);
                     const playerB = getPlayer(match.playerBId);
-                    
                     return (
-                      <div 
+                      <div
                         key={match.id}
                         onClick={() => setSelectedMatch(match)}
                         className={cn(
                           "flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md hover:border-primary/50",
                           match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
                         )}
+                        data-testid={`match-card-${match.id}`}
                       >
                         <div className="flex-1 text-right font-medium">
                           {playerA?.name || "TBD"}
                         </div>
-                        
                         <div className="flex items-center gap-3 px-6">
                           <div className={cn(
                             "w-8 h-8 flex items-center justify-center rounded-md font-bold text-lg",
@@ -267,7 +367,6 @@ export default function TournamentDetail() {
                             {match.scoreB || 0}
                           </div>
                         </div>
-
                         <div className="flex-1 text-left font-medium">
                           {playerB?.name || "TBD"}
                         </div>
@@ -294,6 +393,7 @@ export default function TournamentDetail() {
                           <TableHead>Player</TableHead>
                           <TableHead className="text-center">P</TableHead>
                           <TableHead className="text-center">W</TableHead>
+                          <TableHead className="text-center">D</TableHead>
                           <TableHead className="text-center">L</TableHead>
                           <TableHead className="text-center hidden md:table-cell">Legs +/-</TableHead>
                           <TableHead className="text-right font-bold">Pts</TableHead>
@@ -306,6 +406,7 @@ export default function TournamentDetail() {
                             <TableCell className="font-bold">{player.name}</TableCell>
                             <TableCell className="text-center">{player.played}</TableCell>
                             <TableCell className="text-center text-green-600">{player.won}</TableCell>
+                            <TableCell className="text-center text-muted-foreground">{player.drawn}</TableCell>
                             <TableCell className="text-center text-red-500">{player.lost}</TableCell>
                             <TableCell className="text-center hidden md:table-cell font-mono">
                               {player.diff > 0 ? `+${player.diff}` : player.diff}

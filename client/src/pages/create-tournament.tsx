@@ -37,6 +37,9 @@ export default function CreateTournament() {
     const [sfBestOf, setSfBestOf] = useState(7);
     const [fBestOf, setFBestOf] = useState(9);
     const [seeded, setSeeded] = useState(false);
+    const [pointsForWin, setPointsForWin] = useState(2);
+    const [pointsForDraw, setPointsForDraw] = useState(1);
+    const [pointsForLoss, setPointsForLoss] = useState(0);
 
     const handleAddPlayer = () => {
       if (players.length >= 48) return;
@@ -86,7 +89,10 @@ export default function CreateTournament() {
             semiFinal: sfBestOf,
             final: fBestOf
           } : undefined,
-          seeded: (type === "KNOCKOUT" || type === "MULTI_STAGE") ? seeded : undefined
+          seeded: (type === "KNOCKOUT" || type === "MULTI_STAGE") ? seeded : undefined,
+          pointsForWin: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForWin : undefined,
+          pointsForDraw: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForDraw : undefined,
+          pointsForLoss: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForLoss : undefined,
         }
       }, {
         onSuccess: () => {
@@ -196,6 +202,53 @@ export default function CreateTournament() {
                       </Select>
                     </div>
                   </>
+                )}
+
+                {(type === "ROUND_ROBIN" || type === "MULTI_STAGE") && (
+                  <div className="space-y-4 col-span-2 border rounded-xl p-4 bg-muted/30">
+                    <Label className="text-base font-bold">Points System</Label>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="pointsWin">Points for Win</Label>
+                        <Input
+                          id="pointsWin"
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={pointsForWin}
+                          onChange={(e) => setPointsForWin(parseInt(e.target.value) || 0)}
+                          className="h-10"
+                          data-testid="input-points-win"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pointsDraw">Points for Draw</Label>
+                        <Input
+                          id="pointsDraw"
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={pointsForDraw}
+                          onChange={(e) => setPointsForDraw(parseInt(e.target.value) || 0)}
+                          className="h-10"
+                          data-testid="input-points-draw"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pointsLoss">Points for Loss</Label>
+                        <Input
+                          id="pointsLoss"
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={pointsForLoss}
+                          onChange={(e) => setPointsForLoss(parseInt(e.target.value) || 0)}
+                          className="h-10"
+                          data-testid="input-points-loss"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {(type === "KNOCKOUT" || type === "DOUBLE_ELIMINATION" || type === "MULTI_STAGE") && (
