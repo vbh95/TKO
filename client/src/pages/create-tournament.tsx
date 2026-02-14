@@ -31,6 +31,9 @@ export default function CreateTournament() {
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [randomize, setRandomize] = useState(false);
     const [groupCount, setGroupCount] = useState(1);
+    const [groupBestOf, setGroupBestOf] = useState(3);
+    const [knockoutBestOf, setKnockoutBestOf] = useState(5);
+    const [seeded, setSeeded] = useState(false);
 
     const handleAddPlayer = () => {
       if (players.length >= 48) return;
@@ -72,7 +75,10 @@ export default function CreateTournament() {
         playerNames: validPlayers,
         randomize,
         settings: {
-          groupCount: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupCount : undefined
+          groupCount: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupCount : undefined,
+          groupBestOf: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupBestOf : undefined,
+          knockoutBestOf: (type === "KNOCKOUT" || type === "DOUBLE_ELIMINATION" || type === "MULTI_STAGE") ? knockoutBestOf : undefined,
+          seeded: (type === "KNOCKOUT" || type === "MULTI_STAGE") ? seeded : undefined
         }
       }, {
         onSuccess: () => {
@@ -147,24 +153,69 @@ export default function CreateTournament() {
                 </div>
 
                 {(type === "ROUND_ROBIN" || type === "MULTI_STAGE") && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="groupCount">Number of Groups</Label>
+                      <Select 
+                        value={groupCount.toString()} 
+                        onValueChange={(val) => setGroupCount(parseInt(val))}
+                      >
+                        <SelectTrigger id="groupCount" className="h-12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 4, 8].map(n => (
+                            <SelectItem key={n} value={n.toString()}>{n} Group{n > 1 ? 's' : ''}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="groupBestOf">Group Stage Match Format</Label>
+                      <Select 
+                        value={groupBestOf.toString()} 
+                        onValueChange={(val) => setGroupBestOf(parseInt(val))}
+                      >
+                        <SelectTrigger id="groupBestOf" className="h-12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 3, 5, 7, 9, 11].map(n => (
+                            <SelectItem key={n} value={n.toString()}>Best of {n} legs</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {(type === "KNOCKOUT" || type === "DOUBLE_ELIMINATION" || type === "MULTI_STAGE") && (
                   <div className="space-y-2">
-                    <Label htmlFor="groupCount">Number of Groups</Label>
+                    <Label htmlFor="knockoutBestOf">Knockout Match Format</Label>
                     <Select 
-                      value={groupCount.toString()} 
-                      onValueChange={(val) => setGroupCount(parseInt(val))}
+                      value={knockoutBestOf.toString()} 
+                      onValueChange={(val) => setKnockoutBestOf(parseInt(val))}
                     >
-                      <SelectTrigger id="groupCount" className="h-12">
+                      <SelectTrigger id="knockoutBestOf" className="h-12">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {[1, 2, 4, 8].map(n => (
-                          <SelectItem key={n} value={n.toString()}>{n} Group{n > 1 ? 's' : ''}</SelectItem>
+                        {[1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21].map(n => (
+                          <SelectItem key={n} value={n.toString()}>Best of {n} legs</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Split players into multiple groups for the initial stage.
-                    </p>
+                  </div>
+                )}
+
+                {(type === "KNOCKOUT" || type === "MULTI_STAGE") && (
+                  <div className="space-y-2 flex items-center justify-between border rounded-xl p-4">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Seeded Bracket</Label>
+                      <p className="text-xs text-muted-foreground">Highest seeds play lowest seeds in first round</p>
+                    </div>
+                    <Switch checked={seeded} onCheckedChange={setSeeded} />
                   </div>
                 )}
               </div>
