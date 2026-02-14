@@ -1,0 +1,367 @@
+You are an expert full-stack engineer. Build a production-ready web app called “Ultimate Darts Tournament Generator” (UDTG).
+
+GOAL
+A darts tournament generator + tournament manager (Score7-style admin) with:
+- Tournament formats: Round Robin (groups), Knockout (single elimination), Double Elimination, Multi-Stage (Round Robin → Knockout)
+- Per-stage match formats (Best of legs): 3, 5, 7, 9, 11
+- Logged-in users have their own tournaments saved permanently (view/edit/delete anytime)
+- Public spectator mode via shareable link + QR code (read-only)
+- Export tournament data (CSV required, XLSX preferred)
+- My Tournaments management page
+- My Account page to manage profile/email/password/delete account
+- iPad-friendly UI and spectator pages
+
+TECH STACK (use unless impossible)
+Frontend:
+- React + TypeScript + Vite
+- Simple clean admin UI (tabs, tables, forms), responsive, touch-friendly on iPad
+Backend:
+- Node.js + Express + TypeScript
+Database:
+- SQLite + Prisma ORM (persist everything)
+Auth:
+- Email + password with secure hashing (bcrypt or argon2)
+- Cookie-based sessions (httpOnly). Use express-session + Prisma-backed session store if feasible, otherwise JWT (but prefer cookie sessions).
+Monorepo:
+- Replit-friendly single workspace with frontend + backend.
+- Provide one command to run everything: “npm run dev” (use concurrently).
+
+NON-NEGOTIABLES
+- All data persists in SQLite; refresh must not lose data.
+- Ownership enforced: users can only access their own tournaments and exports.
+- Public spectator links must be read-only and must not reveal any private account info.
+- Include README with setup/run instructions and rules.
+
+========================
+FEATURES & REQUIREMENTS
+========================
+
+1) AUTHENTICATION + USER ACCOUNTS
+Pages:
+- /login (email + password)
+- /signup (email + password + confirm password)
+- global top nav when logged in: “My Tournaments”, “Account”, “Logout”
+
+Backend:
+- POST /api/auth/signup
+- POST /api/auth/login
+- POST /api/auth/logout
+- GET  /api/auth/me  (returns current user id, name, email)
+
+Rules:
+- Validate email format
+- Password minimum 8 chars
+- Hash passwords (bcrypt or argon2)
+- Handle duplicate email signup gracefully
+- Use httpOnly cookies; set same-site appropriately
+- Protect all tournament APIs (must be authenticated)
+- Redirect to /login if not authenticated
+
+2) USER OWNERSHIP + DATA MODEL
+- Add User table (id, name, email unique, passwordHash, createdAt, updatedAt)
+- Tournament must include userId (owner)
+- Enforce ownership on every tournament API call
+- Account delete must cascade delete all user data
+
+3) MY TOURNAMENTS PAGE (MANAGEMENT HUB)
+Route:
+- /tournaments is default landing after login
+Features:
+- List ALL tournaments (including completed) for the logged in user
+- Each row shows: name, type, status (Not started / In progress / Completed), last updated
+- Actions: View, Rename (inline), Delete (confirmation modal)
+- Search by name
+- Filter by type (RR/KO/DE/Multi-Stage)
+- Filter by status
+- Sort by last updated / created / name
+- Sharing shortcut: show if sharing enabled + “Copy link” button (optional but desired)
+
+API:
+- GET /api/tournaments
+- POST /api/tournaments
+- GET /api/tournaments/:id
+- PUT /api/tournaments/:id
+- DELETE /api/tournaments/:id
+
+4) TOURNAMENT CREATION (SUPPORTED FORMATS)
+Create Tournament flow:
+- Tournament name
+- Tournament type: Round Robin | Knockout | Double Elimination | Multi-Stage
+- Number of players: selectable from 4 up to 48 (every integer 4..48)
+- Player entry: add players by name (manual list) + option to randomize order
+- Store the randomized order / generated allocations so they don’t change on refresh.
+
+4A) MATCH FORMATS (PER STAGE) — BEST OF LEGS
+Allowed best-of values: 3, 5, 7, 9, 11
+Store match.bestOf at match creation time.
+
+Group stage:
+- Group stage Best-of selector (applies to all group matches)
+
+Knockout stage (single elim + multi-stage knockout):
+- Per-round best-of selectors shown dynamically based on bracket size:
+  - e.g., R32, R16, Quarter Finals, Semi Finals, Final
+- Always include Final
+- If third place playoff is enabled: “Third Place Final best-of” selector
+- EXPLICIT REQUIREMENT: provide selectors for QF/SF/Final when applicable:
+  - Quarter Final best-of: 3/5/7/9/11
+  - Semi Final best-of: 3/5/7/9/11
+  - Final best-of: 3/5/7/9/11
+
+Double Elimination:
+- Per-round best-of selectors for Winners Bracket and Losers Bracket (dynamic)
+- Grand Final best-of selector always shown
+- Optional: “Grand final reset” toggle (if implemented). If not implemented, document clearly.
+
+Score validation:
+- legsToWin = (bestOf + 1) / 2
+- On score entry, enforce:
+  - winner must reach legsToWin
+  - loser must be < legsToWin
+  - total legs <= bestOf
+- Show friendly inline errors. Do not allow invalid saves (unless you implement an admin override toggle—optional).
+
+5) TOURNAMENT SETTINGS (EDITABLE) + OVERVIEW TAB
+Every tournament has an OVERVIEW tab:
+- Displays all settings (format type, players, groups, promoted counts, seeding options, match formats, third place settings, etc.)
+- Shows player list, group allocations, and overall status
+- Must allow editing/amending settings (Edit Settings button/modal)
+
+Editing rules:
+- User can rename tournament ANYTIME (even mid-tournament or after completion).
+- For changing structural settings (groups, promoted, seeded, etc.):
+  - If results already exist that would be invalidated, warn and choose ONE strategy:
+    - Either block the edit with explanation
+    - OR require confirmation and regenerate affected fixtures/results (reset affected matches)
+  Implement one strategy cleanly and consistently.
+
+6) ROUND ROBIN (GROUP STAGE)
+Settings:
+- Choose number of groups (editable; validate)
+- Choose promoted from each group (editable; validate <= group size)
+- Group assignment:
+  - Random assignment OR seeded snake assignment if “seeded groups” toggle is enabled (optional toggle; if you prefer simpler, always random and document)
+Fixtures:
+- Generate full round robin schedule for each group
+- Handle odd group sizes with byes
+Scoring:
+- Save results per match
+- Allow draws toggle for groups (default ON). Points system configurable:
+  - Win points, Draw points, Loss points (default 2/1/0)
+
+7) MULTI-STAGE (GROUPS → KNOCKOUT)
+- Group stage same as Round Robin (with group stage best-of setting)
+- Promoted players move into knockout bracket
+- Knockout seeding option:
+  - Seeded first round toggle:
+    - If seeded: group winners vs runners-up etc., avoiding same-group clashes if feasible
+    - If not seeded: random draw
+- Knockout stage has per-round best-of settings like Knockout
+
+8) KNOCKOUT (SINGLE ELIMINATION)
+Settings:
+- Third place playoff toggle (default OFF)
+- Seeded first round toggle (default ON)
+  - Seeded: 1vN, 2vN-1, etc.
+  - Not seeded: random draw
+- Support byes to next round if not power-of-two; show clearly
+
+9) DOUBLE ELIMINATION
+- Generate Winners bracket, Losers bracket, and Grand Final
+- Loser drops to losers bracket correctly
+- Advance winners automatically when result saved
+- If “bracket reset” is implemented, document behavior; otherwise omit and document.
+
+10) TOURNAMENT TABS (UI)
+Tournament detail page uses tabs. Show only relevant tabs.
+
+A) Overview (ALL)
+- Settings display + edit
+- Rename tournament
+- Share panel
+- Export panel
+- Delete tournament option (confirmation modal)
+
+B) Group Fixtures & Results (Round Robin + Multi-Stage)
+For each group:
+- List fixtures with:
+  - Player A vs Player B
+  - “Best of X” displayed
+  - Score inputs: legsA, legsB
+  - Save/update result
+  - Notes per match:
+    - Highest checkout (number)
+    - Number of 180s (number)
+    - Custom note (text area)
+- Quick filter: all / unplayed / completed
+
+C) Group Standings (Round Robin + Multi-Stage)
+For each group, a clearly separated leaderboard table with EXACT columns:
+- Position
+- Name
+- Matches Played
+- Wins
+- Draws
+- Losses
+- For (Legs won)
+- Against (Legs Lost)
+- Difference (Legs Won minus Legs Lost)
+- Total Points
+
+Rules:
+- Calculate from match results
+- Sorting: Points desc, then Difference desc, then For desc (document tie-breaks in README)
+- Highlight progressing players based on promoted-from-each-group setting
+- Make group sections visually separated and easy to scan
+
+D) Knockout Fixtures & Results
+For Knockout and Multi-Stage:
+- Display rounds clearly labeled (R32/R16/QF/SF/Final; show only those that exist)
+- Explicitly label Quarter Finals, Semi Finals, Final
+- Show Third Place Final if enabled
+For Double Elim:
+- Winners Bracket rounds
+- Losers Bracket rounds
+- Grand Final
+Each match:
+- Player A vs Player B (or “TBD”)
+- “Best of X” displayed
+- Score input (legsA/legsB)
+- Notes (highest checkout, 180s, custom note)
+- Auto-advance winner
+- Prevent score entry if both sides TBD
+
+11) PUBLIC SPECTATOR MODE (SHARE LINK + QR)
+Goal: Tournament creator can share a public link/QR for participants to view:
+- Group Fixtures & Results (view-only)
+- Group Standings (view-only)
+- Knockout Fixtures & Results (view-only)
+
+Implementation:
+- Per tournament “Share Tournament” panel in Overview:
+  - Enable/Disable sharing
+  - Show sharable link with copy button
+  - Show QR code encoding the public URL
+  - Regenerate link button (confirmation) invalidates old token
+Public URL:
+- /public/t/:shareToken
+Public pages:
+- Mobile/iPad friendly, read-only, no login required
+- Do not show any private user info or internal IDs
+
+API:
+- POST /api/tournaments/:id/share/enable
+- POST /api/tournaments/:id/share/disable
+- POST /api/tournaments/:id/share/regenerate
+- GET  /api/public/t/:shareToken  (public view model)
+
+Database:
+- Tournament fields:
+  - shareEnabled boolean
+  - shareToken string nullable
+  - shareTokenCreatedAt datetime
+
+12) EXPORT TOURNAMENT DATA (CSV REQUIRED, XLSX PREFERRED)
+Owner-only export endpoints:
+- GET /api/tournaments/:id/export.csv
+- GET /api/tournaments/:id/export.xlsx (optional but strongly preferred)
+
+Exports must include:
+A) Players table/sheet:
+- Player name, group (if any), matches played, wins/draws/losses, legs for/against, difference, points, and any final placement if determinable
+B) Group fixtures/results:
+- Group name, match id, player A, player B, score A, score B, bestOf, saved timestamp, highestCheckout, numberOf180s, customNote
+C) Knockout fixtures/results:
+- Round name, match id, player A, player B, score A, score B, bestOf, notes fields
+D) Standings snapshot per group at export time
+
+UI:
+- Overview tab “Export” section with buttons:
+  - Export CSV
+  - Export XLSX (if implemented)
+
+Libraries:
+- CSV generation server-side
+- XLSX: use exceljs if feasible
+
+13) MY ACCOUNT PAGE
+Route:
+- /account
+Features:
+- Change display name
+- Change email (require current password)
+- Change password (require current password + new password confirm)
+- Delete account:
+  - Must require re-enter password AND type confirmation phrase “DELETE”
+  - Final confirmation button
+  - Cascade delete all tournaments and related records
+
+API:
+- GET  /api/account/me
+- PUT  /api/account/profile (name)
+- PUT  /api/account/email (new email + current password)
+- PUT  /api/account/password (current password + new password)
+- DELETE /api/account (password + confirmationPhrase)
+
+14) LOGOUT
+- Global logout button
+- POST /api/auth/logout clears session cookie and redirects to /login
+
+15) DATABASE (PRISMA) — MUST PERSIST EVERYTHING
+Entities (minimum):
+- User
+- Tournament (userId, type, name, status, settings JSON, share fields, timestamps)
+- Player (tournamentId, name, seed/order)
+- Group (tournamentId, name/index)
+- GroupMembership (groupId, playerId)
+- Match (tournamentId, stage: GROUP/WB/LB/KO, roundKey, groupId nullable, playerAId nullable, playerBId nullable, scoreA, scoreB, bestOf, status, order/index)
+- MatchNote (matchId, highestCheckout, numberOf180s, customNote)
+- Optional: Session table if using DB sessions
+
+Store settings snapshots:
+- tournament.settings should include:
+  - playerCount, groupCount, promotedPerGroup, seeding toggles, thirdPlace toggle
+  - points system
+  - stage formats: groupStageBestOf, knockoutBestOfByRoundKey, doubleElim formats
+
+16) GENERATION LOGIC (MUST BE CORRECT + TESTED)
+- Round robin schedule generator per group (supports odd sizes with byes)
+- Standings calculator (points, legs, W/D/L, tie-break)
+- Knockout bracket generator with byes + seeding/random
+- Multi-stage promotion into knockout (based on standings)
+- Double elimination bracket progression basics
+
+Tests (minimal but real):
+- Round robin fixture generation correctness
+- Group standings calculation correctness
+- Knockout seeding + byes correctness
+
+17) UX / QUALITY
+- iPad/touch friendly inputs
+- Clear headings and spacing
+- Friendly validation errors
+- Empty states
+- Prevent editing in public spectator mode
+- Avoid exposing internal IDs on public pages
+
+18) README
+Include:
+- How to run locally in Replit (npm install, prisma migrate, npm run dev)
+- Explanation of tournament formats
+- Seeding rules
+- Tie-break rules
+- Public share behavior
+- Export format description
+
+DELIVERABLE
+Generate the full working codebase in the Replit workspace with:
+- frontend + backend + database migrations/seed
+- auth working
+- create/manage tournaments
+- edit settings + rename
+- input results + notes
+- standings + knockout progression
+- public spectator link + QR
+- export csv (and xlsx if implemented)
+- my account page + delete account + logout
+- tests + README
