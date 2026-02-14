@@ -112,6 +112,22 @@ export const api = {
         401: errorSchemas.unauthorized,
       },
     },
+    bulkPlayers: {
+      method: 'POST' as const,
+      path: '/api/tournaments/:id/players/bulk' as const,
+      input: z.object({
+        players: z.array(z.object({
+          name: z.string(),
+          seed: z.number().optional(),
+        })),
+        replace: z.boolean().default(false),
+      }),
+      responses: {
+        200: z.array(z.custom<typeof players.$inferSelect>()),
+        401: errorSchemas.unauthorized,
+        404: errorSchemas.notFound,
+      },
+    },
     update: {
       method: 'PUT' as const,
       path: '/api/tournaments/:id' as const,

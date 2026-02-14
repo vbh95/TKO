@@ -173,7 +173,22 @@ export type CreateTournamentRequest = {
   type: string;
   playerNames: string[];
   randomize: boolean;
-  settings: any; // Using any for flexibility with JSON settings structure
+  settings: {
+    groupCount?: number;
+    promotedPerGroup?: number;
+    pointsPerWin?: number;
+    pointsPerDraw?: number;
+    pointsPerLoss?: number;
+    groupStageBestOf?: number;
+    knockoutBestOfByRound?: Record<string, number>;
+    thirdPlacePlayoff?: boolean;
+    seededKnockout?: boolean;
+    bracketReset?: boolean;
+    multiStageSettings?: {
+      groupStageBestOf: number;
+      knockoutBestOfByRound: Record<string, number>;
+    };
+  };
 };
 
 export type UpdateMatchScoreRequest = {
