@@ -168,37 +168,25 @@ export type MatchNote = typeof matchNotes.$inferSelect;
 export type InsertMatchNote = z.infer<typeof insertMatchNoteSchema>;
 
 // === API DTOs ===
+export type TournamentSettings = {
+  groupCount?: number;
+  groupBestOf?: number;
+  knockoutBestOf?: number;
+  knockoutBestOfByRound?: {
+    quarterFinal?: number;
+    semiFinal?: number;
+    final?: number;
+  };
+  seeded?: boolean;
+  promotedPerGroup?: number;
+};
+
 export type CreateTournamentRequest = {
   name: string;
   type: string;
   playerNames: string[];
   randomize: boolean;
-  settings: {
-    groupCount?: number;
-    promotedPerGroup?: number;
-    pointsPerWin?: number;
-    pointsPerDraw?: number;
-    pointsPerLoss?: number;
-    groupBestOf?: number;
-    knockoutBestOf?: number;
-    knockoutBestOfByRound?: {
-      quarterFinal?: number;
-      semiFinal?: number;
-      final?: number;
-    };
-    seeded?: boolean;
-    thirdPlacePlayoff?: boolean;
-    seededKnockout?: boolean;
-    bracketReset?: boolean;
-    multiStageSettings?: {
-      groupStageBestOf: number;
-      knockoutBestOfByRound: {
-        quarterFinal?: number;
-        semiFinal?: number;
-        final?: number;
-      };
-    };
-  };
+  settings: TournamentSettings;
 };
 
 export type UpdateMatchScoreRequest = {
