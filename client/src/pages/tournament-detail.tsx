@@ -136,7 +136,7 @@ export default function TournamentDetail() {
   const ptsLoss = settings.pointsForLoss ?? 0;
 
   const calcStandings = (playerList: Player[], matchList: typeof matches) => {
-    return playerList.map((player: Player) => {
+    const stats = playerList.map((player: Player) => {
       const playerMatches = matchList.filter((m: any) => 
         (m.playerAId === player.id || m.playerBId === player.id) && m.status === 'COMPLETED'
       );
@@ -163,7 +163,26 @@ export default function TournamentDetail() {
         diff: legsFor - legsAgainst,
         pts: (won * ptsWin) + (drawn * ptsDraw) + (lost * ptsLoss)
       };
-    }).sort((a: any, b: any) => b.pts - a.pts || b.diff - a.diff);
+    });
+
+    const completedMatches = matchList.filter((m: any) => m.status === 'COMPLETED');
+
+    const headToHead = (a: any, b: any): number => {
+      const h2h = completedMatches.find((m: any) =>
+        (m.playerAId === a.id && m.playerBId === b.id) ||
+        (m.playerAId === b.id && m.playerBId === a.id)
+      );
+      if (!h2h) return 0;
+      if (h2h.winnerId === a.id) return -1;
+      if (h2h.winnerId === b.id) return 1;
+      return 0;
+    };
+
+    return stats.sort((a: any, b: any) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+      return headToHead(a, b);
+    });
   };
 
   const groupStandings = groups.length > 0
@@ -444,10 +463,17 @@ export default function TournamentDetail() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {standings.map((player: any, idx: number) => (
-                          <TableRow key={player.id}>
-                            <TableCell className="font-medium text-muted-foreground">{idx + 1}</TableCell>
-                            <TableCell className="font-bold">{player.name}</TableCell>
+                        {standings.map((player: any, idx: number) => {
+                          const qualifying = idx < 2;
+                          return (
+                          <TableRow key={player.id} className={qualifying ? "bg-green-50 dark:bg-green-950/30" : ""}>
+                            <TableCell className="font-medium text-muted-foreground">
+                              <div className="flex items-center gap-1.5">
+                                {idx + 1}
+                                {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
+                              </div>
+                            </TableCell>
+                            <TableCell className={cn("font-bold", qualifying && "text-green-700 dark:text-green-400")}>{player.name}</TableCell>
                             <TableCell className="text-center">{player.played}</TableCell>
                             <TableCell className="text-center text-green-600">{player.won}</TableCell>
                             <TableCell className="text-center text-muted-foreground">{player.drawn}</TableCell>
@@ -459,7 +485,8 @@ export default function TournamentDetail() {
                             </TableCell>
                             <TableCell className="text-right font-bold text-primary text-lg">{player.pts}</TableCell>
                           </TableRow>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
