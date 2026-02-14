@@ -1,0 +1,215 @@
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { LayoutShell } from "@/components/layout-shell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { useCreateTournament } from "@/hooks/use-tournaments";
+import { Loader2, Plus, Trash2, Trophy, Users } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Separator } from "@/components/ui/separator";
+
+export default function CreateTournament() {
+  const [, setLocation] = useLocation();
+  const { mutate: create, isPending } = useCreateTournament();
+  const { toast } = useToast();
+
+  const [name, setName] = useState("");
+  const [type, setType] = useState("ROUND_ROBIN");
+  const [players, setPlayers] = useState<string[]>(["", ""]);
+  const [randomize, setRandomize] = useState(false);
+
+  const handleAddPlayer = () => setPlayers([...players, ""]);
+  
+  const handleRemovePlayer = (index: number) => {
+    if (players.length <= 2) return;
+    setPlayers(players.filter((_, i) => i !== index));
+  };
+
+  const handlePlayerChange = (index: number, value: string) => {
+    const newPlayers = [...players];
+    newPlayers[index] = value;
+    setPlayers(newPlayers);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate
+    const validPlayers = players.filter(p => p.trim() !== "");
+    if (validPlayers.length < 2) {
+      toast({
+        title: "Not enough players",
+        description: "You need at least 2 players to start a tournament.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    create({
+      name,
+      type,
+      playerNames: validPlayers,
+      randomize,
+      settings: {} // Defaults for now
+    }, {
+      onSuccess: () => {
+        toast({
+          title: "Tournament Created",
+          description: "Ready to play! Redirecting...",
+        });
+        setLocation("/tournaments");
+      }
+    });
+  };
+
+  return (
+    <LayoutShell>
+      <div className="max-w-3xl mx-auto space-y-8">
+        <div>
+          <h1 className="text-3xl font-display font-bold tracking-tight">Create New Tournament</h1>
+          <p className="text-muted-foreground mt-1">Configure your tournament format and add players.</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Basic Info */}
+          <Card>
+            <CardContent className="pt-6 space-y-6">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <h2 className="text-xl font-bold">Format & Details</h2>
+              </div>
+              
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="name">Tournament Name</Label>
+                  <Input 
+                    id="name" 
+                    placeholder="e.g. Friday Night Darts" 
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    className="h-12 text-lg"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="type">Tournament Format</Label>
+                  <Select value={type} onValueChange={setType}>
+                    <SelectTrigger className="h-12">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ROUND_ROBIN">Round Robin</SelectItem>
+                      <SelectItem value="KNOCKOUT">Knockout</SelectItem>
+                      <SelectItem value="DOUBLE_ELIMINATION">Double Elimination</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {type === "ROUND_ROBIN" && "Every player plays every other player. Best for leagues."}
+                    {type === "KNOCKOUT" && "Standard bracket. Loser goes home."}
+                    {type === "DOUBLE_ELIMINATION" && "Two losses to be eliminated. Winners & Losers brackets."}
+                  </p>
+                </div>
+
+                <div className="space-y-2 flex items-center justify-between border rounded-xl p-4">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Randomize Seeds</Label>
+                    <p className="text-xs text-muted-foreground">Shuffle player order before generating matches</p>
+                  </div>
+                  <Switch checked={randomize} onCheckedChange={setRandomize} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Players */}
+          <Card>
+            <CardContent className="pt-6 space-y-6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-xl font-bold">Players</h2>
+                </div>
+                <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                  {players.length} Players
+                </span>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {players.map((player, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <div className="flex-none flex items-center justify-center w-8 h-10 bg-muted/50 rounded-md font-mono text-xs text-muted-foreground">
+                      {idx + 1}
+                    </div>
+                    <Input
+                      placeholder={`Player Name`}
+                      value={player}
+                      onChange={(e) => handlePlayerChange(idx, e.target.value)}
+                      required={idx < 2} // First two are required
+                      className="flex-1"
+                    />
+                    {players.length > 2 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRemovePlayer(idx)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleAddPlayer}
+                className="w-full border-dashed"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Player
+              </Button>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end gap-4">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              onClick={() => setLocation("/tournaments")}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              size="lg" 
+              disabled={isPending}
+              className="min-w-[200px]"
+            >
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create Tournament
+            </Button>
+          </div>
+        </form>
+      </div>
+    </LayoutShell>
+  );
+}
