@@ -181,6 +181,9 @@ export type CreateTournamentRequest = {
     pointsPerLoss?: number;
     groupStageBestOf?: number;
     knockoutBestOfByRound?: Record<string, number>;
+    groupBestOf?: number;
+    knockoutBestOf?: number;
+    seeded?: boolean;
     thirdPlacePlayoff?: boolean;
     seededKnockout?: boolean;
     bracketReset?: boolean;
