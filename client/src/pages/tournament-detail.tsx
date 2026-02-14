@@ -37,7 +37,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import type { Match, Player } from "@shared/schema";
+import type { Match, Player, GroupMembership } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 export default function TournamentDetail() {
@@ -63,7 +63,7 @@ export default function TournamentDetail() {
     );
   }
 
-  const { tournament, players, matches, groups } = data;
+  const { tournament, players, matches, groups, groupMemberships = [] } = data as any;
 
   const handleCopyLink = () => {
     const url = `${window.location.origin}/public/t/${tournament.shareToken}`;
@@ -91,44 +91,58 @@ export default function TournamentDetail() {
     });
   };
 
-  const getPlayer = (id: number | null) => players.find(p => p.id === id) || null;
+  const getPlayer = (id: number | null) => players.find((p: Player) => p.id === id) || null;
 
-  // Group matches by round/group for display
-  const matchesByRound = matches.reduce((acc, match) => {
-    const key = match.groupId ? (groups.find(g => g.id === match.groupId)?.name || 'Group') : match.roundKey;
+  const matchesByRound = matches.reduce((acc: Record<string, any[]>, match: any) => {
+    const key = match.groupId ? (groups.find((g: any) => g.id === match.groupId)?.name || 'Group') : match.roundKey;
     if (!acc[key]) acc[key] = [];
     acc[key].push(match);
     return acc;
-  }, {} as Record<string, typeof matches>);
+  }, {} as Record<string, any[]>);
 
-  // Calculate standings
-  const standings = players.map(player => {
-    const playerMatches = matches.filter(m => 
-      (m.playerAId === player.id || m.playerBId === player.id) && m.status === 'COMPLETED'
-    );
-    
-    let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
-    
-    playerMatches.forEach(m => {
-      played++;
-      const isA = m.playerAId === player.id;
-      const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
-      const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
+  const calcStandings = (playerList: Player[], matchList: typeof matches) => {
+    return playerList.map((player: Player) => {
+      const playerMatches = matchList.filter((m: any) => 
+        (m.playerAId === player.id || m.playerBId === player.id) && m.status === 'COMPLETED'
+      );
       
-      legsFor += myScore;
-      legsAgainst += oppScore;
+      let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
       
-      if (m.winnerId === player.id) won++;
-      else lost++;
-    });
+      playerMatches.forEach((m: any) => {
+        played++;
+        const isA = m.playerAId === player.id;
+        const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
+        const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
+        
+        legsFor += myScore;
+        legsAgainst += oppScore;
+        
+        if (m.winnerId === player.id) won++;
+        else lost++;
+      });
 
-    return {
-      ...player,
-      played, won, lost, legsFor, legsAgainst,
-      diff: legsFor - legsAgainst,
-      pts: won * 2 // Standard 2pts for win
-    };
-  }).sort((a, b) => b.pts - a.pts || b.diff - a.diff);
+      return {
+        ...player,
+        played, won, lost, legsFor, legsAgainst,
+        diff: legsFor - legsAgainst,
+        pts: won * 2
+      };
+    }).sort((a: any, b: any) => b.pts - a.pts || b.diff - a.diff);
+  };
+
+  const groupStandings = groups.length > 0
+    ? groups.map((group: any) => {
+        const memberPlayerIds = groupMemberships
+          .filter((gm: any) => gm.groupId === group.id)
+          .map((gm: any) => gm.playerId);
+        const groupPlayers = players.filter((p: Player) => memberPlayerIds.includes(p.id));
+        const groupMatches = matches.filter((m: any) => m.groupId === group.id);
+        return {
+          group,
+          standings: calcStandings(groupPlayers, groupMatches),
+        };
+      })
+    : [{ group: { name: "All Players" }, standings: calcStandings(players, matches) }];
 
   return (
     <LayoutShell>
@@ -181,7 +195,7 @@ export default function TournamentDetail() {
                         </Button>
                       </div>
                       <div className="flex justify-between">
-                        <Button variant="link" asChild className="px-0">
+                        <Button variant="ghost" asChild className="px-0">
                           <a href={`/public/t/${tournament.shareToken}`} target="_blank" rel="noopener noreferrer">
                             Open Public View <ExternalLink className="w-3 h-3 ml-1" />
                           </a>
@@ -221,7 +235,7 @@ export default function TournamentDetail() {
                   <CardTitle className="text-lg font-bold">{roundName}</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4">
-                  {roundMatches.map((match) => {
+                  {(roundMatches as any[]).map((match: any) => {
                     const playerA = getPlayer(match.playerAId);
                     const playerB = getPlayer(match.playerBId);
                     
@@ -265,44 +279,46 @@ export default function TournamentDetail() {
             ))}
           </TabsContent>
 
-          <TabsContent value="standings">
-            <Card>
-              <CardHeader>
-                <CardTitle>Leaderboard</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[50px]">#</TableHead>
-                        <TableHead>Player</TableHead>
-                        <TableHead className="text-center">P</TableHead>
-                        <TableHead className="text-center">W</TableHead>
-                        <TableHead className="text-center">L</TableHead>
-                        <TableHead className="text-center hidden md:table-cell">Legs +/-</TableHead>
-                        <TableHead className="text-right font-bold">Pts</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {standings.map((player, idx) => (
-                        <TableRow key={player.id}>
-                          <TableCell className="font-medium text-muted-foreground">{idx + 1}</TableCell>
-                          <TableCell className="font-bold">{player.name}</TableCell>
-                          <TableCell className="text-center">{player.played}</TableCell>
-                          <TableCell className="text-center text-green-600">{player.won}</TableCell>
-                          <TableCell className="text-center text-red-500">{player.lost}</TableCell>
-                          <TableCell className="text-center hidden md:table-cell font-mono">
-                            {player.diff > 0 ? `+${player.diff}` : player.diff}
-                          </TableCell>
-                          <TableCell className="text-right font-bold text-primary text-lg">{player.pts}</TableCell>
+          <TabsContent value="standings" className="space-y-6">
+            {groupStandings.map(({ group, standings }: any, gIdx: number) => (
+              <Card key={gIdx} data-testid={`standings-group-${gIdx}`}>
+                <CardHeader>
+                  <CardTitle>{group.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">#</TableHead>
+                          <TableHead>Player</TableHead>
+                          <TableHead className="text-center">P</TableHead>
+                          <TableHead className="text-center">W</TableHead>
+                          <TableHead className="text-center">L</TableHead>
+                          <TableHead className="text-center hidden md:table-cell">Legs +/-</TableHead>
+                          <TableHead className="text-right font-bold">Pts</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {standings.map((player: any, idx: number) => (
+                          <TableRow key={player.id}>
+                            <TableCell className="font-medium text-muted-foreground">{idx + 1}</TableCell>
+                            <TableCell className="font-bold">{player.name}</TableCell>
+                            <TableCell className="text-center">{player.played}</TableCell>
+                            <TableCell className="text-center text-green-600">{player.won}</TableCell>
+                            <TableCell className="text-center text-red-500">{player.lost}</TableCell>
+                            <TableCell className="text-center hidden md:table-cell font-mono">
+                              {player.diff > 0 ? `+${player.diff}` : player.diff}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-primary text-lg">{player.pts}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </TabsContent>
           
           <TabsContent value="players">
@@ -310,7 +326,7 @@ export default function TournamentDetail() {
               <div className="flex justify-end">
                 <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" className="gap-2" onClick={() => setBulkInput(players.map(p => p.name).join("\n"))}>
+                    <Button variant="outline" className="gap-2" onClick={() => setBulkInput(players.map((p: Player) => p.name).join("\n"))}>
                       <Users className="w-4 h-4" />
                       Bulk Edit Players
                     </Button>
@@ -341,7 +357,7 @@ export default function TournamentDetail() {
                 </Dialog>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {players.map((player) => (
+                {players.map((player: Player) => (
                   <Card key={player.id}>
                     <CardContent className="flex items-center gap-4 p-4">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">

@@ -91,7 +91,12 @@ export const api = {
           players: z.array(z.custom<typeof players.$inferSelect>()),
           groups: z.array(z.custom<typeof groups.$inferSelect>()),
           matches: z.array(z.custom<typeof matches.$inferSelect>()),
-        }), // Simplified response structure for now, ideally strictly typed
+          groupMemberships: z.array(z.object({
+            id: z.number(),
+            groupId: z.number(),
+            playerId: z.number(),
+          })).optional().default([]),
+        }),
         404: errorSchemas.notFound,
         401: errorSchemas.unauthorized,
       },

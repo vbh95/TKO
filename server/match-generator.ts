@@ -1,0 +1,399 @@
+import type { Player, TournamentSettings } from "@shared/schema";
+import { storage } from "./storage";
+
+function groupLabel(index: number): string {
+  return `Group ${String.fromCharCode(65 + index)}`;
+}
+
+function getRoundKey(totalSlots: number, currentRound: number): string {
+  const matchesInRound = totalSlots / Math.pow(2, currentRound + 1);
+  if (matchesInRound === 1) return "F";
+  if (matchesInRound === 2) return "SF";
+  if (matchesInRound === 4) return "QF";
+  if (matchesInRound === 8) return "R16";
+  if (matchesInRound === 16) return "R32";
+  return `R${currentRound + 1}`;
+}
+
+function getBestOfForRound(roundKey: string, settings: TournamentSettings): number {
+  if (settings.knockoutBestOfByRound) {
+    if (roundKey === "QF" && settings.knockoutBestOfByRound.quarterFinal) return settings.knockoutBestOfByRound.quarterFinal;
+    if (roundKey === "SF" && settings.knockoutBestOfByRound.semiFinal) return settings.knockoutBestOfByRound.semiFinal;
+    if (roundKey === "F" && settings.knockoutBestOfByRound.final) return settings.knockoutBestOfByRound.final;
+  }
+  return settings.knockoutBestOf || 3;
+}
+
+function nextPowerOfTwo(n: number): number {
+  let p = 1;
+  while (p < n) p *= 2;
+  return p;
+}
+
+function generateRoundRobinPairs(players: Player[]): [Player, Player][] {
+  const pairs: [Player, Player][] = [];
+  for (let i = 0; i < players.length; i++) {
+    for (let j = i + 1; j < players.length; j++) {
+      pairs.push([players[i], players[j]]);
+    }
+  }
+  return pairs;
+}
+
+function createSeededOrder(players: Player[]): (Player | null)[] {
+  const sorted = [...players].sort((a, b) => (a.seed || 999) - (b.seed || 999));
+  const totalSlots = nextPowerOfTwo(sorted.length);
+  const bracket: (Player | null)[] = new Array(totalSlots).fill(null);
+
+  for (let i = 0; i < sorted.length; i++) {
+    bracket[i] = sorted[i];
+  }
+
+  if (totalSlots <= 2) return bracket;
+
+  const seeded: (Player | null)[] = new Array(totalSlots).fill(null);
+  const positions = getSeededPositions(totalSlots);
+  for (let i = 0; i < totalSlots; i++) {
+    seeded[positions[i]] = bracket[i];
+  }
+  return seeded;
+}
+
+function getSeededPositions(size: number): number[] {
+  if (size === 1) return [0];
+  if (size === 2) return [0, 1];
+
+  const half = getSeededPositions(size / 2);
+  const result: number[] = [];
+  for (const pos of half) {
+    result.push(pos * 2);
+    result.push(size - 1 - pos * 2);
+  }
+  return result;
+}
+
+export async function generateRoundRobinMatches(
+  tournamentId: number,
+  players: Player[],
+  settings: TournamentSettings
+): Promise<void> {
+  const groupCount = settings.groupCount || 1;
+  const bestOf = settings.groupBestOf || 3;
+
+  const playersPerGroup = Math.ceil(players.length / groupCount);
+  const groupArrays: Player[][] = [];
+
+  for (let g = 0; g < groupCount; g++) {
+    groupArrays.push(players.slice(g * playersPerGroup, (g + 1) * playersPerGroup));
+  }
+
+  let matchOrder = 0;
+
+  for (let g = 0; g < groupArrays.length; g++) {
+    const groupPlayers = groupArrays[g];
+    if (groupPlayers.length === 0) continue;
+
+    const group = await storage.createGroup({
+      tournamentId,
+      name: groupLabel(g),
+    });
+
+    for (const player of groupPlayers) {
+      await storage.createGroupMembership({
+        groupId: group.id,
+        playerId: player.id,
+      });
+    }
+
+    const roundRobinPairs = generateRoundRobinPairs(groupPlayers);
+    for (const [a, b] of roundRobinPairs) {
+      await storage.createMatch({
+        tournamentId,
+        stage: "GROUP",
+        roundKey: "group",
+        groupId: group.id,
+        playerAId: a.id,
+        playerBId: b.id,
+        scoreA: 0,
+        scoreB: 0,
+        bestOf,
+        status: "PENDING",
+        winnerId: null,
+        order: matchOrder++,
+      });
+    }
+  }
+}
+
+export async function generateKnockoutMatches(
+  tournamentId: number,
+  players: Player[],
+  settings: TournamentSettings
+): Promise<void> {
+  const seeded = settings.seeded || false;
+  const totalSlots = nextPowerOfTwo(players.length);
+
+  let bracketPlayers: (Player | null)[];
+  if (seeded) {
+    bracketPlayers = createSeededOrder(players);
+  } else {
+    bracketPlayers = [...players] as (Player | null)[];
+    while (bracketPlayers.length < totalSlots) {
+      bracketPlayers.push(null);
+    }
+  }
+
+  const totalRounds = Math.log2(totalSlots);
+  let matchOrder = 0;
+
+  let nextRoundSlots: (Player | null)[] = [];
+
+  for (let round = 0; round < totalRounds; round++) {
+    const roundKey = getRoundKey(totalSlots, round);
+    const bestOf = getBestOfForRound(roundKey, settings);
+
+    const currentPlayers = round === 0 ? bracketPlayers : new Array(Math.pow(2, Math.log2(totalSlots) - round)).fill(null);
+    const matchCount = currentPlayers.length / 2;
+
+    for (let m = 0; m < matchCount; m++) {
+      const playerA = round === 0 ? bracketPlayers[m * 2] : null;
+      const playerB = round === 0 ? bracketPlayers[m * 2 + 1] : null;
+
+      if (round === 0 && ((playerA && !playerB) || (!playerA && playerB))) {
+        const winner = playerA || playerB;
+        await storage.createMatch({
+          tournamentId,
+          stage: "KNOCKOUT",
+          roundKey,
+          groupId: null,
+          playerAId: playerA?.id || null,
+          playerBId: playerB?.id || null,
+          scoreA: playerA ? 1 : 0,
+          scoreB: playerB ? 1 : 0,
+          bestOf: 1,
+          status: "COMPLETED",
+          winnerId: winner!.id,
+          order: matchOrder++,
+        });
+        continue;
+      }
+
+      if (round === 0 && !playerA && !playerB) {
+        continue;
+      }
+
+      await storage.createMatch({
+        tournamentId,
+        stage: "KNOCKOUT",
+        roundKey,
+        groupId: null,
+        playerAId: playerA?.id || null,
+        playerBId: playerB?.id || null,
+        scoreA: 0,
+        scoreB: 0,
+        bestOf,
+        status: "PENDING",
+        winnerId: null,
+        order: matchOrder++,
+      });
+    }
+  }
+}
+
+export async function generateDoubleEliminationMatches(
+  tournamentId: number,
+  players: Player[],
+  settings: TournamentSettings
+): Promise<void> {
+  const totalSlots = nextPowerOfTwo(players.length);
+  const bestOf = settings.knockoutBestOf || 3;
+
+  let bracketPlayers: (Player | null)[] = [...players];
+  while (bracketPlayers.length < totalSlots) {
+    bracketPlayers.push(null);
+  }
+
+  const wbRounds = Math.log2(totalSlots);
+  let matchOrder = 0;
+
+  for (let round = 0; round < wbRounds; round++) {
+    const matchCount = totalSlots / Math.pow(2, round + 1);
+    const roundKey = `WB_R${round + 1}`;
+
+    for (let m = 0; m < matchCount; m++) {
+      const playerA = round === 0 ? bracketPlayers[m * 2] : null;
+      const playerB = round === 0 ? bracketPlayers[m * 2 + 1] : null;
+
+      if (round === 0 && ((playerA && !playerB) || (!playerA && playerB))) {
+        const winner = playerA || playerB;
+        await storage.createMatch({
+          tournamentId,
+          stage: "WINNERS_BRACKET",
+          roundKey,
+          groupId: null,
+          playerAId: playerA?.id || null,
+          playerBId: playerB?.id || null,
+          scoreA: playerA ? 1 : 0,
+          scoreB: playerB ? 1 : 0,
+          bestOf: 1,
+          status: "COMPLETED",
+          winnerId: winner!.id,
+          order: matchOrder++,
+        });
+        continue;
+      }
+
+      if (round === 0 && !playerA && !playerB) continue;
+
+      await storage.createMatch({
+        tournamentId,
+        stage: "WINNERS_BRACKET",
+        roundKey,
+        groupId: null,
+        playerAId: playerA?.id || null,
+        playerBId: playerB?.id || null,
+        scoreA: 0,
+        scoreB: 0,
+        bestOf,
+        status: "PENDING",
+        winnerId: null,
+        order: matchOrder++,
+      });
+    }
+  }
+
+  const lbRounds = Math.max(1, (wbRounds - 1) * 2);
+  for (let round = 0; round < lbRounds; round++) {
+    const roundKey = `LB_R${round + 1}`;
+    const matchCount = Math.max(1, totalSlots / Math.pow(2, Math.floor(round / 2) + 2));
+
+    for (let m = 0; m < matchCount; m++) {
+      await storage.createMatch({
+        tournamentId,
+        stage: "LOSERS_BRACKET",
+        roundKey,
+        groupId: null,
+        playerAId: null,
+        playerBId: null,
+        scoreA: 0,
+        scoreB: 0,
+        bestOf,
+        status: "PENDING",
+        winnerId: null,
+        order: matchOrder++,
+      });
+    }
+  }
+
+  await storage.createMatch({
+    tournamentId,
+    stage: "GRAND_FINAL",
+    roundKey: "GF",
+    groupId: null,
+    playerAId: null,
+    playerBId: null,
+    scoreA: 0,
+    scoreB: 0,
+    bestOf: getBestOfForRound("F", settings),
+    status: "PENDING",
+    winnerId: null,
+    order: matchOrder++,
+  });
+}
+
+export async function generateMultiStageMatches(
+  tournamentId: number,
+  players: Player[],
+  settings: TournamentSettings
+): Promise<void> {
+  const groupCount = settings.groupCount || 2;
+  const groupBestOf = settings.groupBestOf || 3;
+  const promotedPerGroup = settings.promotedPerGroup || 2;
+
+  const playersPerGroup = Math.ceil(players.length / groupCount);
+  let matchOrder = 0;
+
+  for (let g = 0; g < groupCount; g++) {
+    const groupPlayers = players.slice(g * playersPerGroup, (g + 1) * playersPerGroup);
+    if (groupPlayers.length === 0) continue;
+
+    const group = await storage.createGroup({
+      tournamentId,
+      name: groupLabel(g),
+    });
+
+    for (const player of groupPlayers) {
+      await storage.createGroupMembership({
+        groupId: group.id,
+        playerId: player.id,
+      });
+    }
+
+    const pairs = generateRoundRobinPairs(groupPlayers);
+    for (const [a, b] of pairs) {
+      await storage.createMatch({
+        tournamentId,
+        stage: "GROUP",
+        roundKey: "group",
+        groupId: group.id,
+        playerAId: a.id,
+        playerBId: b.id,
+        scoreA: 0,
+        scoreB: 0,
+        bestOf: groupBestOf,
+        status: "PENDING",
+        winnerId: null,
+        order: matchOrder++,
+      });
+    }
+  }
+
+  const knockoutPlayers = groupCount * promotedPerGroup;
+  const totalSlots = nextPowerOfTwo(knockoutPlayers);
+  const knockoutRounds = Math.log2(totalSlots);
+
+  for (let round = 0; round < knockoutRounds; round++) {
+    const matchCount = totalSlots / Math.pow(2, round + 1);
+    const roundKey = getRoundKey(totalSlots, round);
+    const bestOf = getBestOfForRound(roundKey, settings);
+
+    for (let m = 0; m < matchCount; m++) {
+      await storage.createMatch({
+        tournamentId,
+        stage: "KNOCKOUT",
+        roundKey,
+        groupId: null,
+        playerAId: null,
+        playerBId: null,
+        scoreA: 0,
+        scoreB: 0,
+        bestOf,
+        status: "PENDING",
+        winnerId: null,
+        order: matchOrder++,
+      });
+    }
+  }
+}
+
+export async function generateMatches(
+  tournamentId: number,
+  players: Player[],
+  type: string,
+  settings: TournamentSettings
+): Promise<void> {
+  switch (type) {
+    case "ROUND_ROBIN":
+      await generateRoundRobinMatches(tournamentId, players, settings);
+      break;
+    case "KNOCKOUT":
+      await generateKnockoutMatches(tournamentId, players, settings);
+      break;
+    case "DOUBLE_ELIMINATION":
+      await generateDoubleEliminationMatches(tournamentId, players, settings);
+      break;
+    case "MULTI_STAGE":
+      await generateMultiStageMatches(tournamentId, players, settings);
+      break;
+  }
+}

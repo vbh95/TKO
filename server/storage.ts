@@ -39,6 +39,7 @@ export interface IStorage {
   // Group Memberships
   createGroupMembership(membership: InsertGroupMembership): Promise<GroupMembership>;
   getGroupMembershipsByGroupId(groupId: number): Promise<(GroupMembership & { player: Player })[]>;
+  getGroupMembershipsByTournamentId(tournamentId: number): Promise<GroupMembership[]>;
   
   // Matches
   getMatchesByTournamentId(tournamentId: number): Promise<(Match & { playerA: Player | null, playerB: Player | null })[]>;
@@ -136,6 +137,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(groupMemberships.groupId, groupId));
       
     return results.map(r => ({ ...r.group_memberships, player: r.players }));
+  }
+
+  async getGroupMembershipsByTournamentId(tournamentId: number): Promise<GroupMembership[]> {
+    const tournamentGroups = await db.select().from(groups).where(eq(groups.tournamentId, tournamentId));
+    if (tournamentGroups.length === 0) return [];
+    const groupIds = tournamentGroups.map(g => g.id);
+    const allMemberships = await db.select().from(groupMemberships);
+    return allMemberships.filter(m => groupIds.includes(m.groupId));
   }
 
   // Matches

@@ -8,6 +8,8 @@ import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import { generateMatches } from "./match-generator";
+import type { TournamentSettings } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
 
@@ -169,12 +171,12 @@ export async function registerRoutes(
     if (!tournament) return res.status(404).json({ message: "Not found" });
     if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
     
-    // Fetch related data
     const players = await storage.getPlayersByTournamentId(id);
     const groups = await storage.getGroupsByTournamentId(id);
     const matches = await storage.getMatchesByTournamentId(id);
+    const groupMemberships = await storage.getGroupMembershipsByTournamentId(id);
     
-    res.json({ tournament, players, groups, matches });
+    res.json({ tournament, players, groups, matches, groupMemberships });
   });
 
   app.post(api.tournaments.create.path, isAuthenticated, async (req, res) => {
@@ -207,16 +209,15 @@ export async function registerRoutes(
         }
       }
       
+      const createdPlayers = [];
       for (const p of playerInputs) {
-        await storage.createPlayer(p);
+        const created = await storage.createPlayer(p);
+        createdPlayers.push(created);
       }
       
-      // LOGIC: Generate Fixtures based on Type
-      // For MVP, we'll just create the basic structure (Players) and let the "Generate" button or logic handle the rest,
-      // OR we generate it immediately here.
-      // The prompt says "Fixtures: Generate full round robin schedule".
-      // Let's defer complex generation to a helper function or assume specific logic is needed.
-      // For now, we return the created tournament.
+      await generateMatches(tournament.id, createdPlayers, input.type, input.settings as TournamentSettings);
+      
+      await storage.updateTournament(tournament.id, { status: "IN_PROGRESS" });
       
       res.status(201).json(tournament);
     } catch (err) {
