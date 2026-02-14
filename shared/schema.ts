@@ -179,8 +179,6 @@ export type CreateTournamentRequest = {
     pointsPerWin?: number;
     pointsPerDraw?: number;
     pointsPerLoss?: number;
-    groupStageBestOf?: number;
-    knockoutBestOfByRound?: Record<string, number>;
     groupBestOf?: number;
     knockoutBestOf?: number;
     knockoutBestOfByRound?: {
@@ -194,7 +192,11 @@ export type CreateTournamentRequest = {
     bracketReset?: boolean;
     multiStageSettings?: {
       groupStageBestOf: number;
-      knockoutBestOfByRound: Record<string, number>;
+      knockoutBestOfByRound: {
+        quarterFinal?: number;
+        semiFinal?: number;
+        final?: number;
+      };
     };
   };
 };
