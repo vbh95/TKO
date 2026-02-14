@@ -49,8 +49,9 @@ export const api = {
       method: 'POST' as const,
       path: '/api/auth/login' as const,
       input: z.object({
-        username: z.string(), // We use email as username in passport strategy usually, but let's stick to generic username field which maps to email in schema
+        username: z.string(),
         password: z.string(),
+        rememberMe: z.boolean().optional(),
       }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),

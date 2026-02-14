@@ -109,6 +109,11 @@ export async function registerRoutes(
   });
 
   app.post(api.auth.login.path, passport.authenticate("local"), (req, res) => {
+    if (req.body.rememberMe) {
+      req.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30; // 30 days
+    } else {
+      req.session.cookie.maxAge = 1000 * 60 * 60 * 24; // 1 day
+    }
     res.json(req.user);
   });
 

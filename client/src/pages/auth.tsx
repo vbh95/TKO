@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Trophy, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -12,6 +13,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   
   const login = useLogin();
   const signup = useSignup();
@@ -19,7 +21,7 @@ export default function AuthPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    login.mutate({ username: email, password }, {
+    login.mutate({ username: email, password, rememberMe }, {
       onError: (err) => {
         toast({ title: "Login failed", description: err.message, variant: "destructive" });
       }
@@ -77,7 +79,18 @@ export default function AuthPage() {
                       required 
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={login.isPending}>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="remember-me" 
+                      checked={rememberMe}
+                      onCheckedChange={(checked) => setRememberMe(checked === true)}
+                      data-testid="checkbox-remember-me"
+                    />
+                    <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+                      Remember me
+                    </Label>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">
                     {login.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Log In
                   </Button>
