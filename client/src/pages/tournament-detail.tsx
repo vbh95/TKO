@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useTournament, useTournamentShare } from "@/hooks/use-tournaments";
+import { useTournament, useTournamentShare, useBulkUpdatePlayers } from "@/hooks/use-tournaments";
 import { LayoutShell } from "@/components/layout-shell";
 import { MatchScoreInput } from "@/components/match-score-input";
 import { 
@@ -10,7 +10,8 @@ import {
   Trophy, 
   Copy, 
   Check, 
-  ExternalLink 
+  ExternalLink,
+  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,11 +29,13 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import type { Match, Player } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -42,10 +45,13 @@ export default function TournamentDetail() {
   const tournamentId = parseInt(id || "0");
   const { data, isLoading } = useTournament(tournamentId);
   const { enableShare, disableShare } = useTournamentShare(tournamentId);
+  const { mutate: bulkUpdate, isPending: isUpdatingPlayers } = useBulkUpdatePlayers(tournamentId);
   const { toast } = useToast();
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [copied, setCopied] = useState(false);
+  const [bulkInput, setBulkInput] = useState("");
+  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -65,6 +71,24 @@ export default function TournamentDetail() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast({ title: "Link copied to clipboard" });
+  };
+
+  const handleBulkUpdate = () => {
+    const names = bulkInput.split("\n").map(n => n.trim()).filter(n => n !== "");
+    if (names.length < 2) {
+      toast({ title: "Validation Error", description: "Need at least 2 players", variant: "destructive" });
+      return;
+    }
+
+    bulkUpdate({ 
+      players: names.map(name => ({ name })), 
+      replace: true 
+    }, {
+      onSuccess: () => {
+        toast({ title: "Players Updated", description: `Successfully updated ${names.length} players.` });
+        setIsBulkDialogOpen(false);
+      }
+    });
   };
 
   const getPlayer = (id: number | null) => players.find(p => p.id === id) || null;
@@ -282,20 +306,55 @@ export default function TournamentDetail() {
           </TabsContent>
           
           <TabsContent value="players">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {players.map((player) => (
-                <Card key={player.id}>
-                  <CardContent className="flex items-center gap-4 p-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                      {player.name.charAt(0)}
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="gap-2" onClick={() => setBulkInput(players.map(p => p.name).join("\n"))}>
+                      <Users className="w-4 h-4" />
+                      Bulk Edit Players
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>Bulk Edit Players</DialogTitle>
+                      <DialogDescription>
+                        Edit player names below. Enter one name per line.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Textarea 
+                        value={bulkInput} 
+                        onChange={(e) => setBulkInput(e.target.value)} 
+                        className="min-h-[300px] font-mono"
+                        placeholder="Enter player names..."
+                      />
                     </div>
-                    <div>
-                      <h4 className="font-bold">{player.name}</h4>
-                      <p className="text-xs text-muted-foreground">Seed #{player.seed || '-'}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    <DialogFooter>
+                      <Button variant="ghost" onClick={() => setIsBulkDialogOpen(false)}>Cancel</Button>
+                      <Button onClick={handleBulkUpdate} disabled={isUpdatingPlayers}>
+                        {isUpdatingPlayers && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Changes
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {players.map((player) => (
+                  <Card key={player.id}>
+                    <CardContent className="flex items-center gap-4 p-4">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                        {player.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h4 className="font-bold">{player.name}</h4>
+                        <p className="text-xs text-muted-foreground">Seed #{player.seed || '-'}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
           </TabsContent>
         </Tabs>

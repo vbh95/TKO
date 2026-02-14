@@ -24,54 +24,60 @@ export default function CreateTournament() {
   const { mutate: create, isPending } = useCreateTournament();
   const { toast } = useToast();
 
-  const [name, setName] = useState("");
-  const [type, setType] = useState("ROUND_ROBIN");
-  const [players, setPlayers] = useState<string[]>(["", ""]);
-  const [randomize, setRandomize] = useState(false);
+    const [name, setName] = useState("");
+    const [type, setType] = useState("ROUND_ROBIN");
+    const [players, setPlayers] = useState<string[]>(["", ""]);
+    const [bulkInput, setBulkInput] = useState("");
+    const [isBulkMode, setIsBulkMode] = useState(false);
+    const [randomize, setRandomize] = useState(false);
 
-  const handleAddPlayer = () => setPlayers([...players, ""]);
-  
-  const handleRemovePlayer = (index: number) => {
-    if (players.length <= 2) return;
-    setPlayers(players.filter((_, i) => i !== index));
-  };
-
-  const handlePlayerChange = (index: number, value: string) => {
-    const newPlayers = [...players];
-    newPlayers[index] = value;
-    setPlayers(newPlayers);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    const handleAddPlayer = () => setPlayers([...players, ""]);
     
-    // Validate
-    const validPlayers = players.filter(p => p.trim() !== "");
-    if (validPlayers.length < 2) {
-      toast({
-        title: "Not enough players",
-        description: "You need at least 2 players to start a tournament.",
-        variant: "destructive"
-      });
-      return;
-    }
+    const handleRemovePlayer = (index: number) => {
+      if (players.length <= 2) return;
+      setPlayers(players.filter((_, i) => i !== index));
+    };
 
-    create({
-      name,
-      type,
-      playerNames: validPlayers,
-      randomize,
-      settings: {} // Defaults for now
-    }, {
-      onSuccess: () => {
-        toast({
-          title: "Tournament Created",
-          description: "Ready to play! Redirecting...",
-        });
-        setLocation("/tournaments");
+    const handlePlayerChange = (index: number, value: string) => {
+      const newPlayers = [...players];
+      newPlayers[index] = value;
+      setPlayers(newPlayers);
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      let playerList = players;
+      if (isBulkMode) {
+        playerList = bulkInput.split("\n").map(p => p.trim()).filter(p => p !== "");
       }
-    });
-  };
+
+      const validPlayers = playerList.filter(p => p.trim() !== "");
+      if (validPlayers.length < 2) {
+        toast({
+          title: "Not enough players",
+          description: "You need at least 2 players to start a tournament.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      create({
+        name,
+        type,
+        playerNames: validPlayers,
+        randomize,
+        settings: {} // Defaults for now
+      }, {
+        onSuccess: () => {
+          toast({
+            title: "Tournament Created",
+            description: "Ready to play! Redirecting...",
+          });
+          setLocation("/tournaments");
+        }
+      });
+    };
 
   return (
     <LayoutShell>
@@ -115,12 +121,14 @@ export default function CreateTournament() {
                       <SelectItem value="ROUND_ROBIN">Round Robin</SelectItem>
                       <SelectItem value="KNOCKOUT">Knockout</SelectItem>
                       <SelectItem value="DOUBLE_ELIMINATION">Double Elimination</SelectItem>
+                      <SelectItem value="MULTI_STAGE">Multi-Stage (Groups & Knockout)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
                     {type === "ROUND_ROBIN" && "Every player plays every other player. Best for leagues."}
                     {type === "KNOCKOUT" && "Standard bracket. Loser goes home."}
                     {type === "DOUBLE_ELIMINATION" && "Two losses to be eliminated. Winners & Losers brackets."}
+                    {type === "MULTI_STAGE" && "Players start in groups and advance to a knockout bracket."}
                   </p>
                 </div>
 
@@ -145,48 +153,82 @@ export default function CreateTournament() {
                   </div>
                   <h2 className="text-xl font-bold">Players</h2>
                 </div>
-                <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-md">
-                  {players.length} Players
-                </span>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="bulk-toggle" className="text-xs cursor-pointer">Bulk Mode</Label>
+                    <Switch 
+                      id="bulk-toggle"
+                      checked={isBulkMode} 
+                      onCheckedChange={(checked) => {
+                        setIsBulkMode(checked);
+                        if (checked) {
+                          setBulkInput(players.filter(p => p.trim() !== "").join("\n"));
+                        } else {
+                          const newPlayers = bulkInput.split("\n").map(p => p.trim()).filter(p => p !== "");
+                          setPlayers(newPlayers.length > 0 ? newPlayers : ["", ""]);
+                        }
+                      }} 
+                    />
+                  </div>
+                  <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                    {isBulkMode ? bulkInput.split("\n").filter(p => p.trim() !== "").length : players.length} Players
+                  </span>
+                </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                {players.map((player, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <div className="flex-none flex items-center justify-center w-8 h-10 bg-muted/50 rounded-md font-mono text-xs text-muted-foreground">
-                      {idx + 1}
-                    </div>
-                    <Input
-                      placeholder={`Player Name`}
-                      value={player}
-                      onChange={(e) => handlePlayerChange(idx, e.target.value)}
-                      required={idx < 2} // First two are required
-                      className="flex-1"
-                    />
-                    {players.length > 2 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemovePlayer(idx)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
+              {isBulkMode ? (
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-players">Player Names (one per line)</Label>
+                  <Textarea
+                    id="bulk-players"
+                    placeholder="Enter names here..."
+                    className="min-h-[200px] font-mono"
+                    value={bulkInput}
+                    onChange={(e) => setBulkInput(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Tip: Paste a list from Excel or a text file.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {players.map((player, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <div className="flex-none flex items-center justify-center w-8 h-10 bg-muted/50 rounded-md font-mono text-xs text-muted-foreground">
+                          {idx + 1}
+                        </div>
+                        <Input
+                          placeholder={`Player Name`}
+                          value={player}
+                          onChange={(e) => handlePlayerChange(idx, e.target.value)}
+                          required={idx < 2} // First two are required
+                          className="flex-1"
+                        />
+                        {players.length > 2 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => handleRemovePlayer(idx)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddPlayer}
-                className="w-full border-dashed"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Player
-              </Button>
+                  
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={handleAddPlayer}
+                    className="w-full border-dashed"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Player
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
 

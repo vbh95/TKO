@@ -85,6 +85,26 @@ export function useDeleteTournament() {
   });
 }
 
+// Bulk update players
+export function useBulkUpdatePlayers(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ players, replace }: { players: { name: string, seed?: number }[], replace: boolean }) => {
+      const url = buildUrl(api.tournaments.bulkPlayers.path, { id });
+      const res = await fetch(url, {
+        method: api.tournaments.bulkPlayers.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ players, replace }),
+      });
+      if (!res.ok) throw new Error("Failed to bulk update players");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.tournaments.get.path, id] });
+    },
+  });
+}
+
 // Share functions
 export function useTournamentShare(id: number) {
   const queryClient = useQueryClient();
