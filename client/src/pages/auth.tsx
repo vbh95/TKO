@@ -42,7 +42,7 @@ export default function AuthPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4 shadow-lg shadow-primary/30">
             <Trophy className="w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-display font-bold tracking-tight">Welcome to UDTG</h1>
+          <h1 className="text-3xl font-display font-bold tracking-tight">Welcome to UDT</h1>
           <p className="text-muted-foreground">The Ultimate Darts Tournament Generator</p>
         </div>
 

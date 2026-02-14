@@ -17,12 +17,10 @@ export function useUpdateMatchScore() {
       if (!res.ok) throw new Error("Failed to update match score");
       return api.matches.update.responses[200].parse(await res.json());
     },
-    onSuccess: (match) => {
-      // Invalidate relevant tournament to refresh brackets/standings
-      queryClient.invalidateQueries({ 
+    onSuccess: async (match) => {
+      await queryClient.invalidateQueries({ 
         queryKey: [api.tournaments.get.path, match.tournamentId] 
       });
-      // Also invalidate public view if active
       queryClient.invalidateQueries({ queryKey: [api.public.get.path] });
     },
   });
