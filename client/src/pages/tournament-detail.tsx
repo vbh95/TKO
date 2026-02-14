@@ -257,128 +257,170 @@ export default function TournamentDetail() {
         </div>
 
         {/* Content Tabs */}
-        <Tabs defaultValue="matches" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-            <TabsTrigger value="matches">Matches</TabsTrigger>
-            <TabsTrigger value="standings">Standings</TabsTrigger>
-            <TabsTrigger value="players">Players</TabsTrigger>
-          </TabsList>
+        {(() => {
+          const isMultiStage = tournament.type === "MULTI_STAGE";
+          const hasKnockout = groupMatchData.nonGroupRounds.length > 0;
+          const hasGroups = groupMatchData.byGroup.length > 0;
+          const tabCount = isMultiStage ? (hasGroups && hasKnockout ? 4 : 3) : 3;
 
-          <TabsContent value="matches" className="space-y-8">
-            {groupMatchData.byGroup.map(({ group, rounds }) => (
-              <div key={group.id} className="space-y-4">
-                <h2 className="text-xl font-bold text-primary" data-testid={`group-header-${group.id}`}>{group.name}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {rounds.map(({ roundKey, matches: roundMatches }) => (
-                    <Card key={roundKey} className="overflow-hidden" data-testid={`round-card-${group.id}-${roundKey}`}>
-                      <div className="bg-primary px-4 py-2 flex items-center justify-between">
-                        <span className="text-primary-foreground font-bold text-sm">
-                          Round {roundKey.replace("R", "")}
-                        </span>
-                      </div>
-                      <CardContent className="p-3 space-y-2">
-                        {roundMatches.map((match: any) => {
-                          const playerA = getPlayer(match.playerAId);
-                          const playerB = getPlayer(match.playerBId);
-                          return (
-                            <div
-                              key={match.id}
-                              onClick={() => setSelectedMatch(match)}
-                              className={cn(
-                                "rounded-lg border p-3 cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
-                                match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
-                              )}
-                              data-testid={`match-card-${match.id}`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1 space-y-1">
-                                  <div className={cn(
-                                    "text-sm font-medium",
-                                    match.status === 'COMPLETED' && match.winnerId === playerA?.id && "text-primary font-bold"
-                                  )}>
-                                    {playerA?.name || "TBD"}
+          const renderGroupMatches = () => (
+            <div className="space-y-8">
+              {groupMatchData.byGroup.map(({ group, rounds }) => (
+                <div key={group.id} className="space-y-4">
+                  <h2 className="text-xl font-bold text-primary" data-testid={`group-header-${group.id}`}>{group.name}</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {rounds.map(({ roundKey, matches: roundMatches }) => (
+                      <Card key={roundKey} className="overflow-hidden" data-testid={`round-card-${group.id}-${roundKey}`}>
+                        <div className="bg-primary px-4 py-2 flex items-center justify-between">
+                          <span className="text-primary-foreground font-bold text-sm">
+                            Round {roundKey.replace("R", "")}
+                          </span>
+                        </div>
+                        <CardContent className="p-3 space-y-2">
+                          {roundMatches.map((match: any) => {
+                            const playerA = getPlayer(match.playerAId);
+                            const playerB = getPlayer(match.playerBId);
+                            return (
+                              <div
+                                key={match.id}
+                                onClick={() => setSelectedMatch(match)}
+                                className={cn(
+                                  "rounded-lg border p-3 cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
+                                  match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
+                                )}
+                                data-testid={`match-card-${match.id}`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 space-y-1">
+                                    <div className={cn(
+                                      "text-sm font-medium",
+                                      match.status === 'COMPLETED' && match.winnerId === playerA?.id && "text-primary font-bold"
+                                    )}>
+                                      {playerA?.name || "TBD"}
+                                    </div>
+                                    <div className={cn(
+                                      "text-sm font-medium",
+                                      match.status === 'COMPLETED' && match.winnerId === playerB?.id && "text-primary font-bold"
+                                    )}>
+                                      {playerB?.name || "TBD"}
+                                    </div>
                                   </div>
-                                  <div className={cn(
-                                    "text-sm font-medium",
-                                    match.status === 'COMPLETED' && match.winnerId === playerB?.id && "text-primary font-bold"
-                                  )}>
-                                    {playerB?.name || "TBD"}
-                                  </div>
-                                </div>
-                                <div className="flex flex-col items-center gap-1 ml-3">
-                                  <div className={cn(
-                                    "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
-                                    match.status === 'COMPLETED' && match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
-                                  )}>
-                                    {match.scoreA || 0}
-                                  </div>
-                                  <div className={cn(
-                                    "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
-                                    match.status === 'COMPLETED' && match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
-                                  )}>
-                                    {match.scoreB || 0}
+                                  <div className="flex flex-col items-center gap-1 ml-3">
+                                    <div className={cn(
+                                      "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                                      match.status === 'COMPLETED' && match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
+                                    )}>
+                                      {match.scoreA || 0}
+                                    </div>
+                                    <div className={cn(
+                                      "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                                      match.status === 'COMPLETED' && match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
+                                    )}>
+                                      {match.scoreB || 0}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </CardContent>
-                    </Card>
-                  ))}
+                            );
+                          })}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          );
 
-            {groupMatchData.nonGroupRounds.map(({ roundKey, matches: roundMatches }) => (
-              <Card key={roundKey}>
-                <CardHeader>
-                  <CardTitle className="text-lg font-bold">{roundKey}</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-4">
-                  {roundMatches.map((match: any) => {
-                    const playerA = getPlayer(match.playerAId);
-                    const playerB = getPlayer(match.playerBId);
-                    return (
-                      <div
-                        key={match.id}
-                        onClick={() => setSelectedMatch(match)}
-                        className={cn(
-                          "flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md hover:border-primary/50",
-                          match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
-                        )}
-                        data-testid={`match-card-${match.id}`}
-                      >
-                        <div className="flex-1 text-right font-medium">
-                          {playerA?.name || "TBD"}
-                        </div>
-                        <div className="flex items-center gap-3 px-6">
-                          <div className={cn(
-                            "w-8 h-8 flex items-center justify-center rounded-md font-bold text-lg",
-                            match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
-                          )}>
-                            {match.scoreA || 0}
+          const renderKnockoutMatches = () => (
+            <div className="space-y-6">
+              {groupMatchData.nonGroupRounds.map(({ roundKey, matches: roundMatches }) => (
+                <Card key={roundKey}>
+                  <CardHeader>
+                    <CardTitle className="text-lg font-bold">{roundKey}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    {roundMatches.map((match: any) => {
+                      const playerA = getPlayer(match.playerAId);
+                      const playerB = getPlayer(match.playerBId);
+                      return (
+                        <div
+                          key={match.id}
+                          onClick={() => setSelectedMatch(match)}
+                          className={cn(
+                            "flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md hover:border-primary/50",
+                            match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
+                          )}
+                          data-testid={`match-card-${match.id}`}
+                        >
+                          <div className="flex-1 text-right font-medium">
+                            {playerA?.name || "TBD"}
                           </div>
-                          <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">vs</span>
-                          <div className={cn(
-                            "w-8 h-8 flex items-center justify-center rounded-md font-bold text-lg",
-                            match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
-                          )}>
-                            {match.scoreB || 0}
+                          <div className="flex items-center gap-3 px-6">
+                            <div className={cn(
+                              "w-8 h-8 flex items-center justify-center rounded-md font-bold text-lg",
+                              match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
+                            )}>
+                              {match.scoreA || 0}
+                            </div>
+                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">vs</span>
+                            <div className={cn(
+                              "w-8 h-8 flex items-center justify-center rounded-md font-bold text-lg",
+                              match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
+                            )}>
+                              {match.scoreB || 0}
+                            </div>
+                          </div>
+                          <div className="flex-1 text-left font-medium">
+                            {playerB?.name || "TBD"}
                           </div>
                         </div>
-                        <div className="flex-1 text-left font-medium">
-                          {playerB?.name || "TBD"}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              ))}
+              {groupMatchData.nonGroupRounds.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p className="text-lg font-medium">Knockout stage not yet generated</p>
+                  <p className="text-sm mt-1">Complete the group stage to advance players to the knockout rounds.</p>
+                </div>
+              )}
+            </div>
+          );
 
-          <TabsContent value="standings" className="space-y-6">
+          return (
+            <Tabs defaultValue={isMultiStage ? "group-stage" : "matches"} className="space-y-6">
+              <TabsList className={cn("grid w-full lg:w-[500px]", tabCount === 4 ? "grid-cols-4" : "grid-cols-3")}>
+                {isMultiStage ? (
+                  <>
+                    <TabsTrigger value="group-stage" data-testid="tab-group-stage">Group Stage</TabsTrigger>
+                    <TabsTrigger value="knockout" data-testid="tab-knockout">Knockout</TabsTrigger>
+                  </>
+                ) : (
+                  <TabsTrigger value="matches" data-testid="tab-matches">Matches</TabsTrigger>
+                )}
+                <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
+                <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
+              </TabsList>
+
+              {isMultiStage ? (
+                <>
+                  <TabsContent value="group-stage" className="space-y-8" data-testid="content-group-stage">
+                    {renderGroupMatches()}
+                  </TabsContent>
+                  <TabsContent value="knockout" className="space-y-6" data-testid="content-knockout">
+                    {renderKnockoutMatches()}
+                  </TabsContent>
+                </>
+              ) : (
+                <TabsContent value="matches" className="space-y-8">
+                  {renderGroupMatches()}
+                  {renderKnockoutMatches()}
+                </TabsContent>
+              )}
+
+              <TabsContent value="standings" className="space-y-6">
             {groupStandings.map(({ group, standings }: any, gIdx: number) => (
               <Card key={gIdx} data-testid={`standings-group-${gIdx}`}>
                 <CardHeader>
@@ -473,8 +515,10 @@ export default function TournamentDetail() {
                 ))}
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+              </TabsContent>
+            </Tabs>
+          );
+        })()}
 
         {/* Score Dialog */}
         {selectedMatch && (
