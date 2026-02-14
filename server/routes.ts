@@ -261,10 +261,18 @@ export async function registerRoutes(
     
     const input = api.matches.update.input.parse(req.body);
     
+    let winnerId: number | null = null;
+    if (input.scoreA > input.scoreB && match.playerAId) {
+      winnerId = match.playerAId;
+    } else if (input.scoreB > input.scoreA && match.playerBId) {
+      winnerId = match.playerBId;
+    }
+
     const updatedMatch = await storage.updateMatch(id, {
         scoreA: input.scoreA,
         scoreB: input.scoreB,
-        status: "COMPLETED" // Auto-complete for now if score entered
+        winnerId,
+        status: "COMPLETED"
     });
     
     if (input.notes) {

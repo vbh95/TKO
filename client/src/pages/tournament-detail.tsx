@@ -437,7 +437,9 @@ export default function TournamentDetail() {
                           <TableHead className="text-center">W</TableHead>
                           <TableHead className="text-center">D</TableHead>
                           <TableHead className="text-center">L</TableHead>
-                          <TableHead className="text-center hidden md:table-cell">Legs +/-</TableHead>
+                          <TableHead className="text-center hidden md:table-cell">LW</TableHead>
+                          <TableHead className="text-center hidden md:table-cell">LL</TableHead>
+                          <TableHead className="text-center hidden md:table-cell">+/-</TableHead>
                           <TableHead className="text-right font-bold">Pts</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -450,6 +452,8 @@ export default function TournamentDetail() {
                             <TableCell className="text-center text-green-600">{player.won}</TableCell>
                             <TableCell className="text-center text-muted-foreground">{player.drawn}</TableCell>
                             <TableCell className="text-center text-red-500">{player.lost}</TableCell>
+                            <TableCell className="text-center hidden md:table-cell font-mono">{player.legsFor}</TableCell>
+                            <TableCell className="text-center hidden md:table-cell font-mono">{player.legsAgainst}</TableCell>
                             <TableCell className="text-center hidden md:table-cell font-mono">
                               {player.diff > 0 ? `+${player.diff}` : player.diff}
                             </TableCell>
