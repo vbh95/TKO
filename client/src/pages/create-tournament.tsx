@@ -267,7 +267,7 @@ export default function CreateTournament() {
                   </div>
                 )}
 
-                {(type === "KNOCKOUT" || type === "MULTI_STAGE") && (
+                {(type === "KNOCKOUT") && (
                   <div className="space-y-2 flex items-center justify-between border rounded-xl p-4">
                     <div className="space-y-0.5">
                       <Label className="text-base">Seeded Bracket</Label>
