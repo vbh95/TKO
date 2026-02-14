@@ -183,6 +183,11 @@ export type CreateTournamentRequest = {
     knockoutBestOfByRound?: Record<string, number>;
     groupBestOf?: number;
     knockoutBestOf?: number;
+    knockoutBestOfByRound?: {
+      quarterFinal?: number;
+      semiFinal?: number;
+      final?: number;
+    };
     seeded?: boolean;
     thirdPlacePlayoff?: boolean;
     seededKnockout?: boolean;
