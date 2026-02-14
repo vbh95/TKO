@@ -35,7 +35,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
       <div className="p-6 border-b">
         <h1 className="text-2xl font-display font-bold text-primary flex items-center gap-2">
           <Trophy className="w-8 h-8" />
-          UDTG
+          UDT
         </h1>
         <p className="text-xs text-muted-foreground mt-1 font-medium">Ultimate Darts Tournament</p>
       </div>
@@ -95,7 +95,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 border-b bg-background/80 backdrop-blur-md z-40 flex items-center justify-between px-4">
         <div className="flex items-center gap-2 font-display font-bold text-lg text-primary">
           <Trophy className="w-6 h-6" />
-          UDTG
+          UDT
         </div>
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>
