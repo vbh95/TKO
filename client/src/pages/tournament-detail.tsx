@@ -185,6 +185,92 @@ export default function TournamentDetail() {
     });
   };
 
+  const getRoundDisplayName = (roundKey: string): string => {
+    switch (roundKey) {
+      case 'QF': return 'Quarter-Finals';
+      case 'SF': return 'Semi-Finals';
+      case 'F': return 'Final';
+      case 'R16': return 'Round of 16';
+      case 'R32': return 'Round of 32';
+      default: return roundKey;
+    }
+  };
+
+  const knockoutSlotLabels = (() => {
+    const knockoutMatches = matches.filter((m: any) => m.stage === 'KNOCKOUT');
+    if (knockoutMatches.length === 0 || groups.length === 0) return {};
+
+    const sorted = [...knockoutMatches].sort((a: any, b: any) => a.order - b.order);
+    const roundKeys = [] as string[];
+    for (const m of sorted) {
+      if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
+    }
+
+    const labels: Record<number, { a: string; b: string }> = {};
+    const matchRefs: Record<number, string> = {};
+
+    const firstRoundKey = roundKeys[0];
+    const firstRoundMatches = sorted.filter((m: any) => m.roundKey === firstRoundKey);
+
+    const groupCount = groups.length;
+    const pairings: { a: string; b: string }[] = [];
+
+    if (groupCount === 2) {
+      pairings.push(
+        { a: `1st ${groups[0].name}`, b: `2nd ${groups[1].name}` },
+        { a: `1st ${groups[1].name}`, b: `2nd ${groups[0].name}` },
+      );
+    } else if (groupCount === 4) {
+      pairings.push(
+        { a: `1st ${groups[0].name}`, b: `2nd ${groups[1].name}` },
+        { a: `2nd ${groups[2].name}`, b: `1st ${groups[3].name}` },
+        { a: `1st ${groups[2].name}`, b: `2nd ${groups[3].name}` },
+        { a: `2nd ${groups[0].name}`, b: `1st ${groups[1].name}` },
+      );
+    } else if (groupCount === 3) {
+      pairings.push(
+        { a: `1st ${groups[0].name}`, b: `2nd ${groups[2].name}` },
+        { a: `1st ${groups[1].name}`, b: `2nd ${groups[0].name}` },
+        { a: `1st ${groups[2].name}`, b: `2nd ${groups[1].name}` },
+      );
+    } else {
+      for (let i = 0; i < groupCount; i++) {
+        const oppIdx = (groupCount - 1 - i) % groupCount;
+        pairings.push({
+          a: `1st ${groups[i].name}`,
+          b: `2nd ${groups[oppIdx].name}`,
+        });
+      }
+    }
+
+    firstRoundMatches.forEach((match: any, idx: number) => {
+      labels[match.id] = idx < pairings.length
+        ? pairings[idx]
+        : { a: 'TBD', b: 'TBD' };
+      matchRefs[match.id] = `${getRoundDisplayName(firstRoundKey)} ${idx + 1}`;
+    });
+
+    for (let r = 1; r < roundKeys.length; r++) {
+      const prevMatches = sorted.filter((m: any) => m.roundKey === roundKeys[r - 1]);
+      const currentMatches = sorted.filter((m: any) => m.roundKey === roundKeys[r]);
+
+      currentMatches.forEach((match: any, idx: number) => {
+        const prev1 = prevMatches[idx * 2];
+        const prev2 = prevMatches[idx * 2 + 1];
+
+        labels[match.id] = {
+          a: prev1 ? `Winner of ${matchRefs[prev1.id]}` : 'TBD',
+          b: prev2 ? `Winner of ${matchRefs[prev2.id]}` : 'TBD',
+        };
+        matchRefs[match.id] = roundKeys[r] === 'F'
+          ? 'Final'
+          : `${getRoundDisplayName(roundKeys[r])} ${idx + 1}`;
+      });
+    }
+
+    return labels;
+  })();
+
   const groupStandings = groups.length > 0
     ? groups.map((group: any) => {
         const memberPlayerIds = groupMemberships
@@ -352,52 +438,80 @@ export default function TournamentDetail() {
           );
 
           const renderKnockoutMatches = () => (
-            <div className="space-y-6">
-              {groupMatchData.nonGroupRounds.map(({ roundKey, matches: roundMatches }) => (
-                <Card key={roundKey}>
-                  <CardHeader>
-                    <CardTitle className="text-lg font-bold">{roundKey}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-4">
-                    {roundMatches.map((match: any) => {
+            <div className="space-y-8">
+              {groupMatchData.nonGroupRounds.map(({ roundKey, matches: roundMatches }, roundIdx) => (
+                <div key={roundKey} className="space-y-4">
+                  <h2 className="text-xl font-bold text-primary" data-testid={`knockout-round-header-${roundKey}`}>
+                    {getRoundDisplayName(roundKey)}
+                  </h2>
+                  <div className={cn(
+                    "grid gap-4",
+                    roundMatches.length === 1 ? "grid-cols-1 max-w-md mx-auto" : "grid-cols-1 md:grid-cols-2"
+                  )}>
+                    {roundMatches.map((match: any, matchIdx: number) => {
                       const playerA = getPlayer(match.playerAId);
                       const playerB = getPlayer(match.playerBId);
+                      const slotLabel = knockoutSlotLabels[match.id];
+                      const labelA = playerA?.name || slotLabel?.a || 'TBD';
+                      const labelB = playerB?.name || slotLabel?.b || 'TBD';
+
                       return (
-                        <div
+                        <Card
                           key={match.id}
                           onClick={() => setSelectedMatch(match)}
                           className={cn(
-                            "flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md hover:border-primary/50",
+                            "overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
                             match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
                           )}
                           data-testid={`match-card-${match.id}`}
                         >
-                          <div className="flex-1 text-right font-medium">
-                            {playerA?.name || "TBD"}
+                          <div className="bg-primary px-4 py-2 flex items-center justify-between">
+                            <span className="text-primary-foreground font-bold text-sm">
+                              {roundKey === 'F' ? 'Final' : `${getRoundDisplayName(roundKey)} ${matchIdx + 1}`}
+                            </span>
+                            {match.status === 'COMPLETED' && (
+                              <Badge variant="secondary" className="text-xs">Completed</Badge>
+                            )}
                           </div>
-                          <div className="flex items-center gap-3 px-6">
-                            <div className={cn(
-                              "w-8 h-8 flex items-center justify-center rounded-md font-bold text-lg",
-                              match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
-                            )}>
-                              {match.scoreA || 0}
+                          <CardContent className="p-0">
+                            <div className="flex items-center justify-between px-4 py-3 border-b">
+                              <div className="flex-1">
+                                <span className={cn(
+                                  "text-sm font-medium",
+                                  match.status === 'COMPLETED' && match.winnerId === match.playerAId && match.playerAId && "text-primary font-bold"
+                                )}>
+                                  {labelA}
+                                </span>
+                              </div>
+                              <div className={cn(
+                                "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                                match.status === 'COMPLETED' && match.scoreA > match.scoreB ? "bg-primary text-primary-foreground" : "bg-muted"
+                              )}>
+                                {match.scoreA || 0}
+                              </div>
                             </div>
-                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">vs</span>
-                            <div className={cn(
-                              "w-8 h-8 flex items-center justify-center rounded-md font-bold text-lg",
-                              match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
-                            )}>
-                              {match.scoreB || 0}
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <div className="flex-1">
+                                <span className={cn(
+                                  "text-sm font-medium",
+                                  match.status === 'COMPLETED' && match.winnerId === match.playerBId && match.playerBId && "text-primary font-bold"
+                                )}>
+                                  {labelB}
+                                </span>
+                              </div>
+                              <div className={cn(
+                                "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                                match.status === 'COMPLETED' && match.scoreB > match.scoreA ? "bg-primary text-primary-foreground" : "bg-muted"
+                              )}>
+                                {match.scoreB || 0}
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex-1 text-left font-medium">
-                            {playerB?.name || "TBD"}
-                          </div>
-                        </div>
+                          </CardContent>
+                        </Card>
                       );
                     })}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
               {groupMatchData.nonGroupRounds.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
