@@ -554,6 +554,7 @@ export default function TournamentDetail() {
         {/* Score Dialog */}
         {selectedMatch && (
           <MatchScoreInput 
+            key={selectedMatch.id}
             match={selectedMatch}
             playerA={getPlayer(selectedMatch.playerAId)}
             playerB={getPlayer(selectedMatch.playerBId)}
