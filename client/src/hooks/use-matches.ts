@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import type { UpdateMatchScoreRequest } from "@shared/schema";
 
-export function useUpdateMatchScore() {
+export function useUpdateMatchScore(tournamentId: number) {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -15,11 +15,11 @@ export function useUpdateMatchScore() {
       });
       
       if (!res.ok) throw new Error("Failed to update match score");
-      return api.matches.update.responses[200].parse(await res.json());
+      return res.json();
     },
-    onSuccess: async (match) => {
-      await queryClient.invalidateQueries({ 
-        queryKey: [api.tournaments.get.path, match.tournamentId] 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: [api.tournaments.get.path, tournamentId] 
       });
       queryClient.invalidateQueries({ queryKey: [api.public.get.path] });
     },

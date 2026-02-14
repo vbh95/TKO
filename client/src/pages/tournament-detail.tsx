@@ -560,6 +560,7 @@ export default function TournamentDetail() {
             playerB={getPlayer(selectedMatch.playerBId)}
             isOpen={!!selectedMatch}
             onClose={() => setSelectedMatch(null)}
+            tournamentId={tournamentId}
           />
         )}
       </div>

@@ -23,10 +23,11 @@ interface MatchScoreInputProps {
   isOpen: boolean;
   onClose: () => void;
   readOnly?: boolean;
+  tournamentId: number;
 }
 
-export function MatchScoreInput({ match, playerA, playerB, isOpen, onClose, readOnly }: MatchScoreInputProps) {
-  const { mutate: updateScore, isPending } = useUpdateMatchScore();
+export function MatchScoreInput({ match, playerA, playerB, isOpen, onClose, readOnly, tournamentId }: MatchScoreInputProps) {
+  const { mutate: updateScore, isPending } = useUpdateMatchScore(tournamentId);
   const { toast } = useToast();
   
   const [scoreA, setScoreA] = useState(match.scoreA || 0);
