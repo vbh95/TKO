@@ -30,8 +30,12 @@ export default function CreateTournament() {
     const [bulkInput, setBulkInput] = useState("");
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [randomize, setRandomize] = useState(false);
+    const [groupCount, setGroupCount] = useState(1);
 
-    const handleAddPlayer = () => setPlayers([...players, ""]);
+    const handleAddPlayer = () => {
+      if (players.length >= 48) return;
+      setPlayers([...players, ""]);
+    };
     
     const handleRemovePlayer = (index: number) => {
       if (players.length <= 2) return;
@@ -67,7 +71,9 @@ export default function CreateTournament() {
         type,
         playerNames: validPlayers,
         randomize,
-        settings: {} // Defaults for now
+        settings: {
+          groupCount: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupCount : undefined
+        }
       }, {
         onSuccess: () => {
           toast({
@@ -139,6 +145,28 @@ export default function CreateTournament() {
                   </div>
                   <Switch checked={randomize} onCheckedChange={setRandomize} />
                 </div>
+
+                {(type === "ROUND_ROBIN" || type === "MULTI_STAGE") && (
+                  <div className="space-y-2">
+                    <Label htmlFor="groupCount">Number of Groups</Label>
+                    <Select 
+                      value={groupCount.toString()} 
+                      onValueChange={(val) => setGroupCount(parseInt(val))}
+                    >
+                      <SelectTrigger id="groupCount" className="h-12">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 4, 8].map(n => (
+                          <SelectItem key={n} value={n.toString()}>{n} Group{n > 1 ? 's' : ''}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Split players into multiple groups for the initial stage.
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
