@@ -276,7 +276,12 @@ export async function registerRoutes(
     });
     
     if (input.notes) {
-        await storage.updateMatchNote(id, input.notes);
+        const noteValues = Object.fromEntries(
+          Object.entries(input.notes).filter(([, v]) => v !== undefined)
+        );
+        if (Object.keys(noteValues).length > 0) {
+          await storage.updateMatchNote(id, noteValues);
+        }
     }
     
     res.json(updatedMatch);
