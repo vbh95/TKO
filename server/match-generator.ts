@@ -30,14 +30,72 @@ function nextPowerOfTwo(n: number): number {
   return p;
 }
 
-function generateRoundRobinPairs(players: Player[]): [Player, Player][] {
-  const pairs: [Player, Player][] = [];
-  for (let i = 0; i < players.length; i++) {
-    for (let j = i + 1; j < players.length; j++) {
-      pairs.push([players[i], players[j]]);
+function generateRoundRobinSchedule(players: Player[]): [Player, Player][] {
+  if (players.length < 2) return [];
+
+  const list: (Player | null)[] = [...players];
+  if (list.length % 2 !== 0) list.push(null);
+
+  const n = list.length;
+  const rounds: [Player, Player][][] = [];
+
+  const fixed = list[0];
+  const rotating = list.slice(1);
+
+  for (let r = 0; r < n - 1; r++) {
+    const round: [Player, Player][] = [];
+    const current = [fixed, ...rotating];
+
+    for (let i = 0; i < n / 2; i++) {
+      const a = current[i];
+      const b = current[n - 1 - i];
+      if (a && b) round.push([a, b]);
     }
+    rounds.push(round);
+
+    rotating.push(rotating.shift()!);
   }
-  return pairs;
+
+  const allMatches = rounds.flat();
+  return scheduleNoBackToBack(allMatches, rounds);
+}
+
+function scheduleNoBackToBack(
+  allMatches: [Player, Player][],
+  rounds: [Player, Player][][]
+): [Player, Player][] {
+  const used: boolean[] = new Array(allMatches.length).fill(false);
+  const scheduled: [Player, Player][] = [];
+  let lastPlayerA = -1;
+  let lastPlayerB = -1;
+  let usedCount = 0;
+
+  while (usedCount < allMatches.length) {
+    let bestIdx = -1;
+    let bestOverlap = Infinity;
+
+    for (let idx = 0; idx < allMatches.length; idx++) {
+      if (used[idx]) continue;
+      const [a, b] = allMatches[idx];
+      const overlap =
+        (a.id === lastPlayerA || a.id === lastPlayerB ? 1 : 0) +
+        (b.id === lastPlayerA || b.id === lastPlayerB ? 1 : 0);
+      if (overlap < bestOverlap) {
+        bestOverlap = overlap;
+        bestIdx = idx;
+        if (overlap === 0) break;
+      }
+    }
+
+    used[bestIdx] = true;
+    usedCount++;
+    const match = allMatches[bestIdx];
+    scheduled.push(match);
+    lastPlayerA = match[0].id;
+    lastPlayerB = match[1].id;
+  }
+
+  return scheduled;
 }
 
 function createSeededOrder(players: Player[]): (Player | null)[] {
@@ -105,8 +163,8 @@ export async function generateRoundRobinMatches(
       });
     }
 
-    const roundRobinPairs = generateRoundRobinPairs(groupPlayers);
-    for (const [a, b] of roundRobinPairs) {
+    const scheduled = generateRoundRobinSchedule(groupPlayers);
+    for (const [a, b] of scheduled) {
       await storage.createMatch({
         tournamentId,
         stage: "GROUP",
@@ -329,8 +387,8 @@ export async function generateMultiStageMatches(
       });
     }
 
-    const pairs = generateRoundRobinPairs(groupPlayers);
-    for (const [a, b] of pairs) {
+    const scheduled = generateRoundRobinSchedule(groupPlayers);
+    for (const [a, b] of scheduled) {
       await storage.createMatch({
         tournamentId,
         stage: "GROUP",
