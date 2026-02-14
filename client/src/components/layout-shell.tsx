@@ -37,7 +37,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
           <Trophy className="w-8 h-8" />
           UDTG
         </h1>
-        <p className="text-xs text-muted-foreground mt-1 font-medium">Ultimate Darts Tournament Gen</p>
+        <p className="text-xs text-muted-foreground mt-1 font-medium">Ultimate Darts Tournament</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
