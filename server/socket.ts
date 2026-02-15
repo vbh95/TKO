@@ -114,3 +114,12 @@ export function emitBoardMatchUpdate(tournamentId: number, boardNumber: number, 
   if (!io) return;
   io.to(`board:${tournamentId}:${boardNumber}`).emit("match:updated", matchData);
 }
+
+export function emitLegScoring(tournamentId: number, boardNumber: number, shareToken: string | null, scoringData: any) {
+  if (!io) return;
+  io.to(`board:${tournamentId}:${boardNumber}`).emit("leg:scoring", scoringData);
+  io.to(`tournament:${tournamentId}`).emit("leg:scoring", scoringData);
+  if (shareToken) {
+    io.to(`public:${shareToken}`).emit("leg:scoring", scoringData);
+  }
+}

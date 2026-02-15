@@ -10,7 +10,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { generateMatches } from "./match-generator";
 import type { TournamentSettings } from "@shared/schema";
-import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate } from "./socket";
+import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring } from "./socket";
 
 const scryptAsync = promisify(scrypt);
 
@@ -776,6 +776,30 @@ export async function registerRoutes(
       res.json(updatedMatch);
     } catch (err) {
       console.error("Scorer match update error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post('/api/scorer/matches/:matchId/leg-scoring', isBoardAuthenticated, async (req: any, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      const match = await storage.getMatch(matchId);
+      if (!match) return res.status(404).json({ message: "Match not found" });
+
+      const { tournamentId, boardNumber } = req.boardSession;
+      if (match.tournamentId !== tournamentId) {
+        return res.status(403).json({ message: "Match does not belong to this tournament" });
+      }
+
+      const tournament = await storage.getTournament(tournamentId);
+      emitLegScoring(tournamentId, boardNumber, tournament?.shareToken || null, {
+        matchId,
+        ...req.body,
+      });
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Scorer leg scoring error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });

@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useEffect, useCallback } from "react";
-import { Loader2, Target, Trophy, Check, Wifi, WifiOff, Play, ChevronRight, ArrowLeft, Minus, Plus } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Loader2, Target, Trophy, Wifi, WifiOff, Play, ChevronRight, ArrowLeft, Undo2, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +51,13 @@ interface BoardData {
   accessToken?: string;
 }
 
+type Visit = { player: 'A' | 'B'; score: number };
+
 type ScorerView = "matchList" | "scoring";
+
+const STARTING_SCORE = 501;
+
+const QUICK_SCORES = [26, 41, 45, 60, 85, 100, 140, 180];
 
 export default function ScorerPage() {
   const params = useParams<{ tournamentId: string; boardNumber: string }>();
@@ -62,8 +68,17 @@ export default function ScorerPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [view, setView] = useState<ScorerView>("matchList");
   const [activeMatchId, setActiveMatchId] = useState<number | null>(null);
-  const [legScoreA, setLegScoreA] = useState(0);
-  const [legScoreB, setLegScoreB] = useState(0);
+
+  const [legsWonA, setLegsWonA] = useState(0);
+  const [legsWonB, setLegsWonB] = useState(0);
+
+  const [remainingA, setRemainingA] = useState(STARTING_SCORE);
+  const [remainingB, setRemainingB] = useState(STARTING_SCORE);
+  const [currentThrower, setCurrentThrower] = useState<'A' | 'B'>('A');
+  const [legVisits, setLegVisits] = useState<Visit[]>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [bustMessage, setBustMessage] = useState<string | null>(null);
+  const [legStartingThrower, setLegStartingThrower] = useState<'A' | 'B'>('A');
 
   const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/scorer/board-data'],
@@ -88,9 +103,12 @@ export default function ScorerPage() {
     if (data && view === "matchList" && activeMatchId === null) {
       const inProgress = data.matches.find(m => m.status === 'IN_PROGRESS');
       if (inProgress) {
+        const totalLegs = (inProgress.scoreA || 0) + (inProgress.scoreB || 0);
+        const starter: 'A' | 'B' = totalLegs % 2 === 0 ? 'A' : 'B';
         setActiveMatchId(inProgress.id);
-        setLegScoreA(inProgress.scoreA || 0);
-        setLegScoreB(inProgress.scoreB || 0);
+        setLegsWonA(inProgress.scoreA || 0);
+        setLegsWonB(inProgress.scoreB || 0);
+        resetLeg(starter);
         setView("scoring");
       }
     }
@@ -121,8 +139,9 @@ export default function ScorerPage() {
     },
     onSuccess: (_, matchId) => {
       setActiveMatchId(matchId);
-      setLegScoreA(0);
-      setLegScoreB(0);
+      setLegsWonA(0);
+      setLegsWonB(0);
+      resetLeg('A');
       setView("scoring");
       refetch();
     },
@@ -131,7 +150,7 @@ export default function ScorerPage() {
     },
   });
 
-  const submitScoreMutation = useMutation({
+  const updateScoreMutation = useMutation({
     mutationFn: async ({ matchId, scoreA, scoreB }: { matchId: number; scoreA: number; scoreB: number }) => {
       const res = await fetch(`/api/scorer/matches/${matchId}`, {
         method: 'PUT',
@@ -142,10 +161,12 @@ export default function ScorerPage() {
       if (!res.ok) throw new Error("Failed to update score");
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "Match complete!" });
-      setActiveMatchId(null);
-      setView("matchList");
+    onSuccess: (updatedMatch) => {
+      if (updatedMatch.status === 'COMPLETED') {
+        toast({ title: "Match complete!" });
+        setActiveMatchId(null);
+        setView("matchList");
+      }
       refetch();
     },
     onError: (err: any) => {
@@ -153,24 +174,166 @@ export default function ScorerPage() {
     },
   });
 
-  const updateLegMutation = useMutation({
-    mutationFn: async ({ matchId, scoreA, scoreB }: { matchId: number; scoreA: number; scoreB: number }) => {
-      const res = await fetch(`/api/scorer/matches/${matchId}`, {
-        method: 'PUT',
+  const emitLiveScoringMutation = useMutation({
+    mutationFn: async (scoringData: any) => {
+      if (!activeMatchId) return;
+      const res = await fetch(`/api/scorer/matches/${activeMatchId}/leg-scoring`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ scoreA, scoreB }),
+        body: JSON.stringify(scoringData),
       });
-      if (!res.ok) throw new Error("Failed to update score");
+      if (!res.ok) throw new Error("Failed to emit scoring");
       return res.json();
     },
-    onSuccess: () => {
-      refetch();
-    },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
   });
+
+  const resetLeg = (startingThrower: 'A' | 'B') => {
+    setRemainingA(STARTING_SCORE);
+    setRemainingB(STARTING_SCORE);
+    setCurrentThrower(startingThrower);
+    setLegStartingThrower(startingThrower);
+    setLegVisits([]);
+    setInputValue("");
+    setBustMessage(null);
+  };
+
+  const emitLiveState = useCallback((rA: number, rB: number, thrower: 'A' | 'B', lA: number, lB: number) => {
+    emitLiveScoringMutation.mutate({
+      remainingA: rA,
+      remainingB: rB,
+      currentThrower: thrower,
+      legsWonA: lA,
+      legsWonB: lB,
+    });
+  }, [activeMatchId]);
+
+  const handleScoreSubmit = (score: number) => {
+    if (activeMatchId === null) return;
+    const activeM = data?.matches.find(m => m.id === activeMatchId);
+    if (!activeM) return;
+
+    const matchBestOf = activeM.bestOf || 3;
+    const matchLegsToWin = Math.ceil(matchBestOf / 2);
+
+    const isPlayerA = currentThrower === 'A';
+    const currentRemaining = isPlayerA ? remainingA : remainingB;
+    const newRemaining = currentRemaining - score;
+
+    if (newRemaining < 0 || newRemaining === 1) {
+      setBustMessage(`BUST! ${score} scored, stays on ${currentRemaining}`);
+      setTimeout(() => setBustMessage(null), 2000);
+      const nextThrower = currentThrower === 'A' ? 'B' : 'A';
+      setCurrentThrower(nextThrower);
+      setLegVisits(prev => [...prev, { player: currentThrower, score: 0 }]);
+      setInputValue("");
+      emitLiveState(remainingA, remainingB, nextThrower, legsWonA, legsWonB);
+      return;
+    }
+
+    const newVisits = [...legVisits, { player: currentThrower, score }];
+    setLegVisits(newVisits);
+    setInputValue("");
+
+    if (newRemaining === 0) {
+      const newLegsA = isPlayerA ? legsWonA + 1 : legsWonA;
+      const newLegsB = !isPlayerA ? legsWonB + 1 : legsWonB;
+      setLegsWonA(newLegsA);
+      setLegsWonB(newLegsB);
+
+      if (isPlayerA) {
+        setRemainingA(0);
+      } else {
+        setRemainingB(0);
+      }
+
+      emitLiveState(
+        isPlayerA ? 0 : remainingA,
+        !isPlayerA ? 0 : remainingB,
+        currentThrower,
+        newLegsA,
+        newLegsB,
+      );
+
+      updateScoreMutation.mutate({
+        matchId: activeMatchId,
+        scoreA: newLegsA,
+        scoreB: newLegsB,
+      });
+
+      if (newLegsA < matchLegsToWin && newLegsB < matchLegsToWin) {
+        const playerName = isPlayerA
+          ? data?.players.find(p => p.id === activeM.playerAId)?.name
+          : data?.players.find(p => p.id === activeM.playerBId)?.name;
+        toast({ title: `Leg won by ${playerName || 'Player'}!` });
+
+        const nextStarter = legStartingThrower === 'A' ? 'B' : 'A';
+        setTimeout(() => resetLeg(nextStarter), 1500);
+      }
+
+      return;
+    }
+
+    if (isPlayerA) {
+      setRemainingA(newRemaining);
+    } else {
+      setRemainingB(newRemaining);
+    }
+
+    const nextThrower = currentThrower === 'A' ? 'B' : 'A';
+    setCurrentThrower(nextThrower);
+    setBustMessage(null);
+
+    emitLiveState(
+      isPlayerA ? newRemaining : remainingA,
+      !isPlayerA ? newRemaining : remainingB,
+      nextThrower,
+      legsWonA,
+      legsWonB,
+    );
+  };
+
+  const handleUndo = () => {
+    if (legVisits.length === 0 || updateScoreMutation.isPending) return;
+    const lastVisit = legVisits[legVisits.length - 1];
+    const newVisits = legVisits.slice(0, -1);
+    setLegVisits(newVisits);
+
+    if (lastVisit.player === 'A') {
+      const newR = remainingA + lastVisit.score;
+      setRemainingA(newR);
+      setCurrentThrower('A');
+      emitLiveState(newR, remainingB, 'A', legsWonA, legsWonB);
+    } else {
+      const newR = remainingB + lastVisit.score;
+      setRemainingB(newR);
+      setCurrentThrower('B');
+      emitLiveState(remainingA, newR, 'B', legsWonA, legsWonB);
+    }
+
+    setBustMessage(null);
+    setInputValue("");
+  };
+
+  const handleNumpad = (digit: string) => {
+    if (digit === 'C') {
+      setInputValue("");
+      return;
+    }
+    if (digit === 'OK') {
+      const score = parseInt(inputValue);
+      if (isNaN(score) || score < 0 || score > 180) {
+        setBustMessage("Invalid score (0-180)");
+        setTimeout(() => setBustMessage(null), 1500);
+        return;
+      }
+      handleScoreSubmit(score);
+      return;
+    }
+    const newVal = inputValue + digit;
+    if (parseInt(newVal) > 180) return;
+    setInputValue(newVal);
+  };
 
   if (isLoading) {
     return (
@@ -237,41 +400,16 @@ export default function ScorerPage() {
     if (!match) return;
 
     if (match.status === 'IN_PROGRESS') {
+      const totalLegs = (match.scoreA || 0) + (match.scoreB || 0);
+      const starter: 'A' | 'B' = totalLegs % 2 === 0 ? 'A' : 'B';
       setActiveMatchId(matchId);
-      setLegScoreA(match.scoreA || 0);
-      setLegScoreB(match.scoreB || 0);
+      setLegsWonA(match.scoreA || 0);
+      setLegsWonB(match.scoreB || 0);
+      resetLeg(starter);
       setView("scoring");
     } else if (match.status === 'PENDING') {
       startMatchMutation.mutate(matchId);
     }
-  };
-
-  const handleLegWon = (winner: 'A' | 'B') => {
-    if (activeMatchId === null) return;
-    const activeM = matches.find(m => m.id === activeMatchId);
-    if (!activeM) return;
-
-    const matchLegs = Math.ceil((activeM.bestOf || bestOf) / 2);
-    const newScoreA = winner === 'A' ? legScoreA + 1 : legScoreA;
-    const newScoreB = winner === 'B' ? legScoreB + 1 : legScoreB;
-
-    setLegScoreA(newScoreA);
-    setLegScoreB(newScoreB);
-
-    if (newScoreA >= matchLegs || newScoreB >= matchLegs) {
-      submitScoreMutation.mutate({ matchId: activeMatchId, scoreA: newScoreA, scoreB: newScoreB });
-    } else {
-      updateLegMutation.mutate({ matchId: activeMatchId, scoreA: newScoreA, scoreB: newScoreB });
-    }
-  };
-
-  const handleUndoLeg = (side: 'A' | 'B') => {
-    if (activeMatchId === null) return;
-    const newA = side === 'A' ? Math.max(legScoreA - 1, 0) : legScoreA;
-    const newB = side === 'B' ? Math.max(legScoreB - 1, 0) : legScoreB;
-    setLegScoreA(newA);
-    setLegScoreB(newB);
-    updateLegMutation.mutate({ matchId: activeMatchId, scoreA: newA, scoreB: newB });
   };
 
   const activeMatch = activeMatchId ? matches.find(m => m.id === activeMatchId) : null;
@@ -283,122 +421,218 @@ export default function ScorerPage() {
     const matchLegsToWin = Math.ceil(matchBestOf / 2);
 
     return (
-      <div className="min-h-screen bg-background flex flex-col" data-testid="scorer-match-view">
-        <div className="bg-primary text-primary-foreground py-4 px-4 shadow-lg">
-          <div className="container max-w-3xl mx-auto flex items-center gap-3">
+      <div className="min-h-screen bg-background flex flex-col overflow-hidden" data-testid="scorer-match-view">
+        <div className="bg-primary text-primary-foreground py-2 px-3 shadow-lg shrink-0">
+          <div className="flex items-center gap-2 max-w-4xl mx-auto">
             <Button
               variant="ghost"
               size="icon"
-              className="text-primary-foreground shrink-0"
+              className="text-primary-foreground shrink-0 h-8 w-8"
               onClick={() => {
                 setView("matchList");
                 setActiveMatchId(null);
               }}
               data-testid="button-back-to-list"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4" />
             </Button>
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-display font-bold truncate" data-testid="text-tournament-name">{tournament.name}</h1>
-              <p className="text-primary-foreground/80 text-xs">
-                {group.name} — Board {boardNumber} — Best of {matchBestOf}
+              <p className="text-xs text-primary-foreground/80 truncate">
+                {tournament.name} — {group.name} — Board {boardNumber}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {isConnected ? (
-                <Badge variant="outline" className="border-green-400 text-green-100 gap-1">
-                  <Wifi className="w-3 h-3" /> Live
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="border-red-400 text-red-100 gap-1">
-                  <WifiOff className="w-3 h-3" /> Offline
-                </Badge>
-              )}
-            </div>
+            {isConnected ? (
+              <Badge variant="outline" className="border-green-400 text-green-100 gap-1 text-xs py-0">
+                <Wifi className="w-3 h-3" /> Live
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-red-400 text-red-100 gap-1 text-xs py-0">
+                <WifiOff className="w-3 h-3" /> Off
+              </Badge>
+            )}
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col container max-w-3xl mx-auto px-4 py-6">
-          <div className="text-center mb-2">
-            <p className="text-sm text-muted-foreground uppercase tracking-wide font-medium">
-              First to {matchLegsToWin} legs
-            </p>
-          </div>
-
-          <div className="flex-1 grid grid-cols-3 gap-2 items-center min-h-0">
-            <div className="flex flex-col items-center gap-4">
-              <p className="text-lg md:text-xl font-bold text-center leading-tight" data-testid="text-player-a-name">
-                {playerA?.name || "TBD"}
+        <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-3 py-2 overflow-hidden">
+          <div className="grid grid-cols-3 gap-1 mb-2 shrink-0">
+            <div
+              className={cn(
+                "text-center p-3 rounded-lg transition-colors",
+                currentThrower === 'A' ? "bg-primary/10 ring-2 ring-primary" : "bg-muted/30"
+              )}
+              data-testid="panel-player-a"
+            >
+              <p className="text-sm font-bold truncate mb-1" data-testid="text-player-a-name">
+                {playerA?.name || "Player A"}
               </p>
               <div
-                className="text-7xl md:text-8xl font-bold tabular-nums text-primary"
-                data-testid="text-leg-score-a"
+                className={cn(
+                  "text-4xl md:text-5xl font-bold tabular-nums",
+                  remainingA <= 40 ? "text-red-500" : "text-foreground"
+                )}
+                data-testid="text-remaining-a"
               >
-                {legScoreA}
+                {remainingA}
               </div>
-              <Button
-                className="w-full h-24 md:h-28 text-2xl font-bold touch-manipulation bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => handleLegWon('A')}
-                disabled={submitScoreMutation.isPending || updateLegMutation.isPending}
-                data-testid="button-leg-won-a"
-              >
-                <Trophy className="w-6 h-6 mr-2" />
-                Leg Won
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs touch-manipulation"
-                onClick={() => handleUndoLeg('A')}
-                disabled={legScoreA === 0 || submitScoreMutation.isPending || updateLegMutation.isPending}
-                data-testid="button-undo-a"
-              >
-                <Minus className="w-3 h-3 mr-1" />
-                Undo Leg
-              </Button>
+              <div className="mt-1 flex items-center justify-center gap-1">
+                <span className="text-xs text-muted-foreground">Legs:</span>
+                <span className="text-lg font-bold text-primary tabular-nums" data-testid="text-legs-a">{legsWonA}</span>
+              </div>
             </div>
 
             <div className="flex flex-col items-center justify-center">
-              <span className="text-muted-foreground text-2xl font-bold">vs</span>
+              <p className="text-[10px] uppercase text-muted-foreground tracking-wider mb-1">
+                Best of {matchBestOf}
+              </p>
+              <div className="text-2xl font-bold tabular-nums">
+                <span className={legsWonA > legsWonB ? "text-primary" : "text-muted-foreground"}>{legsWonA}</span>
+                <span className="text-muted-foreground mx-1">-</span>
+                <span className={legsWonB > legsWonA ? "text-primary" : "text-muted-foreground"}>{legsWonB}</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                First to {matchLegsToWin}
+              </p>
             </div>
 
-            <div className="flex flex-col items-center gap-4">
-              <p className="text-lg md:text-xl font-bold text-center leading-tight" data-testid="text-player-b-name">
-                {playerB?.name || "TBD"}
+            <div
+              className={cn(
+                "text-center p-3 rounded-lg transition-colors",
+                currentThrower === 'B' ? "bg-primary/10 ring-2 ring-primary" : "bg-muted/30"
+              )}
+              data-testid="panel-player-b"
+            >
+              <p className="text-sm font-bold truncate mb-1" data-testid="text-player-b-name">
+                {playerB?.name || "Player B"}
               </p>
               <div
-                className="text-7xl md:text-8xl font-bold tabular-nums text-primary"
-                data-testid="text-leg-score-b"
+                className={cn(
+                  "text-4xl md:text-5xl font-bold tabular-nums",
+                  remainingB <= 40 ? "text-red-500" : "text-foreground"
+                )}
+                data-testid="text-remaining-b"
               >
-                {legScoreB}
+                {remainingB}
               </div>
-              <Button
-                className="w-full h-24 md:h-28 text-2xl font-bold touch-manipulation bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => handleLegWon('B')}
-                disabled={submitScoreMutation.isPending || updateLegMutation.isPending}
-                data-testid="button-leg-won-b"
-              >
-                <Trophy className="w-6 h-6 mr-2" />
-                Leg Won
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs touch-manipulation"
-                onClick={() => handleUndoLeg('B')}
-                disabled={legScoreB === 0 || submitScoreMutation.isPending || updateLegMutation.isPending}
-                data-testid="button-undo-b"
-              >
-                <Minus className="w-3 h-3 mr-1" />
-                Undo Leg
-              </Button>
+              <div className="mt-1 flex items-center justify-center gap-1">
+                <span className="text-xs text-muted-foreground">Legs:</span>
+                <span className="text-lg font-bold text-primary tabular-nums" data-testid="text-legs-b">{legsWonB}</span>
+              </div>
             </div>
           </div>
 
-          {(submitScoreMutation.isPending || updateLegMutation.isPending) && (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
-              <span className="text-sm text-muted-foreground">Updating...</span>
+          {bustMessage && (
+            <div className="bg-red-500 text-white text-center py-2 rounded-lg mb-2 text-sm font-bold animate-pulse shrink-0" data-testid="text-bust">
+              {bustMessage}
+            </div>
+          )}
+
+          <div className="bg-muted/50 rounded-lg p-3 mb-2 shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">
+                {currentThrower === 'A' ? (playerA?.name || "Player A") : (playerB?.name || "Player B")} to throw
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={handleUndo}
+                  disabled={legVisits.length === 0 || updateScoreMutation.isPending}
+                  data-testid="button-undo"
+                >
+                  <Undo2 className="w-3 h-3 mr-1" />
+                  Undo
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex gap-2 items-center mb-3">
+              <div
+                className="flex-1 bg-background border-2 border-primary rounded-lg px-4 py-3 text-center text-3xl font-bold tabular-nums min-h-[52px] flex items-center justify-center"
+                data-testid="text-input-value"
+              >
+                {inputValue || <span className="text-muted-foreground/30">0</span>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1 mb-2">
+              {QUICK_SCORES.map(qs => (
+                <Button
+                  key={qs}
+                  variant="outline"
+                  className={cn(
+                    "h-10 text-sm font-bold touch-manipulation",
+                    qs === 180 && "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 text-yellow-700 dark:text-yellow-300"
+                  )}
+                  onClick={() => handleScoreSubmit(qs)}
+                  disabled={updateScoreMutation.isPending}
+                  data-testid={`button-quick-${qs}`}
+                >
+                  {qs}
+                </Button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-1">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'].map(key => (
+                <Button
+                  key={key}
+                  variant={key === 'OK' ? 'default' : key === 'C' ? 'secondary' : 'outline'}
+                  className={cn(
+                    "h-12 text-lg font-bold touch-manipulation",
+                    key === 'OK' && "bg-green-600 hover:bg-green-700 text-white",
+                    key === 'C' && "text-red-500"
+                  )}
+                  onClick={() => handleNumpad(key)}
+                  disabled={
+                    (key === 'OK' && inputValue === '') ||
+                    updateScoreMutation.isPending
+                  }
+                  data-testid={`button-numpad-${key}`}
+                >
+                  {key}
+                </Button>
+              ))}
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full mt-2 h-10 text-sm touch-manipulation"
+              onClick={() => handleScoreSubmit(0)}
+              disabled={updateScoreMutation.isPending}
+              data-testid="button-no-score"
+            >
+              No Score (0)
+            </Button>
+          </div>
+
+          {legVisits.length > 0 && (
+            <div className="shrink-0 overflow-auto max-h-24 bg-muted/30 rounded-lg px-3 py-2">
+              <p className="text-[10px] uppercase text-muted-foreground font-medium mb-1">Visit History</p>
+              <div className="flex flex-wrap gap-1">
+                {legVisits.map((v, i) => (
+                  <span
+                    key={i}
+                    className={cn(
+                      "text-xs px-2 py-0.5 rounded-full font-medium",
+                      v.player === 'A'
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                        : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+                      v.score === 0 && "opacity-50"
+                    )}
+                    data-testid={`visit-${i}`}
+                  >
+                    {v.player === 'A' ? (playerA?.name?.charAt(0) || 'A') : (playerB?.name?.charAt(0) || 'B')}: {v.score}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {updateScoreMutation.isPending && (
+            <div className="flex items-center justify-center py-2 shrink-0">
+              <Loader2 className="w-4 h-4 animate-spin text-primary mr-2" />
+              <span className="text-xs text-muted-foreground">Updating...</span>
             </div>
           )}
         </div>
@@ -590,12 +824,12 @@ export default function ScorerPage() {
             <CardContent className="p-0">
               <div className="divide-y">
                 {completedMatches.map(match => {
-                  const playerA = getPlayer(match.playerAId);
-                  const playerB = getPlayer(match.playerBId);
+                  const pA = getPlayer(match.playerAId);
+                  const pB = getPlayer(match.playerBId);
                   return (
                     <div key={match.id} className="flex items-center justify-between p-4">
                       <div className={cn("flex-1 text-right font-medium", match.winnerId === match.playerAId && "text-primary font-bold")}>
-                        {playerA?.name || "TBD"}
+                        {pA?.name || "TBD"}
                       </div>
                       <div className="flex items-center gap-3 px-6">
                         <span className={cn("text-xl font-bold", (match.scoreA || 0) > (match.scoreB || 0) ? "text-primary" : "text-muted-foreground")}>
@@ -607,7 +841,7 @@ export default function ScorerPage() {
                         </span>
                       </div>
                       <div className={cn("flex-1 text-left font-medium", match.winnerId === match.playerBId && "text-primary font-bold")}>
-                        {playerB?.name || "TBD"}
+                        {pB?.name || "TBD"}
                       </div>
                     </div>
                   );
