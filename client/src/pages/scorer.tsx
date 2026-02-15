@@ -75,7 +75,7 @@ interface MatchStats {
   playerBId: number | null;
 }
 
-type ScorerView = "matchList" | "scoring" | "matchReport";
+type ScorerView = "matchList" | "bullThrow" | "scoring" | "matchReport";
 
 const STARTING_SCORE = 501;
 
@@ -507,11 +507,102 @@ export default function ScorerPage() {
       resetLeg(starter);
       setView("scoring");
     } else if (match.status === 'PENDING') {
-      startMatchMutation.mutate(matchId);
+      setActiveMatchId(matchId);
+      setView("bullThrow");
     }
   };
 
   const activeMatch = activeMatchId ? matches.find(m => m.id === activeMatchId) : null;
+
+  if (view === "bullThrow" && activeMatch) {
+    const playerA = getPlayer(activeMatch.playerAId);
+    const playerB = getPlayer(activeMatch.playerBId);
+    const matchBestOf = activeMatch.bestOf || bestOf;
+
+    const handleFirstThrower = (thrower: 'A' | 'B') => {
+      startMatchMutation.mutate(activeMatch.id, {
+        onSuccess: () => {
+          setLegsWonA(0);
+          setLegsWonB(0);
+          setAllMatchVisits([]);
+          resetLeg(thrower);
+          setLegStartingThrower(thrower);
+          setView("scoring");
+          refetch();
+        }
+      });
+    };
+
+    return (
+      <div className="min-h-[100dvh] bg-[#1a1a1a] flex flex-col" data-testid="scorer-bull-throw">
+        <div className="bg-primary text-primary-foreground py-2 px-3 shadow-lg shrink-0">
+          <div className="flex items-center gap-2 max-w-4xl mx-auto">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-primary-foreground shrink-0 h-8 w-8"
+              onClick={() => {
+                setView("matchList");
+                setActiveMatchId(null);
+              }}
+              data-testid="button-back-from-bull"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-primary-foreground/80 truncate">
+                {tournament.name} — {group.name} — Board {boardNumber}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center px-6">
+          <div className="text-center mb-6">
+            <Target className="w-12 h-12 text-yellow-400 mx-auto mb-3" />
+            <h2 className="text-white text-2xl font-bold mb-1">Bull Throw</h2>
+            <p className="text-gray-400 text-sm">Best of {matchBestOf} legs</p>
+          </div>
+
+          <div className="w-full max-w-sm mb-8">
+            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 text-center mb-3">
+              <p className="text-gray-400 text-xs uppercase tracking-wider mb-2">Match</p>
+              <p className="text-white text-xl font-bold">{playerA?.name || 'Player 1'}</p>
+              <p className="text-gray-500 text-sm my-1">vs</p>
+              <p className="text-white text-xl font-bold">{playerB?.name || 'Player 2'}</p>
+            </div>
+          </div>
+
+          <p className="text-gray-300 text-base font-semibold mb-4">Who throws first?</p>
+
+          <div className="w-full max-w-sm space-y-3">
+            <button
+              className="w-full h-16 rounded-xl bg-[#c0392b] text-white text-lg font-bold touch-manipulation active:bg-[#a93226] transition-colors"
+              onClick={() => handleFirstThrower('A')}
+              disabled={startMatchMutation.isPending}
+              data-testid="button-first-thrower-a"
+            >
+              {playerA?.name || 'Player 1'}
+            </button>
+            <button
+              className="w-full h-16 rounded-xl bg-[#2980b9] text-white text-lg font-bold touch-manipulation active:bg-[#2471a3] transition-colors"
+              onClick={() => handleFirstThrower('B')}
+              disabled={startMatchMutation.isPending}
+              data-testid="button-first-thrower-b"
+            >
+              {playerB?.name || 'Player 2'}
+            </button>
+          </div>
+
+          {startMatchMutation.isPending && (
+            <div className="mt-4">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (view === "scoring" && activeMatch) {
     const playerA = getPlayer(activeMatch.playerAId);
