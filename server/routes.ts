@@ -288,6 +288,169 @@ export async function registerRoutes(
           await storage.updateMatchNote(id, noteValues);
         }
     }
+
+    // === AUTO-PROGRESSION LOGIC ===
+    try {
+      const allMatches = await storage.getMatchesByTournamentId(match.tournamentId);
+      const tournamentData = await storage.getTournament(match.tournamentId);
+      const settings = (tournamentData?.settings || {}) as any;
+      const ptsWin = settings.pointsForWin ?? 2;
+      const ptsDraw = settings.pointsForDraw ?? 1;
+      const ptsLoss = settings.pointsForLoss ?? 0;
+
+      if (match.stage === 'GROUP') {
+        // Check if ALL group stage matches are now completed
+        const groupMatches = allMatches.filter(m => m.stage === 'GROUP');
+        const allGroupsDone = groupMatches.every(m => m.status === 'COMPLETED' || m.id === id);
+
+        if (allGroupsDone) {
+          const groupsList = await storage.getGroupsByTournamentId(match.tournamentId);
+          const playersList = await storage.getPlayersByTournamentId(match.tournamentId);
+          const memberships = await storage.getGroupMembershipsByTournamentId(match.tournamentId);
+          const knockoutMatches = allMatches.filter(m => m.stage === 'KNOCKOUT');
+
+          if (knockoutMatches.length > 0 && groupsList.length > 0) {
+            const sorted = [...knockoutMatches].sort((a: any, b: any) => a.order - b.order);
+            const roundKeys: string[] = [];
+            for (const m of sorted) {
+              if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
+            }
+            const firstRoundKey = roundKeys[0];
+            const firstRoundMatches = sorted.filter(m => m.roundKey === firstRoundKey);
+
+            // Calculate standings for each group
+            const calcGroupStandings = (groupId: number) => {
+              const memberPlayerIds = memberships.filter(gm => gm.groupId === groupId).map(gm => gm.playerId);
+              const groupPlayers = playersList.filter(p => memberPlayerIds.includes(p.id));
+              const gMatches = groupMatches.filter(m => m.groupId === groupId);
+              const completedGMatches = gMatches.filter(m => m.status === 'COMPLETED' || m.id === id);
+
+              const stats = groupPlayers.map(player => {
+                const playerMs = completedGMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
+                let won = 0, drawn = 0, lost = 0, legsFor = 0, legsAgainst = 0;
+                playerMs.forEach(m => {
+                  const isA = m.playerAId === player.id;
+                  const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
+                  const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
+                  legsFor += myScore;
+                  legsAgainst += oppScore;
+                  const mWinnerId = m.id === id ? winnerId : m.winnerId;
+                  if (mWinnerId === player.id) won++;
+                  else if (mWinnerId === null) drawn++;
+                  else lost++;
+                });
+                return {
+                  id: player.id,
+                  pts: (won * ptsWin) + (drawn * ptsDraw) + (lost * ptsLoss),
+                  legsFor,
+                  legsAgainst,
+                  diff: legsFor - legsAgainst,
+                };
+              });
+
+              return stats.sort((a, b) => {
+                if (b.pts !== a.pts) return b.pts - a.pts;
+                if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+                const h2h = completedGMatches.find(m =>
+                  (m.playerAId === a.id && m.playerBId === b.id) ||
+                  (m.playerAId === b.id && m.playerBId === a.id)
+                );
+                if (h2h) {
+                  const h2hWinner = h2h.id === id ? winnerId : h2h.winnerId;
+                  if (h2hWinner === a.id) return -1;
+                  if (h2hWinner === b.id) return 1;
+                }
+                return 0;
+              });
+            };
+
+            // Build pairings (same logic as frontend knockoutSlotLabels)
+            const groupCount = groupsList.length;
+            type Pairing = { aGroupIdx: number; aPos: number; bGroupIdx: number; bPos: number };
+            const pairings: Pairing[] = [];
+
+            if (groupCount === 2) {
+              pairings.push(
+                { aGroupIdx: 0, aPos: 0, bGroupIdx: 1, bPos: 1 },
+                { aGroupIdx: 1, aPos: 0, bGroupIdx: 0, bPos: 1 },
+              );
+            } else if (groupCount === 4) {
+              pairings.push(
+                { aGroupIdx: 0, aPos: 0, bGroupIdx: 1, bPos: 1 },
+                { aGroupIdx: 2, aPos: 1, bGroupIdx: 3, bPos: 0 },
+                { aGroupIdx: 2, aPos: 0, bGroupIdx: 3, bPos: 1 },
+                { aGroupIdx: 0, aPos: 1, bGroupIdx: 1, bPos: 0 },
+              );
+            } else if (groupCount === 3) {
+              pairings.push(
+                { aGroupIdx: 0, aPos: 0, bGroupIdx: 2, bPos: 1 },
+                { aGroupIdx: 1, aPos: 0, bGroupIdx: 0, bPos: 1 },
+                { aGroupIdx: 2, aPos: 0, bGroupIdx: 1, bPos: 1 },
+              );
+            } else {
+              for (let i = 0; i < groupCount; i++) {
+                const oppIdx = (groupCount - 1 - i) % groupCount;
+                pairings.push({ aGroupIdx: i, aPos: 0, bGroupIdx: oppIdx, bPos: 1 });
+              }
+            }
+
+            // Calculate standings per group and assign players
+            const standingsPerGroup: Record<number, { id: number; pts: number; legsFor: number }[]> = {};
+            for (const group of groupsList) {
+              standingsPerGroup[group.id] = calcGroupStandings(group.id);
+            }
+
+            for (let i = 0; i < firstRoundMatches.length && i < pairings.length; i++) {
+              const pairing = pairings[i];
+              const groupA = groupsList[pairing.aGroupIdx];
+              const groupB = groupsList[pairing.bGroupIdx];
+              if (!groupA || !groupB) continue;
+
+              const standingsA = standingsPerGroup[groupA.id];
+              const standingsB = standingsPerGroup[groupB.id];
+              const playerAId = standingsA?.[pairing.aPos]?.id || null;
+              const playerBId = standingsB?.[pairing.bPos]?.id || null;
+
+              if (playerAId || playerBId) {
+                await storage.updateMatch(firstRoundMatches[i].id, {
+                  playerAId: playerAId ?? undefined,
+                  playerBId: playerBId ?? undefined,
+                } as any);
+              }
+            }
+          }
+        }
+      } else if (match.stage === 'KNOCKOUT' && winnerId) {
+        // Progress winner to next knockout round
+        const knockoutMatches = allMatches.filter(m => m.stage === 'KNOCKOUT');
+        const sorted = [...knockoutMatches].sort((a: any, b: any) => a.order - b.order);
+        const roundKeys: string[] = [];
+        for (const m of sorted) {
+          if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
+        }
+
+        const currentRoundIdx = roundKeys.indexOf(match.roundKey);
+        if (currentRoundIdx >= 0 && currentRoundIdx < roundKeys.length - 1) {
+          const nextRoundKey = roundKeys[currentRoundIdx + 1];
+          const currentRoundMatches = sorted.filter(m => m.roundKey === match.roundKey);
+          const nextRoundMatches = sorted.filter(m => m.roundKey === nextRoundKey);
+
+          const matchIndexInRound = currentRoundMatches.findIndex(m => m.id === id);
+          const nextMatchIndex = Math.floor(matchIndexInRound / 2);
+          const isTopSlot = matchIndexInRound % 2 === 0;
+
+          if (nextMatchIndex < nextRoundMatches.length) {
+            const nextMatch = nextRoundMatches[nextMatchIndex];
+            await storage.updateMatch(nextMatch.id, isTopSlot
+              ? { playerAId: winnerId } as any
+              : { playerBId: winnerId } as any
+            );
+          }
+        }
+      }
+    } catch (progressionError) {
+      console.error("Auto-progression error (non-fatal):", progressionError);
+    }
     
     res.json(updatedMatch);
   });
