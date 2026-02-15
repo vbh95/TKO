@@ -82,7 +82,7 @@ export default function AuthPage() {
         <div className="text-center space-y-2">
           <img src={tkoLogo} alt="TKO" className="w-20 h-20 mx-auto mb-2" />
           <h1 className="text-3xl font-display font-bold tracking-tight">Welcome to TKO</h1>
-          <p className="text-muted-foreground">Tournament Knockout Organiser</p>
+          <p className="text-muted-foreground">The Ultimate Tournament Generator</p>
         </div>
 
         <Card className="border-none shadow-xl">
