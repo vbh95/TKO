@@ -416,8 +416,8 @@ export default function ScorerPage() {
     }
     if (digit === 'OK') {
       const score = parseInt(inputValue);
-      if (isNaN(score) || score < 0 || score > 180) {
-        setBustMessage("Invalid score (0-180)");
+      if (isNaN(score) || score < 0) {
+        setBustMessage("Invalid score");
         setTimeout(() => setBustMessage(null), 1500);
         return;
       }
@@ -425,7 +425,7 @@ export default function ScorerPage() {
       return;
     }
     const newVal = inputValue + digit;
-    if (parseInt(newVal) > 180) return;
+    if (newVal.length > 3) return;
     setInputValue(newVal);
   };
 
