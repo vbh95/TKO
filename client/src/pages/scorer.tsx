@@ -522,18 +522,26 @@ export default function ScorerPage() {
     const matchBestOf = activeMatch.bestOf || bestOf;
 
     const handleFirstThrower = (thrower: 'A' | 'B') => {
-      startMatchMutation.mutate(activeMatch.id, {
-        onSuccess: () => {
-          setLegsWonA(0);
-          setLegsWonB(0);
-          setAllMatchVisits([]);
-          resetLeg(thrower);
-          setLegStartingThrower(thrower);
-          setSwapPlayers(thrower === 'B');
-          setView("scoring");
-          refetch();
-        }
-      });
+      const applyThrower = () => {
+        setLegsWonA(activeMatch.scoreA || 0);
+        setLegsWonB(activeMatch.scoreB || 0);
+        setAllMatchVisits([]);
+        resetLeg(thrower);
+        setLegStartingThrower(thrower);
+        setSwapPlayers(thrower === 'B');
+        setView("scoring");
+      };
+
+      if (activeMatch.status === 'IN_PROGRESS') {
+        applyThrower();
+      } else {
+        startMatchMutation.mutate(activeMatch.id, {
+          onSuccess: () => {
+            applyThrower();
+            refetch();
+          }
+        });
+      }
     };
 
     return (
