@@ -345,34 +345,34 @@ export default function PublicView() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[40px] pl-4">#</TableHead>
-                        <TableHead>Player</TableHead>
-                        <TableHead className="text-center">P</TableHead>
-                        <TableHead className="text-center">W</TableHead>
-                        <TableHead className="text-center">L</TableHead>
-                        <TableHead className="text-center">LF</TableHead>
-                        <TableHead className="text-center">LA</TableHead>
-                        <TableHead className="text-right font-bold pr-4">Pts</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <table className="w-full table-fixed text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="w-8 pl-2 pr-1 py-2 text-left text-xs font-medium text-muted-foreground">#</th>
+                        <th className="py-2 text-left text-xs font-medium text-muted-foreground">Player</th>
+                        <th className="w-8 py-2 text-center text-xs font-medium text-muted-foreground">P</th>
+                        <th className="w-8 py-2 text-center text-xs font-medium text-muted-foreground">W</th>
+                        <th className="w-8 py-2 text-center text-xs font-medium text-muted-foreground">L</th>
+                        <th className="w-8 py-2 text-center text-xs font-medium text-muted-foreground">LF</th>
+                        <th className="w-8 py-2 text-center text-xs font-medium text-muted-foreground">LA</th>
+                        <th className="w-10 py-2 pr-2 text-right text-xs font-bold text-muted-foreground">Pts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {standings.map((player, idx) => (
-                        <TableRow key={player.id} className={idx === 0 ? "bg-yellow-50 dark:bg-yellow-900/10" : ""} data-testid={`row-standing-${player.id}`}>
-                          <TableCell className="font-medium text-muted-foreground pl-4">{idx + 1}</TableCell>
-                          <TableCell className="font-bold">{player.name}</TableCell>
-                          <TableCell className="text-center">{player.played}</TableCell>
-                          <TableCell className="text-center text-green-600">{player.won}</TableCell>
-                          <TableCell className="text-center text-red-500">{player.lost}</TableCell>
-                          <TableCell className="text-center">{player.legsFor}</TableCell>
-                          <TableCell className="text-center">{player.legsAgainst}</TableCell>
-                          <TableCell className="text-right font-bold text-primary text-lg pr-4">{player.pts}</TableCell>
-                        </TableRow>
+                        <tr key={player.id} className={cn("border-b last:border-0", idx === 0 && "bg-yellow-50 dark:bg-yellow-900/10")} data-testid={`row-standing-${player.id}`}>
+                          <td className="pl-2 pr-1 py-2 text-muted-foreground">{idx + 1}</td>
+                          <td className="py-2 font-bold truncate">{player.name}</td>
+                          <td className="py-2 text-center">{player.played}</td>
+                          <td className="py-2 text-center text-green-600">{player.won}</td>
+                          <td className="py-2 text-center text-red-500">{player.lost}</td>
+                          <td className="py-2 text-center">{player.legsFor}</td>
+                          <td className="py-2 text-center">{player.legsAgainst}</td>
+                          <td className="py-2 pr-2 text-right font-bold text-primary text-base">{player.pts}</td>
+                        </tr>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
                 </CardContent>
               </Card>
             ))}
