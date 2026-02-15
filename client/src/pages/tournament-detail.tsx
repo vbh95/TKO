@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link } from "wouter";
+import { QRCodeSVG } from "qrcode.react";
 import { useTournament, useTournamentShare, useBulkUpdatePlayers } from "@/hooks/use-tournaments";
 import { LayoutShell } from "@/components/layout-shell";
 import { MatchScoreInput } from "@/components/match-score-input";
@@ -61,6 +62,7 @@ export default function TournamentDetail() {
   const [copied, setCopied] = useState(false);
   const [bulkInput, setBulkInput] = useState("");
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
+  const [isDevicesDialogOpen, setIsDevicesDialogOpen] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -410,12 +412,80 @@ export default function TournamentDetail() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem data-testid="menu-item-devices" className="gap-2 cursor-pointer">
+                <DropdownMenuItem data-testid="menu-item-devices" className="gap-2 cursor-pointer" onSelect={() => setIsDevicesDialogOpen(true)}>
                   <TabletSmartphone className="w-4 h-4" />
                   Connected Devices
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Dialog open={isDevicesDialogOpen} onOpenChange={setIsDevicesDialogOpen}>
+              <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto" data-testid="dialog-connected-devices">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <TabletSmartphone className="w-5 h-5 text-primary" />
+                    Connected Devices
+                  </DialogTitle>
+                  <DialogDescription>
+                    Use these links or QR codes to connect your scoring app to each board. Each board maps to a group in the tournament.
+                  </DialogDescription>
+                </DialogHeader>
+
+                {!tournament.shareEnabled ? (
+                  <div className="text-center py-6 space-y-3">
+                    <p className="text-sm text-muted-foreground">Sharing must be enabled to generate device links.</p>
+                    <Button onClick={() => { enableShare.mutate(); }} data-testid="button-enable-sharing-devices">
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Enable Sharing
+                    </Button>
+                  </div>
+                ) : groups.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-muted-foreground">No groups found. Start the tournament to generate boards.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {[...groups].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((group: any, idx: number) => {
+                      const boardUrl = `${window.location.origin}/public/t/${tournament.shareToken}/board/${idx + 1}`;
+                      return (
+                        <div key={group.id} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${idx + 1}`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="font-bold text-sm">Board {idx + 1}</h3>
+                              <p className="text-xs text-muted-foreground">{group.name}</p>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              <Target className="w-3 h-3 mr-1" />
+                              Board {idx + 1}
+                            </Badge>
+                          </div>
+
+                          <div className="flex justify-center bg-white rounded-lg p-4">
+                            <QRCodeSVG value={boardUrl} size={160} level="M" />
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Input readOnly value={boardUrl} className="text-xs h-8" data-testid={`input-device-url-${idx + 1}`} />
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 shrink-0"
+                              data-testid={`button-copy-device-${idx + 1}`}
+                              onClick={() => {
+                                navigator.clipboard.writeText(boardUrl);
+                                toast({ title: `Board ${idx + 1} link copied!` });
+                              }}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
