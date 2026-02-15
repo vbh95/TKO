@@ -284,13 +284,7 @@ export default function ScorerPage() {
     const newRemaining = currentRemaining - score;
 
     if (newRemaining < 0 || newRemaining === 1) {
-      setBustMessage(`BUST! ${score} scored, stays on ${currentRemaining}`);
-      setTimeout(() => setBustMessage(null), 2000);
-      const nextThrower = currentThrower === 'A' ? 'B' : 'A';
-      setCurrentThrower(nextThrower);
-      setLegVisits(prev => [...prev, { player: currentThrower, score: 0 }]);
-      setInputValue("");
-      emitLiveState(remainingA, remainingB, nextThrower, legsWonA, legsWonB);
+      setImpossibleWarning(`BUST! ${score} is more than the remaining ${currentRemaining}. Enter the correct score or 0 for no score.`);
       return;
     }
 
@@ -666,7 +660,9 @@ export default function ScorerPage() {
 
           {impossibleWarning && (
             <div className="bg-[#222] border-2 border-yellow-500 rounded-xl p-4 mb-2 shrink-0" data-testid="impossible-warning">
-              <p className="text-yellow-400 font-bold text-center text-base mb-1">Impossible Score</p>
+              <p className="text-yellow-400 font-bold text-center text-base mb-1">
+                {impossibleWarning.startsWith("BUST") ? "BUST!" : "Impossible Score"}
+              </p>
               <p className="text-gray-300 text-center text-sm mb-3">{impossibleWarning}</p>
               <button
                 className="w-full h-11 rounded-xl bg-yellow-600 text-white font-semibold text-base touch-manipulation active:bg-yellow-700 transition-colors"
