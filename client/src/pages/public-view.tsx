@@ -137,9 +137,9 @@ export default function PublicView() {
       {/* Public Header */}
       <div className="bg-primary text-primary-foreground py-6 px-4 shadow-lg mb-6">
         <div className="container max-w-6xl mx-auto">
-          <div className="flex items-center gap-4 mb-2">
-            <img src={tkoLogoFull} alt="TKO" className="h-14 md:h-16" data-testid="img-tko-logo" />
-            <h1 className="text-2xl md:text-3xl font-display font-bold" data-testid="text-tournament-name">{tournament.name}</h1>
+          <div className="flex items-center gap-5 mb-2">
+            <img src={tkoLogoFull} alt="TKO" className="h-20 md:h-24" data-testid="img-tko-logo" />
+            <h1 className="text-xl md:text-2xl font-display font-bold" data-testid="text-tournament-name">{tournament.name}</h1>
           </div>
           <div className="flex flex-wrap gap-2 items-center text-primary-foreground/80 text-sm pl-1">
             <Badge variant="outline" className="border-white/30 text-white">
