@@ -121,11 +121,16 @@ export default function PublicView() {
     : [{ group: null, standings: calcStandings(players, matches) }];
 
   const knockoutRoundOrder: Record<string, number> = {
+    'QF': 1,
     'Quarter Final': 1,
     'Quarter Finals': 1,
+    'SF': 2,
     'Semi Final': 2,
     'Semi Finals': 2,
+    'F': 3,
     'Final': 3,
+    'GF': 4,
+    'Grand Final': 4,
   };
 
   const matchesByRound = matches.reduce((acc, match) => {
