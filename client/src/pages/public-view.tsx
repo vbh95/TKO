@@ -37,6 +37,127 @@ interface LiveScoring {
   lastScoreB: number | null;
 }
 
+function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
+  match: any;
+  ls: LiveScoring | undefined;
+  playerA: any;
+  playerB: any;
+  headerLabel: string;
+}) {
+  return (
+    <Card className="border-2 border-primary shadow-xl overflow-hidden" data-testid={`live-match-${match.id}`}>
+      <CardHeader className="bg-primary/10 border-b py-2.5 px-4">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+          {headerLabel}
+          {ls && (
+            <span className="text-xs text-muted-foreground ml-auto">
+              Leg {(ls.legsWonA + ls.legsWonB + 1)} / Best of {ls.bestOf}
+            </span>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-3 pb-4 px-4">
+        {ls ? (
+          <div>
+            <div className="text-center mb-2">
+              <div className="flex items-center justify-center gap-3 tabular-nums">
+                <span className={cn("text-2xl font-bold", ls.legsWonA >= ls.legsWonB ? "text-primary" : "text-muted-foreground")}>{ls.legsWonA}</span>
+                <span className="text-muted-foreground text-sm">-</span>
+                <span className={cn("text-2xl font-bold", ls.legsWonB >= ls.legsWonA ? "text-primary" : "text-muted-foreground")}>{ls.legsWonB}</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div
+                className={cn(
+                  "rounded-lg p-3 transition-all",
+                  ls.currentThrower === 'A'
+                    ? "bg-red-600/15 ring-2 ring-red-500/50"
+                    : "bg-green-600/15 ring-2 ring-green-500/50"
+                )}
+                data-testid="live-panel-a"
+              >
+                <div className="h-3.5 mb-0.5">
+                  {ls.currentThrower === 'A' && (
+                    <div className="flex items-center gap-1">
+                      <Eye className="w-3 h-3 text-red-500" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs font-bold truncate">{ls.playerAName}</p>
+                <p className="text-4xl font-bold tabular-nums leading-none mt-1" data-testid="live-remaining-a">{ls.remainingA}</p>
+                <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Avg</span>
+                    <span className="font-medium tabular-nums text-foreground">{ls.avgA}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Last</span>
+                    <span className="font-medium tabular-nums text-foreground">{ls.lastScoreA !== null ? ls.lastScoreA : '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Darts</span>
+                    <span className="font-medium tabular-nums text-foreground">{ls.dartsA}</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                className={cn(
+                  "rounded-lg p-3 transition-all",
+                  ls.currentThrower === 'B'
+                    ? "bg-red-600/15 ring-2 ring-red-500/50"
+                    : "bg-green-600/15 ring-2 ring-green-500/50"
+                )}
+                data-testid="live-panel-b"
+              >
+                <div className="h-3.5 mb-0.5">
+                  {ls.currentThrower === 'B' && (
+                    <div className="flex items-center gap-1">
+                      <Eye className="w-3 h-3 text-red-500" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs font-bold truncate">{ls.playerBName}</p>
+                <p className="text-4xl font-bold tabular-nums leading-none mt-1" data-testid="live-remaining-b">{ls.remainingB}</p>
+                <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Avg</span>
+                    <span className="font-medium tabular-nums text-foreground">{ls.avgB}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Last</span>
+                    <span className="font-medium tabular-nums text-foreground">{ls.lastScoreB !== null ? ls.lastScoreB : '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Darts</span>
+                    <span className="font-medium tabular-nums text-foreground">{ls.dartsB}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between text-center py-4">
+            <div className="flex-1">
+              <p className="text-lg font-bold">{playerA?.name || "TBD"}</p>
+            </div>
+            <div className="flex items-center gap-3 px-3">
+              <span className="text-2xl font-bold tabular-nums">{match.scoreA || 0}</span>
+              <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
+              <span className="text-2xl font-bold tabular-nums">{match.scoreB || 0}</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-lg font-bold">{playerB?.name || "TBD"}</p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function PublicView() {
   const { shareToken } = useParams();
   const { data, isLoading, error, refetch } = usePublicTournament(shareToken || "");
@@ -154,6 +275,10 @@ export default function PublicView() {
 
   const { theme, toggleTheme } = useTheme();
 
+  const groupStageMatches = matches.filter(m => m.stage === 'GROUP');
+  const knockoutStageMatches = matches.filter(m => m.stage !== 'GROUP');
+  const groupsFinished = groupStageMatches.length > 0 && groupStageMatches.every(m => m.status === 'COMPLETED');
+
   const liveMatches = matches
     .filter(m => m.status === 'IN_PROGRESS')
     .sort((a, b) => {
@@ -162,16 +287,51 @@ export default function PublicView() {
       return groupA.localeCompare(groupB);
     });
 
-  const completedGroups = groups.length > 0
+  const getRoundDisplayName = (rk: string) => {
+    const names: Record<string, string> = { QF: 'Quarter Final', SF: 'Semi Final', F: 'Final', GF: 'Grand Final' };
+    return names[rk] || rk;
+  };
+
+  const knockoutCards: { match: typeof matches[0]; isLive: boolean; label: string }[] = [];
+  if (groupsFinished && knockoutStageMatches.length > 0) {
+    const knockoutRounds = Array.from(new Set(knockoutStageMatches.map(m => m.roundKey))) as string[];
+    const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
+    knockoutRounds.sort((a, b) => (koOrder[a] || 0) - (koOrder[b] || 0));
+
+    let currentRoundKey: string | null = null;
+    for (const rk of knockoutRounds) {
+      const roundMatches = knockoutStageMatches.filter(m => m.roundKey === rk);
+      if (!roundMatches.every(m => m.status === 'COMPLETED')) {
+        currentRoundKey = rk;
+        break;
+      }
+    }
+
+    if (currentRoundKey) {
+      const currentRoundMatches = knockoutStageMatches
+        .filter(m => m.roundKey === currentRoundKey)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      currentRoundMatches.forEach((match, i) => {
+        knockoutCards.push({
+          match,
+          isLive: match.status === 'IN_PROGRESS',
+          label: `${getRoundDisplayName(currentRoundKey!)}${currentRoundMatches.length > 1 ? ` ${i + 1}` : ''}`,
+        });
+      });
+    }
+  }
+
+  const completedGroups = groups.length > 0 && !groupsFinished
     ? groups
         .filter(group => {
-          const groupMatches = matches.filter(m => m.groupId === group.id);
-          return groupMatches.length > 0 &&
-            groupMatches.every(m => m.status === 'COMPLETED') &&
-            liveMatches.length > 0;
+          const gm = matches.filter(m => m.groupId === group.id);
+          return gm.length > 0 && gm.every(m => m.status === 'COMPLETED') && liveMatches.length > 0;
         })
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
     : [];
+
+  const showLiveSection = !groupsFinished && liveMatches.length > 0;
+  const showKnockoutSection = groupsFinished && knockoutCards.length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -206,7 +366,8 @@ export default function PublicView() {
             </span>
           )}
         </div>
-        {liveMatches.length > 0 && (
+
+        {showLiveSection && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
@@ -219,118 +380,8 @@ export default function PublicView() {
                 const playerA = getPlayer(match.playerAId);
                 const playerB = getPlayer(match.playerBId);
                 const groupName = match.groupId ? groups.find(g => g.id === match.groupId)?.name : null;
-
                 return (
-                  <Card key={match.id} className="border-2 border-primary shadow-xl overflow-hidden" data-testid={`live-match-${match.id}`}>
-                    <CardHeader className="bg-primary/10 border-b py-2.5 px-4">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
-                        {groupName ? groupName : 'Live'}
-                        {ls && (
-                          <span className="text-xs text-muted-foreground ml-auto">
-                            Leg {(ls.legsWonA + ls.legsWonB + 1)} / Best of {ls.bestOf}
-                          </span>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-3 pb-4 px-4">
-                      {ls ? (
-                        <div>
-                          <div className="text-center mb-2">
-                            <div className="flex items-center justify-center gap-3 tabular-nums">
-                              <span className={cn("text-2xl font-bold", ls.legsWonA >= ls.legsWonB ? "text-primary" : "text-muted-foreground")}>{ls.legsWonA}</span>
-                              <span className="text-muted-foreground text-sm">-</span>
-                              <span className={cn("text-2xl font-bold", ls.legsWonB >= ls.legsWonA ? "text-primary" : "text-muted-foreground")}>{ls.legsWonB}</span>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div
-                              className={cn(
-                                "rounded-lg p-3 transition-all",
-                                ls.currentThrower === 'A'
-                                  ? "bg-red-600/15 ring-2 ring-red-500/50"
-                                  : "bg-green-600/15 ring-2 ring-green-500/50"
-                              )}
-                              data-testid="live-panel-a"
-                            >
-                              <div className="h-3.5 mb-0.5">
-                                {ls.currentThrower === 'A' && (
-                                  <div className="flex items-center gap-1">
-                                    <Eye className="w-3 h-3 text-red-500" />
-                                    <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
-                                  </div>
-                                )}
-                              </div>
-                              <p className="text-xs font-bold truncate">{ls.playerAName}</p>
-                              <p className="text-4xl font-bold tabular-nums leading-none mt-1" data-testid="live-remaining-a">{ls.remainingA}</p>
-                              <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                                <div className="flex justify-between">
-                                  <span>Avg</span>
-                                  <span className="font-medium tabular-nums text-foreground">{ls.avgA}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Last</span>
-                                  <span className="font-medium tabular-nums text-foreground">{ls.lastScoreA !== null ? ls.lastScoreA : '-'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Darts</span>
-                                  <span className="font-medium tabular-nums text-foreground">{ls.dartsA}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div
-                              className={cn(
-                                "rounded-lg p-3 transition-all",
-                                ls.currentThrower === 'B'
-                                  ? "bg-red-600/15 ring-2 ring-red-500/50"
-                                  : "bg-green-600/15 ring-2 ring-green-500/50"
-                              )}
-                              data-testid="live-panel-b"
-                            >
-                              <div className="h-3.5 mb-0.5">
-                                {ls.currentThrower === 'B' && (
-                                  <div className="flex items-center gap-1">
-                                    <Eye className="w-3 h-3 text-red-500" />
-                                    <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
-                                  </div>
-                                )}
-                              </div>
-                              <p className="text-xs font-bold truncate">{ls.playerBName}</p>
-                              <p className="text-4xl font-bold tabular-nums leading-none mt-1" data-testid="live-remaining-b">{ls.remainingB}</p>
-                              <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                                <div className="flex justify-between">
-                                  <span>Avg</span>
-                                  <span className="font-medium tabular-nums text-foreground">{ls.avgB}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Last</span>
-                                  <span className="font-medium tabular-nums text-foreground">{ls.lastScoreB !== null ? ls.lastScoreB : '-'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Darts</span>
-                                  <span className="font-medium tabular-nums text-foreground">{ls.dartsB}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between text-center py-4">
-                          <div className="flex-1">
-                            <p className="text-lg font-bold">{playerA?.name || "TBD"}</p>
-                          </div>
-                          <div className="flex items-center gap-3 px-3">
-                            <span className="text-2xl font-bold tabular-nums">{match.scoreA || 0}</span>
-                            <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
-                            <span className="text-2xl font-bold tabular-nums">{match.scoreB || 0}</span>
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-lg font-bold">{playerB?.name || "TBD"}</p>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <LiveMatchCard key={match.id} match={match} ls={ls} playerA={playerA} playerB={playerB} headerLabel={groupName || 'Live'} />
                 );
               })}
               {completedGroups.map(group => (
@@ -346,6 +397,77 @@ export default function PublicView() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          </div>
+        )}
+
+        {showKnockoutSection && (
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Trophy className="w-5 h-5 text-yellow-500" />
+              <h2 className="text-xl font-display font-bold">Knockout Stage</h2>
+              {liveMatches.length > 0 && (
+                <Badge variant="default" className="ml-1 bg-green-600">{liveMatches.length} Live</Badge>
+              )}
+            </div>
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+              {knockoutCards.map(({ match, isLive, label }) => {
+                const ls = liveScorings.get(match.id);
+                const playerA = getPlayer(match.playerAId);
+                const playerB = getPlayer(match.playerBId);
+                const isCompleted = match.status === 'COMPLETED';
+
+                if (isLive) {
+                  return <LiveMatchCard key={match.id} match={match} ls={ls} playerA={playerA} playerB={playerB} headerLabel={label} />;
+                }
+
+                return (
+                  <Card
+                    key={match.id}
+                    className={cn(
+                      "overflow-hidden",
+                      isCompleted ? "border border-muted-foreground/20 opacity-70" : "border-2 border-dashed border-primary/40"
+                    )}
+                    data-testid={`knockout-match-${match.id}`}
+                  >
+                    <CardHeader className={cn("border-b py-2.5 px-4", isCompleted ? "bg-muted/30" : "bg-primary/5")}>
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        {isCompleted ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
+                        )}
+                        {label}
+                        {!isCompleted && (
+                          <span className="text-xs text-muted-foreground ml-auto">Next Up</span>
+                        )}
+                        {isCompleted && (
+                          <span className="text-xs text-muted-foreground ml-auto">Completed</span>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="py-4 px-4">
+                      <div className="flex items-center justify-between text-center">
+                        <div className="flex-1">
+                          <p className={cn("text-lg font-bold", isCompleted && match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>
+                            {playerA?.name || "TBD"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 px-3">
+                          <span className={cn("text-2xl font-bold tabular-nums", isCompleted && match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>{match.scoreA || 0}</span>
+                          <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
+                          <span className={cn("text-2xl font-bold tabular-nums", isCompleted && match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>{match.scoreB || 0}</span>
+                        </div>
+                        <div className="flex-1">
+                          <p className={cn("text-lg font-bold", isCompleted && match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>
+                            {playerB?.name || "TBD"}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}
