@@ -781,16 +781,11 @@ export default function TournamentDetail() {
                       <TableBody>
                         {standings.map((player: any, idx: number) => {
                           const qualifying = idx < 2;
-                          const pos = idx === 0 ? 1 : (
-                            standings[idx - 1].pts === player.pts &&
-                            standings[idx - 1].diff === player.diff &&
-                            standings[idx - 1].legsFor === player.legsFor
-                          ) ? standings.findIndex((p: any) => p.pts === player.pts && p.diff === player.diff && p.legsFor === player.legsFor) + 1 : idx + 1;
                           return (
                           <TableRow key={player.id} className={qualifying ? "bg-green-50 dark:bg-green-950/30" : ""}>
                             <TableCell className="font-medium text-muted-foreground">
                               <div className="flex items-center gap-1.5">
-                                {pos}
+                                {idx + 1}
                                 {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
                               </div>
                             </TableCell>

@@ -84,7 +84,7 @@ function tryHeadToHead(
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.diff !== a.diff) return b.diff - a.diff;
     if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-    return 0;
+    return a.id - b.id;
   });
 
   return h2hStats.map(h => tiedGroup.find(p => p.id === h.id)!);
@@ -103,7 +103,8 @@ export function calcStandings<P extends PlayerLike>(
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.diff !== a.diff) return b.diff - a.diff;
     if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-    return a.played - b.played;
+    if (a.played !== b.played) return a.played - b.played;
+    return a.id - b.id;
   });
 
   let i = 0;

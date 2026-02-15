@@ -375,16 +375,10 @@ export default function PublicView() {
                       </tr>
                     </thead>
                     <tbody>
-                      {standings.map((player, idx) => {
-                        const pos = idx === 0 ? 1 : (
-                          standings[idx - 1].pts === player.pts &&
-                          standings[idx - 1].diff === player.diff &&
-                          standings[idx - 1].legsFor === player.legsFor
-                        ) ? standings.findIndex((p, i) => p.pts === player.pts && p.diff === player.diff && p.legsFor === player.legsFor) + 1 : idx + 1;
-                        return (
+                      {standings.map((player, idx) => (
                         <tr key={player.id} className={cn("border-b last:border-0", idx < 2 && "bg-green-50 dark:bg-green-950/30")} data-testid={`row-standing-${player.id}`}>
                           <td className="pl-2 pr-1 py-2 text-muted-foreground flex items-center gap-1">
-                            {pos}
+                            {idx + 1}
                             {idx < 2 && <div className="w-2 h-2 rounded-full bg-green-500" />}
                           </td>
                           <td className={cn("py-2 font-bold truncate", idx < 2 && "text-green-700 dark:text-green-400")}>{player.name}</td>
@@ -395,8 +389,7 @@ export default function PublicView() {
                           <td className="py-2 text-center">{player.legsAgainst}</td>
                           <td className="py-2 pr-2 text-right font-bold text-primary text-base">{player.pts}</td>
                         </tr>
-                        );
-                      })}
+                      ))}
                     </tbody>
                   </table>
                 </CardContent>
