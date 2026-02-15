@@ -676,6 +676,51 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/scorer/matches/:matchId/start', isBoardAuthenticated, async (req: any, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      const match = await storage.getMatch(matchId);
+      if (!match) return res.status(404).json({ message: "Match not found" });
+
+      const { tournamentId, boardNumber } = req.boardSession;
+      if (match.tournamentId !== tournamentId) {
+        return res.status(403).json({ message: "Match does not belong to this tournament" });
+      }
+
+      if (match.status !== 'PENDING') {
+        return res.status(400).json({ message: "Match is not in PENDING status" });
+      }
+
+      const allMatches = await storage.getMatchesByTournamentId(tournamentId);
+      const boardGroups = await storage.getGroupsByTournamentId(tournamentId);
+      const sortedGroups = boardGroups.sort((a, b) => a.name.localeCompare(b.name));
+      const boardGroup = sortedGroups[boardNumber - 1];
+      if (!boardGroup) {
+        return res.status(404).json({ message: "Board group not found" });
+      }
+      const boardMatches = allMatches.filter(m => m.groupId === boardGroup.id);
+      const existingInProgress = boardMatches.find(m => m.status === 'IN_PROGRESS' && m.id !== matchId);
+      if (existingInProgress) {
+        return res.status(400).json({ message: "Another match is already in progress on this board" });
+      }
+
+      const updatedMatch = await storage.updateMatch(matchId, {
+        status: "IN_PROGRESS",
+        scoreA: 0,
+        scoreB: 0,
+      });
+
+      const tournament = await storage.getTournament(tournamentId);
+      emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
+      emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
+
+      res.json(updatedMatch);
+    } catch (err) {
+      console.error("Scorer match start error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.put('/api/scorer/matches/:matchId', isBoardAuthenticated, async (req: any, res) => {
     try {
       const matchId = parseInt(req.params.matchId);
@@ -692,15 +737,27 @@ export async function registerRoutes(
         return res.status(400).json({ message: "scoreA and scoreB are required" });
       }
 
+      if (match.status !== 'IN_PROGRESS') {
+        return res.status(400).json({ message: "Match must be IN_PROGRESS to update scores" });
+      }
+
+      const matchBestOf = match.bestOf || 3;
+      const legsToWin = Math.ceil(matchBestOf / 2);
+      const isFinished = scoreA >= legsToWin || scoreB >= legsToWin;
+
       let winnerId: number | null = null;
-      if (scoreA > scoreB && match.playerAId) winnerId = match.playerAId;
-      else if (scoreB > scoreA && match.playerBId) winnerId = match.playerBId;
+      let status: string = "IN_PROGRESS";
+      if (isFinished) {
+        status = "COMPLETED";
+        if (scoreA > scoreB && match.playerAId) winnerId = match.playerAId;
+        else if (scoreB > scoreA && match.playerBId) winnerId = match.playerBId;
+      }
 
       const updatedMatch = await storage.updateMatch(matchId, {
         scoreA,
         scoreB,
         winnerId,
-        status: "COMPLETED",
+        status,
       });
 
       if (req.body.notes) {

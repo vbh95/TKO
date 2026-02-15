@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
-import { Loader2, Target, Trophy, Check, Wifi, WifiOff } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Loader2, Target, Trophy, Check, Wifi, WifiOff, Play, ChevronRight, ArrowLeft, Minus, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/hooks/use-socket";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface BoardData {
   tournament: {
@@ -52,6 +51,8 @@ interface BoardData {
   accessToken?: string;
 }
 
+type ScorerView = "matchList" | "scoring";
+
 export default function ScorerPage() {
   const params = useParams<{ tournamentId: string; boardNumber: string }>();
   const tournamentId = parseInt(params.tournamentId || "0");
@@ -59,9 +60,10 @@ export default function ScorerPage() {
   const { toast } = useToast();
   const { joinScorer, joinBoard, on, socket } = useSocket();
   const [isConnected, setIsConnected] = useState(false);
+  const [view, setView] = useState<ScorerView>("matchList");
   const [activeMatchId, setActiveMatchId] = useState<number | null>(null);
-  const [tempScoreA, setTempScoreA] = useState(0);
-  const [tempScoreB, setTempScoreB] = useState(0);
+  const [legScoreA, setLegScoreA] = useState(0);
+  const [legScoreB, setLegScoreB] = useState(0);
 
   const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/scorer/board-data'],
@@ -83,6 +85,18 @@ export default function ScorerPage() {
   }, [data?.accessToken, tournamentId, boardNumber, joinScorer, joinBoard]);
 
   useEffect(() => {
+    if (data && view === "matchList" && activeMatchId === null) {
+      const inProgress = data.matches.find(m => m.status === 'IN_PROGRESS');
+      if (inProgress) {
+        setActiveMatchId(inProgress.id);
+        setLegScoreA(inProgress.scoreA || 0);
+        setLegScoreB(inProgress.scoreB || 0);
+        setView("scoring");
+      }
+    }
+  }, [data, view, activeMatchId]);
+
+  useEffect(() => {
     const cleanup1 = on("connect", () => setIsConnected(true));
     const cleanup2 = on("disconnect", () => setIsConnected(false));
     const cleanup3 = on("match:updated", () => {
@@ -91,6 +105,31 @@ export default function ScorerPage() {
     setIsConnected(socket.connected);
     return () => { cleanup1(); cleanup2(); cleanup3(); };
   }, [on, socket, refetch]);
+
+  const startMatchMutation = useMutation({
+    mutationFn: async (matchId: number) => {
+      const res = await fetch(`/api/scorer/matches/${matchId}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to start match");
+      }
+      return res.json();
+    },
+    onSuccess: (_, matchId) => {
+      setActiveMatchId(matchId);
+      setLegScoreA(0);
+      setLegScoreB(0);
+      setView("scoring");
+      refetch();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
 
   const submitScoreMutation = useMutation({
     mutationFn: async ({ matchId, scoreA, scoreB }: { matchId: number; scoreA: number; scoreB: number }) => {
@@ -104,8 +143,28 @@ export default function ScorerPage() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Score submitted" });
+      toast({ title: "Match complete!" });
       setActiveMatchId(null);
+      setView("matchList");
+      refetch();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateLegMutation = useMutation({
+    mutationFn: async ({ matchId, scoreA, scoreB }: { matchId: number; scoreA: number; scoreB: number }) => {
+      const res = await fetch(`/api/scorer/matches/${matchId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ scoreA, scoreB }),
+      });
+      if (!res.ok) throw new Error("Failed to update score");
+      return res.json();
+    },
+    onSuccess: () => {
       refetch();
     },
     onError: (err: any) => {
@@ -145,7 +204,6 @@ export default function ScorerPage() {
   const completedMatches = matches.filter(m => m.status === 'COMPLETED');
   const pendingMatches = matches.filter(m => m.status === 'PENDING');
   const inProgressMatch = matches.find(m => m.status === 'IN_PROGRESS');
-  const currentMatch = inProgressMatch || pendingMatches[0];
 
   const standings = players.map(player => {
     const playerMatches = completedMatches.filter(m =>
@@ -174,16 +232,179 @@ export default function ScorerPage() {
     return 0;
   });
 
-  const handleStartScoring = (matchId: number, currentScoreA: number, currentScoreB: number) => {
-    setActiveMatchId(matchId);
-    setTempScoreA(currentScoreA || 0);
-    setTempScoreB(currentScoreB || 0);
+  const handleTapMatch = (matchId: number) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match) return;
+
+    if (match.status === 'IN_PROGRESS') {
+      setActiveMatchId(matchId);
+      setLegScoreA(match.scoreA || 0);
+      setLegScoreB(match.scoreB || 0);
+      setView("scoring");
+    } else if (match.status === 'PENDING') {
+      startMatchMutation.mutate(matchId);
+    }
   };
 
-  const handleSubmitScore = () => {
+  const handleLegWon = (winner: 'A' | 'B') => {
     if (activeMatchId === null) return;
-    submitScoreMutation.mutate({ matchId: activeMatchId, scoreA: tempScoreA, scoreB: tempScoreB });
+    const activeM = matches.find(m => m.id === activeMatchId);
+    if (!activeM) return;
+
+    const matchLegs = Math.ceil((activeM.bestOf || bestOf) / 2);
+    const newScoreA = winner === 'A' ? legScoreA + 1 : legScoreA;
+    const newScoreB = winner === 'B' ? legScoreB + 1 : legScoreB;
+
+    setLegScoreA(newScoreA);
+    setLegScoreB(newScoreB);
+
+    if (newScoreA >= matchLegs || newScoreB >= matchLegs) {
+      submitScoreMutation.mutate({ matchId: activeMatchId, scoreA: newScoreA, scoreB: newScoreB });
+    } else {
+      updateLegMutation.mutate({ matchId: activeMatchId, scoreA: newScoreA, scoreB: newScoreB });
+    }
   };
+
+  const handleUndoLeg = (side: 'A' | 'B') => {
+    if (activeMatchId === null) return;
+    const newA = side === 'A' ? Math.max(legScoreA - 1, 0) : legScoreA;
+    const newB = side === 'B' ? Math.max(legScoreB - 1, 0) : legScoreB;
+    setLegScoreA(newA);
+    setLegScoreB(newB);
+    updateLegMutation.mutate({ matchId: activeMatchId, scoreA: newA, scoreB: newB });
+  };
+
+  const activeMatch = activeMatchId ? matches.find(m => m.id === activeMatchId) : null;
+
+  if (view === "scoring" && activeMatch) {
+    const playerA = getPlayer(activeMatch.playerAId);
+    const playerB = getPlayer(activeMatch.playerBId);
+    const matchBestOf = activeMatch.bestOf || bestOf;
+    const matchLegsToWin = Math.ceil(matchBestOf / 2);
+
+    return (
+      <div className="min-h-screen bg-background flex flex-col" data-testid="scorer-match-view">
+        <div className="bg-primary text-primary-foreground py-4 px-4 shadow-lg">
+          <div className="container max-w-3xl mx-auto flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-primary-foreground shrink-0"
+              onClick={() => {
+                setView("matchList");
+                setActiveMatchId(null);
+              }}
+              data-testid="button-back-to-list"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-display font-bold truncate" data-testid="text-tournament-name">{tournament.name}</h1>
+              <p className="text-primary-foreground/80 text-xs">
+                {group.name} — Board {boardNumber} — Best of {matchBestOf}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {isConnected ? (
+                <Badge variant="outline" className="border-green-400 text-green-100 gap-1">
+                  <Wifi className="w-3 h-3" /> Live
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-red-400 text-red-100 gap-1">
+                  <WifiOff className="w-3 h-3" /> Offline
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col container max-w-3xl mx-auto px-4 py-6">
+          <div className="text-center mb-2">
+            <p className="text-sm text-muted-foreground uppercase tracking-wide font-medium">
+              First to {matchLegsToWin} legs
+            </p>
+          </div>
+
+          <div className="flex-1 grid grid-cols-3 gap-2 items-center min-h-0">
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-lg md:text-xl font-bold text-center leading-tight" data-testid="text-player-a-name">
+                {playerA?.name || "TBD"}
+              </p>
+              <div
+                className="text-7xl md:text-8xl font-bold tabular-nums text-primary"
+                data-testid="text-leg-score-a"
+              >
+                {legScoreA}
+              </div>
+              <Button
+                className="w-full h-24 md:h-28 text-2xl font-bold touch-manipulation bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => handleLegWon('A')}
+                disabled={submitScoreMutation.isPending || updateLegMutation.isPending}
+                data-testid="button-leg-won-a"
+              >
+                <Trophy className="w-6 h-6 mr-2" />
+                Leg Won
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs touch-manipulation"
+                onClick={() => handleUndoLeg('A')}
+                disabled={legScoreA === 0 || submitScoreMutation.isPending || updateLegMutation.isPending}
+                data-testid="button-undo-a"
+              >
+                <Minus className="w-3 h-3 mr-1" />
+                Undo Leg
+              </Button>
+            </div>
+
+            <div className="flex flex-col items-center justify-center">
+              <span className="text-muted-foreground text-2xl font-bold">vs</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-lg md:text-xl font-bold text-center leading-tight" data-testid="text-player-b-name">
+                {playerB?.name || "TBD"}
+              </p>
+              <div
+                className="text-7xl md:text-8xl font-bold tabular-nums text-primary"
+                data-testid="text-leg-score-b"
+              >
+                {legScoreB}
+              </div>
+              <Button
+                className="w-full h-24 md:h-28 text-2xl font-bold touch-manipulation bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => handleLegWon('B')}
+                disabled={submitScoreMutation.isPending || updateLegMutation.isPending}
+                data-testid="button-leg-won-b"
+              >
+                <Trophy className="w-6 h-6 mr-2" />
+                Leg Won
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs touch-manipulation"
+                onClick={() => handleUndoLeg('B')}
+                disabled={legScoreB === 0 || submitScoreMutation.isPending || updateLegMutation.isPending}
+                data-testid="button-undo-b"
+              >
+                <Minus className="w-3 h-3 mr-1" />
+                Undo Leg
+              </Button>
+            </div>
+          </div>
+
+          {(submitScoreMutation.isPending || updateLegMutation.isPending) && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
+              <span className="text-sm text-muted-foreground">Updating...</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background" data-testid="scorer-view">
@@ -218,134 +439,113 @@ export default function ScorerPage() {
       </div>
 
       <div className="container max-w-3xl mx-auto px-4 py-6 space-y-6">
-        {currentMatch && activeMatchId !== currentMatch.id && (
-          <Card className="border-2 border-primary shadow-xl" data-testid="card-current-match">
-            <CardHeader className="bg-primary/10 border-b pb-3">
+        {inProgressMatch && (
+          <Card
+            className="border-2 border-green-500 shadow-xl cursor-pointer"
+            onClick={() => handleTapMatch(inProgressMatch.id)}
+            data-testid={`card-match-in-progress-${inProgressMatch.id}`}
+          >
+            <CardHeader className="bg-green-500/10 border-b pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                {currentMatch.status === 'IN_PROGRESS' ? 'Now Playing' : 'Up Next'}
+                Now Playing
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 pb-4">
-              <div className="flex items-center justify-between text-center mb-6">
+              <div className="flex items-center justify-between text-center mb-4">
                 <div className="flex-1">
-                  <p className="text-xl font-bold">{getPlayer(currentMatch.playerAId)?.name || "TBD"}</p>
+                  <p className="text-xl font-bold">{getPlayer(inProgressMatch.playerAId)?.name || "TBD"}</p>
+                  <p className="text-3xl font-bold text-primary mt-2 tabular-nums">{inProgressMatch.scoreA || 0}</p>
                 </div>
                 <div className="text-muted-foreground text-sm uppercase font-medium px-4">vs</div>
                 <div className="flex-1">
-                  <p className="text-xl font-bold">{getPlayer(currentMatch.playerBId)?.name || "TBD"}</p>
+                  <p className="text-xl font-bold">{getPlayer(inProgressMatch.playerBId)?.name || "TBD"}</p>
+                  <p className="text-3xl font-bold text-primary mt-2 tabular-nums">{inProgressMatch.scoreB || 0}</p>
                 </div>
               </div>
-              <p className="text-center text-sm text-muted-foreground mb-4">Best of {currentMatch.bestOf} (first to {legsToWin})</p>
+              <p className="text-center text-sm text-muted-foreground mb-4">Best of {inProgressMatch.bestOf} (first to {legsToWin})</p>
               <Button
                 className="w-full h-14 text-lg"
-                onClick={() => handleStartScoring(currentMatch.id, currentMatch.scoreA || 0, currentMatch.scoreB || 0)}
-                data-testid="button-start-scoring"
+                data-testid="button-resume-scoring"
               >
-                <Target className="w-5 h-5 mr-2" />
-                Score This Match
+                <Play className="w-5 h-5 mr-2" />
+                Continue Scoring
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {activeMatchId !== null && (() => {
-          const match = matches.find(m => m.id === activeMatchId);
-          if (!match) return null;
-          const playerA = getPlayer(match.playerAId);
-          const playerB = getPlayer(match.playerBId);
-          return (
-            <Card className="border-2 border-primary shadow-2xl" data-testid="card-scoring">
-              <CardHeader className="bg-primary text-primary-foreground pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Target className="w-5 h-5" />
-                  Scoring — Best of {match.bestOf}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-8 pb-6 space-y-8">
-                <div className="grid grid-cols-3 gap-4 items-center">
-                  <div className="text-center">
-                    <p className="text-lg font-bold mb-4">{playerA?.name || "TBD"}</p>
-                    <div className="flex flex-col items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="w-20 h-16 text-3xl font-bold touch-manipulation"
-                        onClick={() => setTempScoreA(Math.min(tempScoreA + 1, match.bestOf))}
-                        data-testid="button-score-a-plus"
-                      >
-                        +
-                      </Button>
-                      <span className="text-5xl font-bold text-primary tabular-nums" data-testid="text-score-a">{tempScoreA}</span>
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="w-20 h-16 text-3xl font-bold touch-manipulation"
-                        onClick={() => setTempScoreA(Math.max(tempScoreA - 1, 0))}
-                        data-testid="button-score-a-minus"
-                      >
-                        −
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center">
-                    <span className="text-muted-foreground text-sm uppercase font-medium">vs</span>
-                  </div>
-
-                  <div className="text-center">
-                    <p className="text-lg font-bold mb-4">{playerB?.name || "TBD"}</p>
-                    <div className="flex flex-col items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="w-20 h-16 text-3xl font-bold touch-manipulation"
-                        onClick={() => setTempScoreB(Math.min(tempScoreB + 1, match.bestOf))}
-                        data-testid="button-score-b-plus"
-                      >
-                        +
-                      </Button>
-                      <span className="text-5xl font-bold text-primary tabular-nums" data-testid="text-score-b">{tempScoreB}</span>
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="w-20 h-16 text-3xl font-bold touch-manipulation"
-                        onClick={() => setTempScoreB(Math.max(tempScoreB - 1, 0))}
-                        data-testid="button-score-b-minus"
-                      >
-                        −
-                      </Button>
-                    </div>
-                  </div>
+        {!inProgressMatch && pendingMatches.length > 0 && (
+          <Card className="border-2 border-primary shadow-xl" data-testid="card-next-up">
+            <CardHeader className="bg-primary/10 border-b pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Play className="w-5 h-5 text-primary" />
+                Next Up
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 pb-4">
+              <div className="flex items-center justify-between text-center mb-4">
+                <div className="flex-1">
+                  <p className="text-xl font-bold">{getPlayer(pendingMatches[0].playerAId)?.name || "TBD"}</p>
                 </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    className="flex-1 h-14 text-base"
-                    onClick={() => setActiveMatchId(null)}
-                    data-testid="button-cancel-scoring"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1 h-14 text-base"
-                    onClick={handleSubmitScore}
-                    disabled={submitScoreMutation.isPending || (tempScoreA < legsToWin && tempScoreB < legsToWin)}
-                    data-testid="button-submit-score"
-                  >
-                    {submitScoreMutation.isPending ? (
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    ) : (
-                      <Check className="w-5 h-5 mr-2" />
-                    )}
-                    Submit Score
-                  </Button>
+                <div className="text-muted-foreground text-sm uppercase font-medium px-4">vs</div>
+                <div className="flex-1">
+                  <p className="text-xl font-bold">{getPlayer(pendingMatches[0].playerBId)?.name || "TBD"}</p>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
+              </div>
+              <p className="text-center text-sm text-muted-foreground mb-4">Best of {pendingMatches[0].bestOf} (first to {legsToWin})</p>
+              <Button
+                className="w-full h-14 text-lg"
+                onClick={() => handleTapMatch(pendingMatches[0].id)}
+                disabled={startMatchMutation.isPending}
+                data-testid="button-start-next-match"
+              >
+                {startMatchMutation.isPending ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <Target className="w-5 h-5 mr-2" />
+                )}
+                Start Match
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {pendingMatches.length === 0 && !inProgressMatch && (
+          <Card className="border-2 border-dashed" data-testid="card-all-done">
+            <CardContent className="py-12 text-center">
+              <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+              <h2 className="text-xl font-bold mb-2">All Matches Complete!</h2>
+              <p className="text-muted-foreground">All matches on this board have been played.</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {pendingMatches.length > 1 && (
+          <Card data-testid="card-upcoming-matches">
+            <CardHeader>
+              <CardTitle className="text-lg">Upcoming Matches</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {pendingMatches.slice(1).map((match) => (
+                  <button
+                    key={match.id}
+                    className="flex items-center justify-between p-4 w-full text-left hover:bg-muted/50 transition-colors touch-manipulation"
+                    onClick={() => handleTapMatch(match.id)}
+                    disabled={!!inProgressMatch || startMatchMutation.isPending}
+                    data-testid={`button-upcoming-match-${match.id}`}
+                  >
+                    <span className="font-medium">{getPlayer(match.playerAId)?.name || "TBD"}</span>
+                    <span className="text-muted-foreground text-sm">vs</span>
+                    <span className="font-medium">{getPlayer(match.playerBId)?.name || "TBD"}</span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground ml-2 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-t-4 border-t-primary" data-testid="card-standings">
           <CardHeader>
@@ -381,25 +581,6 @@ export default function ScorerPage() {
             </Table>
           </CardContent>
         </Card>
-
-        {pendingMatches.length > 1 && (
-          <Card data-testid="card-upcoming-matches">
-            <CardHeader>
-              <CardTitle className="text-lg">Upcoming Matches</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {pendingMatches.slice(1).map(match => (
-                  <div key={match.id} className="flex items-center justify-between p-4">
-                    <span className="font-medium">{getPlayer(match.playerAId)?.name || "TBD"}</span>
-                    <span className="text-muted-foreground text-sm">vs</span>
-                    <span className="font-medium">{getPlayer(match.playerBId)?.name || "TBD"}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {completedMatches.length > 0 && (
           <Card data-testid="card-completed-matches">
