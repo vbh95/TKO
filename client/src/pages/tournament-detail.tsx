@@ -13,7 +13,8 @@ import {
   ExternalLink,
   Users,
   Target,
-  Radio
+  Radio,
+  TabletSmartphone
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -396,9 +403,19 @@ export default function TournamentDetail() {
               </DialogContent>
             </Dialog>
             
-            <Button variant="outline" size="icon">
-              <Settings className="w-4 h-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" data-testid="button-settings-menu">
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem data-testid="menu-item-devices" className="gap-2 cursor-pointer">
+                  <TabletSmartphone className="w-4 h-4" />
+                  Connected Devices
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
