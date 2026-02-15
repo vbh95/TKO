@@ -944,13 +944,8 @@ export default function TournamentDetail() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {players.map((player: Player) => (
                   <Card key={player.id}>
-                    <CardContent className="flex items-center gap-4 p-4">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                        {player.name.charAt(0)}
-                      </div>
-                      <div>
-                        <h4 className="font-bold">{player.name}</h4>
-                      </div>
+                    <CardContent className="flex items-center p-4">
+                      <h4 className="font-bold">{player.name}</h4>
                     </CardContent>
                   </Card>
                 ))}
