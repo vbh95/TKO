@@ -569,6 +569,33 @@ export async function registerRoutes(
     res.json(updatedMatch);
   });
 
+  // === SHARE ===
+  app.post(api.tournaments.share.enable.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    const id = Number(req.params.id);
+    const tournament = await storage.getTournament(id);
+    if (!tournament || tournament.userId !== (req.user as any).id) return res.status(404).json({ message: "Not found" });
+
+    const shareToken = tournament.shareToken || randomBytes(16).toString("hex");
+    const updated = await storage.updateTournament(id, {
+      shareEnabled: true,
+      shareToken,
+    } as any);
+    res.json(updated);
+  });
+
+  app.post(api.tournaments.share.disable.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    const id = Number(req.params.id);
+    const tournament = await storage.getTournament(id);
+    if (!tournament || tournament.userId !== (req.user as any).id) return res.status(404).json({ message: "Not found" });
+
+    const updated = await storage.updateTournament(id, {
+      shareEnabled: false,
+    } as any);
+    res.json(updated);
+  });
+
   // === PUBLIC ===
   app.get(api.public.get.path, async (req, res) => {
     const { shareToken } = req.params;
