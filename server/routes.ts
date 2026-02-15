@@ -108,6 +108,40 @@ export async function registerRoutes(
     }
   });
 
+  const resetAttempts = new Map<string, { count: number; lastAttempt: number }>();
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { email, newPassword } = req.body;
+      if (!email || !newPassword) {
+        return res.status(400).json({ message: "Email and new password are required" });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const now = Date.now();
+      const attempt = resetAttempts.get(email);
+      if (attempt && attempt.count >= 5 && now - attempt.lastAttempt < 15 * 60 * 1000) {
+        return res.status(429).json({ message: "Too many attempts. Please try again later." });
+      }
+      resetAttempts.set(email, {
+        count: (attempt && now - attempt.lastAttempt < 15 * 60 * 1000) ? attempt.count + 1 : 1,
+        lastAttempt: now,
+      });
+
+      const user = await storage.getUserByUsername(email);
+      if (!user) {
+        return res.json({ message: "If an account exists with that email, the password has been reset." });
+      }
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUserPassword(email, hashedPassword);
+      res.json({ message: "If an account exists with that email, the password has been reset." });
+    } catch (err) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.post(api.auth.login.path, passport.authenticate("local"), (req, res) => {
     if (req.body.rememberMe) {
       req.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30; // 30 days

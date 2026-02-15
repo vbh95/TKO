@@ -19,6 +19,7 @@ export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>; // username maps to email
+  updateUserPassword(email: string, hashedPassword: string): Promise<boolean>;
   createUser(user: InsertUser): Promise<User>;
   
   // Tournaments
@@ -75,6 +76,11 @@ export class DatabaseStorage implements IStorage {
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, username));
     return user;
+  }
+
+  async updateUserPassword(email: string, hashedPassword: string): Promise<boolean> {
+    const result = await db.update(users).set({ password: hashedPassword }).where(eq(users.email, email)).returning();
+    return result.length > 0;
   }
 
   async createUser(user: InsertUser): Promise<User> {
