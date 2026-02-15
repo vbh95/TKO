@@ -107,6 +107,7 @@ export default function ScorerPage() {
   const [allMatchVisits, setAllMatchVisits] = useState<Visit[]>([]);
   const [matchReport, setMatchReport] = useState<MatchStats | null>(null);
   const [pendingCheckout, setPendingCheckout] = useState<{ player: 'A' | 'B'; newLegsA: number; newLegsB: number; newVisits: Visit[] } | null>(null);
+  const [impossibleWarning, setImpossibleWarning] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/scorer/board-data'],
@@ -267,17 +268,11 @@ export default function ScorerPage() {
     const activeM = data?.matches.find(m => m.id === activeMatchId);
     if (!activeM) return;
 
-    if (score > 180) {
-      setBustMessage("Impossible! Max score is 180");
-      setTimeout(() => setBustMessage(null), 2000);
-      setInputValue("");
-      return;
-    }
-
-    if (IMPOSSIBLE_SCORES.has(score)) {
-      setBustMessage(`Impossible score! ${score} cannot be scored with 3 darts`);
-      setTimeout(() => setBustMessage(null), 2500);
-      setInputValue("");
+    if (score > 180 || IMPOSSIBLE_SCORES.has(score)) {
+      const msg = score > 180
+        ? `${score} is impossible — max score is 180`
+        : `${score} is impossible — cannot be scored with 3 darts`;
+      setImpossibleWarning(msg);
       return;
     }
 
@@ -669,6 +664,23 @@ export default function ScorerPage() {
             </div>
           )}
 
+          {impossibleWarning && (
+            <div className="bg-[#222] border-2 border-yellow-500 rounded-xl p-4 mb-2 shrink-0" data-testid="impossible-warning">
+              <p className="text-yellow-400 font-bold text-center text-base mb-1">Impossible Score</p>
+              <p className="text-gray-300 text-center text-sm mb-3">{impossibleWarning}</p>
+              <button
+                className="w-full h-11 rounded-xl bg-yellow-600 text-white font-semibold text-base touch-manipulation active:bg-yellow-700 transition-colors"
+                onClick={() => {
+                  setImpossibleWarning(null);
+                  setInputValue("");
+                }}
+                data-testid="button-dismiss-impossible"
+              >
+                OK
+              </button>
+            </div>
+          )}
+
           {pendingCheckout && (
             <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 mb-2 shrink-0" data-testid="checkout-confirm">
               <div className="text-center mb-3">
@@ -719,7 +731,7 @@ export default function ScorerPage() {
             </div>
           )}
 
-          <div className={cn("flex-1 flex flex-col justify-end pb-2", pendingCheckout && "opacity-30 pointer-events-none")}>
+          <div className={cn("flex-1 flex flex-col justify-end pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
             <div className="flex gap-1.5 items-center mb-1.5 shrink-0">
               <button
                 className="w-11 h-11 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
