@@ -284,7 +284,13 @@ export default function ScorerPage() {
     const newRemaining = currentRemaining - score;
 
     if (newRemaining < 0 || newRemaining === 1) {
-      setImpossibleWarning(`BUST! ${score} is more than the remaining ${currentRemaining}. Enter the correct score or 0 for no score.`);
+      setBustMessage(`BUST! Stays on ${currentRemaining}`);
+      setTimeout(() => setBustMessage(null), 2000);
+      const nextThrower = currentThrower === 'A' ? 'B' : 'A';
+      setCurrentThrower(nextThrower);
+      setLegVisits(prev => [...prev, { player: currentThrower, score: 0 }]);
+      setInputValue("");
+      emitLiveState(remainingA, remainingB, nextThrower, legsWonA, legsWonB);
       return;
     }
 
