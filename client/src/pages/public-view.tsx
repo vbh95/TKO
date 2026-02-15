@@ -360,9 +360,12 @@ export default function PublicView() {
                     </thead>
                     <tbody>
                       {standings.map((player, idx) => (
-                        <tr key={player.id} className={cn("border-b last:border-0", idx === 0 && "bg-yellow-50 dark:bg-yellow-900/10")} data-testid={`row-standing-${player.id}`}>
-                          <td className="pl-2 pr-1 py-2 text-muted-foreground">{idx + 1}</td>
-                          <td className="py-2 font-bold truncate">{player.name}</td>
+                        <tr key={player.id} className={cn("border-b last:border-0", idx < 2 && "bg-green-50 dark:bg-green-950/30")} data-testid={`row-standing-${player.id}`}>
+                          <td className="pl-2 pr-1 py-2 text-muted-foreground flex items-center gap-1">
+                            {idx + 1}
+                            {idx < 2 && <div className="w-2 h-2 rounded-full bg-green-500" />}
+                          </td>
+                          <td className={cn("py-2 font-bold truncate", idx < 2 && "text-green-700 dark:text-green-400")}>{player.name}</td>
                           <td className="py-2 text-center">{player.played}</td>
                           <td className="py-2 text-center text-green-600">{player.won}</td>
                           <td className="py-2 text-center text-red-500">{player.lost}</td>
