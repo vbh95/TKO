@@ -120,12 +120,31 @@ export default function PublicView() {
       })
     : [{ group: null, standings: calcStandings(players, matches) }];
 
+  const knockoutRoundOrder: Record<string, number> = {
+    'Quarter Final': 1,
+    'Quarter Finals': 1,
+    'Semi Final': 2,
+    'Semi Finals': 2,
+    'Final': 3,
+  };
+
   const matchesByRound = matches.reduce((acc, match) => {
-    const key = match.groupId ? (groups.find(g => g.id === match.groupId)?.name || 'Group') : match.roundKey;
+    const key = match.groupId ? (groups.find(g => g.id === match.groupId)?.name || 'Group') : (match.roundKey || 'Other');
     if (!acc[key]) acc[key] = [];
     acc[key].push(match);
     return acc;
   }, {} as Record<string, typeof matches>);
+
+  const sortedRoundEntries = Object.entries(matchesByRound).sort(([a], [b]) => {
+    const aIsGroup = groups.some(g => g.name === a);
+    const bIsGroup = groups.some(g => g.name === b);
+    if (aIsGroup && !bIsGroup) return -1;
+    if (!aIsGroup && bIsGroup) return 1;
+    if (aIsGroup && bIsGroup) return a.localeCompare(b);
+    const aOrder = knockoutRoundOrder[a] ?? 0;
+    const bOrder = knockoutRoundOrder[b] ?? 0;
+    return aOrder - bOrder;
+  });
 
   const getPlayer = (id: number | null) => players.find(p => p.id === id) || null;
 
@@ -380,7 +399,7 @@ export default function PublicView() {
           </TabsContent>
 
           <TabsContent value="matches" className="space-y-6">
-            {Object.entries(matchesByRound).map(([roundName, roundMatches]) => (
+            {sortedRoundEntries.map(([roundName, roundMatches]) => (
               <Card key={roundName} className="overflow-hidden">
                 <CardHeader className="bg-muted/50 border-b">
                   <CardTitle className="text-lg">{roundName}</CardTitle>
