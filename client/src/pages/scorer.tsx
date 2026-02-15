@@ -564,19 +564,21 @@ export default function ScorerPage() {
           <div className="grid grid-cols-2 gap-2 mb-2 shrink-0">
             <div
               className={cn(
-                "rounded-xl p-3 relative transition-all",
+                "rounded-xl p-3 transition-all",
                 currentThrower === 'A'
                   ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a]"
-                  : "bg-[#8b3a2a]"
+                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a]"
               )}
               data-testid="panel-player-a"
             >
-              {currentThrower === 'A' && (
-                <div className="flex items-center gap-1 mb-1">
-                  <Eye className="w-3 h-3 text-white/90" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Throwing</span>
-                </div>
-              )}
+              <div className="h-4 mb-1">
+                {currentThrower === 'A' && (
+                  <div className="flex items-center gap-1">
+                    <Eye className="w-3 h-3 text-white/90" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Throwing</span>
+                  </div>
+                )}
+              </div>
               <p className="text-sm font-bold text-white/90 truncate" data-testid="text-player-a-name">
                 {playerA?.name || "Player 1"}
               </p>
@@ -604,19 +606,21 @@ export default function ScorerPage() {
 
             <div
               className={cn(
-                "rounded-xl p-3 relative transition-all",
+                "rounded-xl p-3 transition-all",
                 currentThrower === 'B'
-                  ? "bg-[#4a6741] ring-2 ring-[#5a8a4f] ring-offset-2 ring-offset-[#1a1a1a]"
-                  : "bg-[#3a5235]"
+                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a]"
+                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a]"
               )}
               data-testid="panel-player-b"
             >
-              {currentThrower === 'B' && (
-                <div className="flex items-center gap-1 mb-1">
-                  <Eye className="w-3 h-3 text-white/90" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Throwing</span>
-                </div>
-              )}
+              <div className="h-4 mb-1">
+                {currentThrower === 'B' && (
+                  <div className="flex items-center gap-1">
+                    <Eye className="w-3 h-3 text-white/90" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Throwing</span>
+                  </div>
+                )}
+              </div>
               <p className="text-sm font-bold text-white/90 truncate" data-testid="text-player-b-name">
                 {playerB?.name || "Player 2"}
               </p>
