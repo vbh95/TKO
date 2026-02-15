@@ -383,20 +383,18 @@ export async function registerRoutes(
                 };
               });
 
-              // Sort by: Points desc, Score Diff desc, Score For desc, then played asc
+              // Sort by: Points desc, Leg Diff desc, then temp fallback
               stats.sort((a, b) => {
                 if (b.pts !== a.pts) return b.pts - a.pts;
                 if (b.diff !== a.diff) return b.diff - a.diff;
-                if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-                if (a.played !== b.played) return a.played - b.played;
                 return a.id - b.id;
               });
 
-              // Apply head-to-head for tied groups
+              // Apply head-to-head for players tied on points + leg diff
               let i = 0;
               while (i < stats.length) {
                 let j = i + 1;
-                while (j < stats.length && stats[j].pts === stats[i].pts && stats[j].diff === stats[i].diff && stats[j].legsFor === stats[i].legsFor) {
+                while (j < stats.length && stats[j].pts === stats[i].pts && stats[j].diff === stats[i].diff) {
                   j++;
                 }
                 if (j - i > 1) {
@@ -413,6 +411,7 @@ export async function registerRoutes(
                     pairingSet.add(pair);
                   });
 
+                  let resolved = false;
                   if (pairingSet.size >= expectedPairings) {
                     const matchCounts = new Map<number, number>();
                     tiedGroup.forEach(p => matchCounts.set(p.id, 0));
@@ -440,18 +439,31 @@ export async function registerRoutes(
                           pts: hWon * ptsWin + hLost * ptsLoss,
                           diff: hFor - hAgainst,
                           legsFor: hFor,
+                          played: player.played,
                         };
                       });
                       h2hStats.sort((a, b) => {
                         if (b.pts !== a.pts) return b.pts - a.pts;
                         if (b.diff !== a.diff) return b.diff - a.diff;
                         if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+                        if (a.played !== b.played) return a.played - b.played;
                         return a.id - b.id;
                       });
                       const reordered = h2hStats.map(h => tiedGroup.find(p => p.id === h.id)!);
                       for (let k = 0; k < reordered.length; k++) {
                         stats[i + k] = reordered[k];
                       }
+                      resolved = true;
+                    }
+                  }
+                  if (!resolved) {
+                    const fallback = tiedGroup.sort((a, b) => {
+                      if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+                      if (a.played !== b.played) return a.played - b.played;
+                      return a.id - b.id;
+                    });
+                    for (let k = 0; k < fallback.length; k++) {
+                      stats[i + k] = fallback[k];
                     }
                   }
                 }

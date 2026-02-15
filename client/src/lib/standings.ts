@@ -49,12 +49,12 @@ function computeStats<P extends PlayerLike>(
   });
 }
 
-function tryHeadToHead(
+function resolveH2HTied(
   tiedGroup: StandingEntry[],
   completedMatches: MatchLike[],
   ptsWin: number,
   ptsLoss: number,
-): StandingEntry[] | null {
+): StandingEntry[] {
   const tiedIds = new Set(tiedGroup.map(p => p.id));
   const h2hMatches = completedMatches.filter(m =>
     m.playerAId !== null && m.playerBId !== null &&
@@ -68,7 +68,13 @@ function tryHeadToHead(
     pairings.add(pair);
   });
 
-  if (pairings.size < expectedPairings) return null;
+  if (pairings.size < expectedPairings) {
+    return tiedGroup.sort((a, b) => {
+      if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+      if (a.played !== b.played) return a.played - b.played;
+      return a.id - b.id;
+    });
+  }
 
   const matchCounts = new Map<number, number>();
   tiedGroup.forEach(p => matchCounts.set(p.id, 0));
@@ -77,13 +83,20 @@ function tryHeadToHead(
     matchCounts.set(m.playerBId!, (matchCounts.get(m.playerBId!) || 0) + 1);
   });
   const counts = Array.from(matchCounts.values());
-  if (!counts.every(c => c === counts[0])) return null;
+  if (!counts.every(c => c === counts[0])) {
+    return tiedGroup.sort((a, b) => {
+      if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+      if (a.played !== b.played) return a.played - b.played;
+      return a.id - b.id;
+    });
+  }
 
   const h2hStats = computeStats(tiedGroup, h2hMatches, ptsWin, ptsLoss);
   h2hStats.sort((a, b) => {
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.diff !== a.diff) return b.diff - a.diff;
     if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+    if (a.played !== b.played) return a.played - b.played;
     return a.id - b.id;
   });
 
@@ -102,8 +115,6 @@ export function calcStandings<P extends PlayerLike>(
   stats.sort((a, b) => {
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.diff !== a.diff) return b.diff - a.diff;
-    if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-    if (a.played !== b.played) return a.played - b.played;
     return a.id - b.id;
   });
 
@@ -113,18 +124,15 @@ export function calcStandings<P extends PlayerLike>(
     while (
       j < stats.length &&
       stats[j].pts === stats[i].pts &&
-      stats[j].diff === stats[i].diff &&
-      stats[j].legsFor === stats[i].legsFor
+      stats[j].diff === stats[i].diff
     ) {
       j++;
     }
     if (j - i > 1) {
       const tiedGroup = stats.slice(i, j);
-      const resolved = tryHeadToHead(tiedGroup, completedMatches, ptsWin, ptsLoss);
-      if (resolved) {
-        for (let k = 0; k < resolved.length; k++) {
-          stats[i + k] = resolved[k];
-        }
+      const resolved = resolveH2HTied(tiedGroup, completedMatches, ptsWin, ptsLoss);
+      for (let k = 0; k < resolved.length; k++) {
+        stats[i + k] = resolved[k];
       }
     }
     i = j;
