@@ -137,8 +137,8 @@ export default function PublicView() {
       {/* Public Header */}
       <div className="bg-primary text-primary-foreground py-6 px-4 shadow-lg mb-6">
         <div className="container max-w-6xl mx-auto flex items-center justify-between">
-          <div>
-            <img src={tkoLogoFull} alt="TKO" className="w-full" data-testid="img-tko-logo" />
+          <div className="shrink-0" style={{ width: 'fit-content' }}>
+            <img src={tkoLogoFull} alt="TKO" className="max-w-full h-auto" style={{ width: '100%' }} data-testid="img-tko-logo" />
             <p className="text-primary-foreground/70 text-xs mt-1 tracking-wide whitespace-nowrap">The Ultimate Tournament Generator</p>
           </div>
           <div className="text-right">
