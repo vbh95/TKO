@@ -950,9 +950,6 @@ export default function TournamentDetail() {
                       </div>
                       <div>
                         <h4 className="font-bold">{player.name}</h4>
-                        {settings.seeded && (
-                          <p className="text-xs text-muted-foreground">Seed #{player.seed || '-'}</p>
-                        )}
                       </div>
                     </CardContent>
                   </Card>
