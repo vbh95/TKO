@@ -353,9 +353,8 @@ export default function PublicView() {
                         <TableHead className="text-center">P</TableHead>
                         <TableHead className="text-center">W</TableHead>
                         <TableHead className="text-center">L</TableHead>
-                        <TableHead className="text-center hidden md:table-cell">LF</TableHead>
-                        <TableHead className="text-center hidden md:table-cell">LA</TableHead>
-                        <TableHead className="text-center hidden md:table-cell">+/-</TableHead>
+                        <TableHead className="text-center">LF</TableHead>
+                        <TableHead className="text-center">LA</TableHead>
                         <TableHead className="text-right font-bold pr-4">Pts</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -367,11 +366,8 @@ export default function PublicView() {
                           <TableCell className="text-center">{player.played}</TableCell>
                           <TableCell className="text-center text-green-600">{player.won}</TableCell>
                           <TableCell className="text-center text-red-500">{player.lost}</TableCell>
-                          <TableCell className="text-center hidden md:table-cell">{player.legsFor}</TableCell>
-                          <TableCell className="text-center hidden md:table-cell">{player.legsAgainst}</TableCell>
-                          <TableCell className="text-center hidden md:table-cell font-mono">
-                            {player.diff > 0 ? `+${player.diff}` : player.diff}
-                          </TableCell>
+                          <TableCell className="text-center">{player.legsFor}</TableCell>
+                          <TableCell className="text-center">{player.legsAgainst}</TableCell>
                           <TableCell className="text-right font-bold text-primary text-lg pr-4">{player.pts}</TableCell>
                         </TableRow>
                       ))}
