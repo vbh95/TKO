@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Loader2, Trophy, Target, Wifi, WifiOff } from "lucide-react";
+import { Loader2, Trophy, Target, Wifi, WifiOff, Eye } from "lucide-react";
 import { useSocket } from "@/hooks/use-socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -14,6 +14,24 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+
+interface LiveScoring {
+  matchId: number;
+  remainingA: number;
+  remainingB: number;
+  currentThrower: 'A' | 'B';
+  legsWonA: number;
+  legsWonB: number;
+  playerAName: string;
+  playerBName: string;
+  bestOf: number;
+  avgA: string;
+  avgB: string;
+  dartsA: number;
+  dartsB: number;
+  lastScoreA: number | null;
+  lastScoreB: number | null;
+}
 
 interface BoardData {
   tournament: {
@@ -51,6 +69,7 @@ export default function BoardView() {
   const { shareToken, boardNumber } = useParams();
   const { joinPublic, joinBoard, on, socket } = useSocket();
   const [isConnected, setIsConnected] = useState(false);
+  const [liveScoring, setLiveScoring] = useState<LiveScoring | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/public/t', shareToken, 'board', boardNumber],
@@ -72,11 +91,19 @@ export default function BoardView() {
   useEffect(() => {
     const cleanup1 = on("connect", () => setIsConnected(true));
     const cleanup2 = on("disconnect", () => setIsConnected(false));
-    const cleanup3 = on("match:updated", () => refetch());
+    const cleanup3 = on("match:updated", () => { setLiveScoring(null); refetch(); });
     const cleanup4 = on("tournament:updated", () => refetch());
+    const cleanup5 = on("leg:scoring", (incoming: LiveScoring) => {
+      const currentMatches = data?.matches;
+      if (!currentMatches) return;
+      const current = currentMatches.find(m => m.status === 'IN_PROGRESS');
+      if (current && incoming.matchId === current.id) {
+        setLiveScoring(incoming);
+      }
+    });
     setIsConnected(socket.connected);
-    return () => { cleanup1(); cleanup2(); cleanup3(); cleanup4(); };
-  }, [on, socket, refetch]);
+    return () => { cleanup1(); cleanup2(); cleanup3(); cleanup4(); cleanup5(); };
+  }, [on, socket, refetch, data?.matches]);
 
   if (isLoading) {
     return (
@@ -173,27 +200,114 @@ export default function BoardView() {
 
       <div className="container max-w-3xl mx-auto px-4 pb-12 space-y-6">
         {currentMatch && (
-          <Card className="border-2 border-primary shadow-xl" data-testid="card-current-match">
+          <Card className="border-2 border-primary shadow-xl overflow-hidden" data-testid="card-current-match">
             <CardHeader className="bg-primary/10 border-b pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
                 Now Playing
+                {liveScoring && (
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    Leg {(liveScoring.legsWonA + liveScoring.legsWonB + 1)} — Best of {liveScoring.bestOf}
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-4">
-              <div className="flex items-center justify-between text-center">
-                <div className="flex-1">
-                  <p className="text-xl font-bold" data-testid="text-current-playerA">{getPlayer(currentMatch.playerAId)?.name || "TBD"}</p>
+            <CardContent className="pt-4 pb-4">
+              {liveScoring ? (
+                <div>
+                  <div className="text-center mb-3">
+                    <div className="flex items-center justify-center gap-3 tabular-nums">
+                      <span className={cn("text-3xl font-bold", liveScoring.legsWonA >= liveScoring.legsWonB ? "text-primary" : "text-muted-foreground")}>{liveScoring.legsWonA}</span>
+                      <span className="text-muted-foreground text-lg">-</span>
+                      <span className={cn("text-3xl font-bold", liveScoring.legsWonB >= liveScoring.legsWonA ? "text-primary" : "text-muted-foreground")}>{liveScoring.legsWonB}</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div
+                      className={cn(
+                        "rounded-xl p-4 transition-all",
+                        liveScoring.currentThrower === 'A'
+                          ? "bg-red-600/15 ring-2 ring-red-500/50"
+                          : "bg-green-600/15 ring-2 ring-green-500/50"
+                      )}
+                      data-testid="live-panel-a"
+                    >
+                      <div className="h-4 mb-1">
+                        {liveScoring.currentThrower === 'A' && (
+                          <div className="flex items-center gap-1">
+                            <Eye className="w-3 h-3 text-red-500" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm font-bold truncate" data-testid="live-player-a-name">{liveScoring.playerAName}</p>
+                      <p className="text-5xl font-bold tabular-nums leading-none mt-1" data-testid="live-remaining-a">{liveScoring.remainingA}</p>
+                      <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>3-dart avg.</span>
+                          <span className="font-medium tabular-nums text-foreground">{liveScoring.avgA}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Last score</span>
+                          <span className="font-medium tabular-nums text-foreground">{liveScoring.lastScoreA !== null ? liveScoring.lastScoreA : '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Darts thrown</span>
+                          <span className="font-medium tabular-nums text-foreground">{liveScoring.dartsA}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "rounded-xl p-4 transition-all",
+                        liveScoring.currentThrower === 'B'
+                          ? "bg-red-600/15 ring-2 ring-red-500/50"
+                          : "bg-green-600/15 ring-2 ring-green-500/50"
+                      )}
+                      data-testid="live-panel-b"
+                    >
+                      <div className="h-4 mb-1">
+                        {liveScoring.currentThrower === 'B' && (
+                          <div className="flex items-center gap-1">
+                            <Eye className="w-3 h-3 text-red-500" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm font-bold truncate" data-testid="live-player-b-name">{liveScoring.playerBName}</p>
+                      <p className="text-5xl font-bold tabular-nums leading-none mt-1" data-testid="live-remaining-b">{liveScoring.remainingB}</p>
+                      <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>3-dart avg.</span>
+                          <span className="font-medium tabular-nums text-foreground">{liveScoring.avgB}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Last score</span>
+                          <span className="font-medium tabular-nums text-foreground">{liveScoring.lastScoreB !== null ? liveScoring.lastScoreB : '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Darts thrown</span>
+                          <span className="font-medium tabular-nums text-foreground">{liveScoring.dartsB}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4 px-4">
-                  <span className="text-3xl font-bold" data-testid="text-current-scoreA">{currentMatch.scoreA || 0}</span>
-                  <span className="text-muted-foreground text-sm uppercase font-medium">vs</span>
-                  <span className="text-3xl font-bold" data-testid="text-current-scoreB">{currentMatch.scoreB || 0}</span>
+              ) : (
+                <div className="flex items-center justify-between text-center">
+                  <div className="flex-1">
+                    <p className="text-xl font-bold" data-testid="text-current-playerA">{getPlayer(currentMatch.playerAId)?.name || "TBD"}</p>
+                  </div>
+                  <div className="flex items-center gap-4 px-4">
+                    <span className="text-3xl font-bold" data-testid="text-current-scoreA">{currentMatch.scoreA || 0}</span>
+                    <span className="text-muted-foreground text-sm uppercase font-medium">vs</span>
+                    <span className="text-3xl font-bold" data-testid="text-current-scoreB">{currentMatch.scoreB || 0}</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xl font-bold" data-testid="text-current-playerB">{getPlayer(currentMatch.playerBId)?.name || "TBD"}</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-xl font-bold" data-testid="text-current-playerB">{getPlayer(currentMatch.playerBId)?.name || "TBD"}</p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         )}

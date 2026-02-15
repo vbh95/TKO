@@ -254,15 +254,30 @@ export default function ScorerPage() {
     setBustMessage(null);
   };
 
-  const emitLiveState = useCallback((rA: number, rB: number, thrower: 'A' | 'B', lA: number, lB: number) => {
+  const emitLiveState = useCallback((rA: number, rB: number, thrower: 'A' | 'B', lA: number, lB: number, visits?: Visit[]) => {
+    const activeM = data?.matches.find(m => m.id === activeMatchId);
+    const pA = activeM ? data?.players.find(p => p.id === activeM.playerAId) : null;
+    const pB = activeM ? data?.players.find(p => p.id === activeM.playerBId) : null;
+    const v = visits || legVisits;
+    const vA = v.filter(vi => vi.player === 'A');
+    const vB = v.filter(vi => vi.player === 'B');
     emitLiveScoringMutation.mutate({
       remainingA: rA,
       remainingB: rB,
       currentThrower: thrower,
       legsWonA: lA,
       legsWonB: lB,
+      playerAName: pA?.name || 'Player 1',
+      playerBName: pB?.name || 'Player 2',
+      bestOf: activeM?.bestOf || 3,
+      avgA: vA.length > 0 ? (vA.reduce((s, vi) => s + vi.score, 0) / vA.length).toFixed(2) : '0.00',
+      avgB: vB.length > 0 ? (vB.reduce((s, vi) => s + vi.score, 0) / vB.length).toFixed(2) : '0.00',
+      dartsA: vA.length * 3,
+      dartsB: vB.length * 3,
+      lastScoreA: vA.length > 0 ? vA[vA.length - 1].score : null,
+      lastScoreB: vB.length > 0 ? vB[vB.length - 1].score : null,
     });
-  }, [activeMatchId]);
+  }, [activeMatchId, data, legVisits]);
 
   const handleScoreSubmit = (score: number) => {
     if (activeMatchId === null) return;
