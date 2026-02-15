@@ -12,7 +12,8 @@ import {
   Check, 
   ExternalLink,
   Users,
-  Target
+  Target,
+  Radio
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -404,7 +405,147 @@ export default function TournamentDetail() {
           const isMultiStage = tournament.type === "MULTI_STAGE";
           const hasKnockout = groupMatchData.nonGroupRounds.length > 0;
           const hasGroups = groupMatchData.byGroup.length > 0;
-          const tabCount = isMultiStage ? (hasGroups && hasKnockout ? 4 : 3) : 3;
+          const baseTabCount = isMultiStage ? (hasGroups && hasKnockout ? 4 : 3) : 3;
+          const tabCount = baseTabCount + 1;
+
+          const liveMatches = matches.filter((m: any) => m.status === 'IN_PROGRESS');
+          const pendingMatches = matches.filter((m: any) => m.status === 'PENDING');
+
+          const getGroupForMatch = (match: any) => {
+            if (!match.groupId) return null;
+            return groups.find((g: any) => g.id === match.groupId) || null;
+          };
+
+          const renderLiveTab = () => {
+            const allActiveMatches = [...liveMatches, ...pendingMatches];
+            
+            if (allActiveMatches.length === 0) {
+              return (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Radio className="w-12 h-12 mx-auto mb-4 opacity-40" />
+                  <p className="text-lg font-medium">No active matches</p>
+                  <p className="text-sm mt-1">All matches have been completed or none have started yet.</p>
+                </div>
+              );
+            }
+
+            const groupedLive: Record<string, any[]> = {};
+            const groupedPending: Record<string, any[]> = {};
+
+            liveMatches.forEach((m: any) => {
+              const group = getGroupForMatch(m);
+              const key = group ? group.name : (m.stage === 'GROUP' ? 'Ungrouped' : getRoundDisplayName(m.roundKey || ''));
+              if (!groupedLive[key]) groupedLive[key] = [];
+              groupedLive[key].push(m);
+            });
+
+            pendingMatches.forEach((m: any) => {
+              const group = getGroupForMatch(m);
+              const key = group ? group.name : (m.stage === 'GROUP' ? 'Ungrouped' : getRoundDisplayName(m.roundKey || ''));
+              if (!groupedPending[key]) groupedPending[key] = [];
+              groupedPending[key].push(m);
+            });
+
+            return (
+              <div className="space-y-8">
+                {liveMatches.length > 0 && (
+                  <div className="space-y-4">
+                    <h2 className="text-xl font-bold flex items-center gap-2" data-testid="live-now-heading">
+                      <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                      Now Playing
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {liveMatches.map((match: any) => {
+                        const playerA = getPlayer(match.playerAId);
+                        const playerB = getPlayer(match.playerBId);
+                        const group = getGroupForMatch(match);
+                        return (
+                          <Card
+                            key={match.id}
+                            onClick={() => setSelectedMatch(match)}
+                            className="overflow-hidden cursor-pointer transition-all hover:shadow-md border-2 border-green-500/50"
+                            data-testid={`live-match-card-${match.id}`}
+                          >
+                            <div className="bg-green-600 dark:bg-green-700 px-4 py-2 flex items-center justify-between">
+                              <span className="text-white font-bold text-sm flex items-center gap-2">
+                                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                                {group ? group.name : getRoundDisplayName(match.roundKey || '')}
+                              </span>
+                              <Badge className="bg-white/20 text-white text-xs">Live</Badge>
+                            </div>
+                            <CardContent className="p-0">
+                              <div className="flex items-center justify-between px-4 py-3 border-b">
+                                <span className={cn("text-sm font-medium flex-1", match.scoreA > match.scoreB && "text-primary font-bold")}>
+                                  {playerA?.name || "TBD"}
+                                </span>
+                                <div className={cn(
+                                  "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
+                                  match.scoreA > match.scoreB ? "bg-primary text-primary-foreground" : "bg-muted"
+                                )}>
+                                  {match.scoreA || 0}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between px-4 py-3">
+                                <span className={cn("text-sm font-medium flex-1", match.scoreB > match.scoreA && "text-primary font-bold")}>
+                                  {playerB?.name || "TBD"}
+                                </span>
+                                <div className={cn(
+                                  "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
+                                  match.scoreB > match.scoreA ? "bg-primary text-primary-foreground" : "bg-muted"
+                                )}>
+                                  {match.scoreB || 0}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {pendingMatches.length > 0 && (
+                  <div className="space-y-4">
+                    <h2 className="text-xl font-bold text-muted-foreground" data-testid="up-next-heading">
+                      Up Next ({pendingMatches.length} matches remaining)
+                    </h2>
+                    {Object.entries(groupedPending).map(([groupName, gMatches]) => (
+                      <div key={groupName} className="space-y-3">
+                        {Object.keys(groupedPending).length > 1 && (
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{groupName}</h3>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {gMatches.map((match: any) => {
+                            const playerA = getPlayer(match.playerAId);
+                            const playerB = getPlayer(match.playerBId);
+                            return (
+                              <Card
+                                key={match.id}
+                                onClick={() => setSelectedMatch(match)}
+                                className="overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-primary/50 border-dashed"
+                                data-testid={`pending-match-card-${match.id}`}
+                              >
+                                <CardContent className="p-0">
+                                  <div className="flex items-center justify-between px-4 py-3 border-b">
+                                    <span className="text-sm font-medium flex-1">{playerA?.name || "TBD"}</span>
+                                    <div className="w-7 h-7 flex items-center justify-center rounded text-sm font-bold bg-muted">-</div>
+                                  </div>
+                                  <div className="flex items-center justify-between px-4 py-3">
+                                    <span className="text-sm font-medium flex-1">{playerB?.name || "TBD"}</span>
+                                    <div className="w-7 h-7 flex items-center justify-center rounded text-sm font-bold bg-muted">-</div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          };
 
           const renderGroupMatches = () => (
             <div className="space-y-8">
@@ -561,11 +702,20 @@ export default function TournamentDetail() {
           );
 
           return (
-            <Tabs defaultValue={isMultiStage ? "group-stage" : "matches"} className="space-y-6">
-              <TabsList className={cn("grid w-full lg:w-[500px]", tabCount === 4 ? "grid-cols-4" : "grid-cols-3")}>
+            <Tabs defaultValue="live" className="space-y-6">
+              <TabsList className={cn("grid w-full lg:w-[600px]", tabCount === 5 ? "grid-cols-5" : "grid-cols-4")}>
+                <TabsTrigger value="live" data-testid="tab-live" className="gap-1.5">
+                  <Radio className="w-3.5 h-3.5" />
+                  Live
+                  {liveMatches.length > 0 && (
+                    <span className="ml-1 w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold">
+                      {liveMatches.length}
+                    </span>
+                  )}
+                </TabsTrigger>
                 {isMultiStage ? (
                   <>
-                    <TabsTrigger value="group-stage" data-testid="tab-group-stage">Group Stage</TabsTrigger>
+                    <TabsTrigger value="group-stage" data-testid="tab-group-stage">Groups</TabsTrigger>
                     <TabsTrigger value="knockout" data-testid="tab-knockout">Knockout</TabsTrigger>
                   </>
                 ) : (
@@ -574,6 +724,10 @@ export default function TournamentDetail() {
                 <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
                 <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="live" className="space-y-6" data-testid="content-live">
+                {renderLiveTab()}
+              </TabsContent>
 
               {isMultiStage ? (
                 <>
