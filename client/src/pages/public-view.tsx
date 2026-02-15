@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { usePublicTournament } from "@/hooks/use-tournaments";
-import { Loader2, Trophy, Eye, Sun, Moon, Check } from "lucide-react";
+import { Loader2, Trophy, Eye, Sun, Moon, Check, ChevronDown } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import tkoLogoFull from "@assets/TKO_White-04_1771178906649.png";
 import { useSocket } from "@/hooks/use-socket";
@@ -35,6 +35,262 @@ interface LiveScoring {
   dartsB: number;
   lastScoreA: number | null;
   lastScoreB: number | null;
+}
+
+function CompletedMatchRow({ match, playerA, playerB, shareToken }: {
+  match: any;
+  playerA: any;
+  playerB: any;
+  shareToken: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [notes, setNotes] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false);
+  const isCompleted = match.status === 'COMPLETED';
+
+  const handleClick = async () => {
+    if (!isCompleted) return;
+    const willExpand = !expanded;
+    setExpanded(willExpand);
+    if (willExpand && !fetched) {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/public/t/${shareToken}/match/${match.id}/notes`);
+        if (res.ok) {
+          const data = await res.json();
+          setNotes(data);
+        }
+      } catch { }
+      setLoading(false);
+      setFetched(true);
+    }
+  };
+
+  const threeDartAvgA = notes?.totalVisitsA > 0 ? ((notes.totalScoredA / notes.totalVisitsA) * 3).toFixed(1) : '-';
+  const threeDartAvgB = notes?.totalVisitsB > 0 ? ((notes.totalScoredB / notes.totalVisitsB) * 3).toFixed(1) : '-';
+  const checkoutPctA = notes?.checkoutAttemptsA > 0 ? ((notes.checkoutSuccessA / notes.checkoutAttemptsA) * 100).toFixed(1) + '%' : '-';
+  const checkoutPctB = notes?.checkoutAttemptsB > 0 ? ((notes.checkoutSuccessB / notes.checkoutAttemptsB) * 100).toFixed(1) + '%' : '-';
+
+  const statRows = notes ? [
+    { label: '3-Dart Avg', valA: threeDartAvgA, valB: threeDartAvgB },
+    { label: 'Checkout %', valA: checkoutPctA, valB: checkoutPctB },
+    { label: 'Highest Finish', valA: notes.highestFinishA || '-', valB: notes.highestFinishB || '-' },
+    { label: 'Highest Visit', valA: notes.highestVisitA || '-', valB: notes.highestVisitB || '-' },
+    { label: '180s', valA: notes.ton80sA ?? '-', valB: notes.ton80sB ?? '-' },
+    { label: '140+', valA: notes.ton40sA ?? '-', valB: notes.ton40sB ?? '-' },
+    { label: '100+', valA: notes.tonsA ?? '-', valB: notes.tonsB ?? '-' },
+    { label: 'Darts Thrown', valA: notes.totalVisitsA != null ? notes.totalVisitsA * 3 : '-', valB: notes.totalVisitsB != null ? notes.totalVisitsB * 3 : '-' },
+  ] : [];
+
+  return (
+    <div data-testid={`match-row-${match.id}`}>
+      <div
+        className={cn(
+          "flex items-center justify-between p-4 transition-colors",
+          isCompleted && "cursor-pointer hover:bg-muted/30"
+        )}
+        onClick={handleClick}
+        data-testid={`button-match-stats-${match.id}`}
+      >
+        <div className="flex-1 text-right font-medium">
+          <span className={cn(match.winnerId === match.playerAId && "text-green-600 dark:text-green-400 font-bold")}>
+            {playerA?.name || "TBD"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3 px-6">
+          <span className={cn(
+            "text-xl font-bold",
+            match.scoreA! > match.scoreB! ? "text-primary" : "text-muted-foreground"
+          )}>
+            {match.scoreA || 0}
+          </span>
+          <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
+          <span className={cn(
+            "text-xl font-bold",
+            match.scoreB! > match.scoreA! ? "text-primary" : "text-muted-foreground"
+          )}>
+            {match.scoreB || 0}
+          </span>
+        </div>
+
+        <div className="flex-1 text-left font-medium">
+          <span className={cn(match.winnerId === match.playerBId && "text-green-600 dark:text-green-400 font-bold")}>
+            {playerB?.name || "TBD"}
+          </span>
+        </div>
+
+        {isCompleted && (
+          <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform ml-2", expanded && "rotate-180")} />
+        )}
+      </div>
+
+      {expanded && isCompleted && (
+        <div className="border-t bg-muted/20 px-4 py-3">
+          {loading && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {!loading && notes && statRows.length > 0 && (
+            <div className="max-w-md mx-auto">
+              <div className="grid grid-cols-3 gap-1 text-sm">
+                <div className="text-right font-bold text-xs text-muted-foreground pb-1">{playerA?.name}</div>
+                <div className="text-center font-bold text-xs text-muted-foreground pb-1">Stat</div>
+                <div className="text-left font-bold text-xs text-muted-foreground pb-1">{playerB?.name}</div>
+                {statRows.map(({ label, valA, valB }) => {
+                  const aNum = parseFloat(String(valA));
+                  const bNum = parseFloat(String(valB));
+                  const aWins = !isNaN(aNum) && !isNaN(bNum) && aNum > bNum;
+                  const bWins = !isNaN(aNum) && !isNaN(bNum) && bNum > aNum;
+                  return (
+                    <div key={label} className="contents">
+                      <div className={cn("text-right tabular-nums py-0.5", aWins && "text-green-600 dark:text-green-400 font-semibold")}>{valA}</div>
+                      <div className="text-center text-muted-foreground text-xs py-0.5">{label}</div>
+                      <div className={cn("text-left tabular-nums py-0.5", bWins && "text-green-600 dark:text-green-400 font-semibold")}>{valB}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {!loading && !notes && (
+            <p className="text-sm text-muted-foreground text-center py-2">No detailed stats available for this match</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareToken }: {
+  match: any;
+  playerA: any;
+  playerB: any;
+  label: string;
+  isCompleted: boolean;
+  shareToken: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [notes, setNotes] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false);
+
+  const handleClick = async () => {
+    if (!isCompleted) return;
+    const willExpand = !expanded;
+    setExpanded(willExpand);
+    if (willExpand && !fetched) {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/public/t/${shareToken}/match/${match.id}/notes`);
+        if (res.ok) setNotes(await res.json());
+      } catch { }
+      setLoading(false);
+      setFetched(true);
+    }
+  };
+
+  const threeDartAvgA = notes?.totalVisitsA > 0 ? ((notes.totalScoredA / notes.totalVisitsA) * 3).toFixed(1) : '-';
+  const threeDartAvgB = notes?.totalVisitsB > 0 ? ((notes.totalScoredB / notes.totalVisitsB) * 3).toFixed(1) : '-';
+  const checkoutPctA = notes?.checkoutAttemptsA > 0 ? ((notes.checkoutSuccessA / notes.checkoutAttemptsA) * 100).toFixed(1) + '%' : '-';
+  const checkoutPctB = notes?.checkoutAttemptsB > 0 ? ((notes.checkoutSuccessB / notes.checkoutAttemptsB) * 100).toFixed(1) + '%' : '-';
+  const statRows = notes ? [
+    { label: '3-Dart Avg', valA: threeDartAvgA, valB: threeDartAvgB },
+    { label: 'Checkout %', valA: checkoutPctA, valB: checkoutPctB },
+    { label: 'Highest Finish', valA: notes.highestFinishA || '-', valB: notes.highestFinishB || '-' },
+    { label: 'Highest Visit', valA: notes.highestVisitA || '-', valB: notes.highestVisitB || '-' },
+    { label: '180s', valA: notes.ton80sA ?? '-', valB: notes.ton80sB ?? '-' },
+    { label: '140+', valA: notes.ton40sA ?? '-', valB: notes.ton40sB ?? '-' },
+    { label: '100+', valA: notes.tonsA ?? '-', valB: notes.tonsB ?? '-' },
+    { label: 'Darts Thrown', valA: notes.totalVisitsA != null ? notes.totalVisitsA * 3 : '-', valB: notes.totalVisitsB != null ? notes.totalVisitsB * 3 : '-' },
+  ] : [];
+
+  return (
+    <Card
+      className={cn(
+        "overflow-hidden",
+        isCompleted ? "border border-muted-foreground/20 cursor-pointer" : "border-2 border-dashed border-primary/40"
+      )}
+      data-testid={`knockout-match-${match.id}`}
+      onClick={handleClick}
+      role={isCompleted ? "button" : undefined}
+    >
+      <CardHeader className={cn("border-b py-2.5 px-4", isCompleted ? "bg-muted/30" : "bg-primary/5")}>
+        <CardTitle className="text-sm flex items-center gap-2">
+          {isCompleted ? (
+            <Check className="w-4 h-4 text-green-500" />
+          ) : (
+            <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
+          )}
+          {label}
+          {!isCompleted && (
+            <span className="text-xs text-muted-foreground ml-auto">Next Up</span>
+          )}
+          {isCompleted && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
+              Tap for stats
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", expanded && "rotate-180")} />
+            </span>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="py-4 px-4">
+        <div className="flex items-center justify-between text-center">
+          <div className="flex-1">
+            <p className={cn("text-lg font-bold", isCompleted && match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>
+              {playerA?.name || "TBD"}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 px-3">
+            <span className={cn("text-2xl font-bold tabular-nums", isCompleted && match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>{match.scoreA || 0}</span>
+            <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
+            <span className={cn("text-2xl font-bold tabular-nums", isCompleted && match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>{match.scoreB || 0}</span>
+          </div>
+          <div className="flex-1">
+            <p className={cn("text-lg font-bold", isCompleted && match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>
+              {playerB?.name || "TBD"}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+      {expanded && isCompleted && (
+        <div className="border-t bg-muted/20 px-4 py-3">
+          {loading && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {!loading && notes && statRows.length > 0 && (
+            <div className="max-w-sm mx-auto">
+              <div className="grid grid-cols-3 gap-1 text-sm">
+                <div className="text-right font-bold text-xs text-muted-foreground pb-1">{playerA?.name}</div>
+                <div className="text-center font-bold text-xs text-muted-foreground pb-1">Stat</div>
+                <div className="text-left font-bold text-xs text-muted-foreground pb-1">{playerB?.name}</div>
+                {statRows.map(({ label: sl, valA, valB }) => {
+                  const aNum = parseFloat(String(valA));
+                  const bNum = parseFloat(String(valB));
+                  const aWins = !isNaN(aNum) && !isNaN(bNum) && aNum > bNum;
+                  const bWins = !isNaN(aNum) && !isNaN(bNum) && bNum > aNum;
+                  return (
+                    <div key={sl} className="contents">
+                      <div className={cn("text-right tabular-nums py-0.5", aWins && "text-green-600 dark:text-green-400 font-semibold")}>{valA}</div>
+                      <div className="text-center text-muted-foreground text-xs py-0.5">{sl}</div>
+                      <div className={cn("text-left tabular-nums py-0.5", bWins && "text-green-600 dark:text-green-400 font-semibold")}>{valB}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {!loading && !notes && (
+            <p className="text-sm text-muted-foreground text-center py-2">No detailed stats available for this match</p>
+          )}
+        </div>
+      )}
+    </Card>
+  );
 }
 
 function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
@@ -422,50 +678,15 @@ export default function PublicView() {
                 }
 
                 return (
-                  <Card
+                  <KnockoutMatchCard
                     key={match.id}
-                    className={cn(
-                      "overflow-hidden",
-                      isCompleted ? "border border-muted-foreground/20 opacity-70" : "border-2 border-dashed border-primary/40"
-                    )}
-                    data-testid={`knockout-match-${match.id}`}
-                  >
-                    <CardHeader className={cn("border-b py-2.5 px-4", isCompleted ? "bg-muted/30" : "bg-primary/5")}>
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        {isCompleted ? (
-                          <Check className="w-4 h-4 text-green-500" />
-                        ) : (
-                          <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
-                        )}
-                        {label}
-                        {!isCompleted && (
-                          <span className="text-xs text-muted-foreground ml-auto">Next Up</span>
-                        )}
-                        {isCompleted && (
-                          <span className="text-xs text-muted-foreground ml-auto">Completed</span>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="py-4 px-4">
-                      <div className="flex items-center justify-between text-center">
-                        <div className="flex-1">
-                          <p className={cn("text-lg font-bold", isCompleted && match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>
-                            {playerA?.name || "TBD"}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3 px-3">
-                          <span className={cn("text-2xl font-bold tabular-nums", isCompleted && match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>{match.scoreA || 0}</span>
-                          <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
-                          <span className={cn("text-2xl font-bold tabular-nums", isCompleted && match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>{match.scoreB || 0}</span>
-                        </div>
-                        <div className="flex-1">
-                          <p className={cn("text-lg font-bold", isCompleted && match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>
-                            {playerB?.name || "TBD"}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    match={match}
+                    playerA={playerA}
+                    playerB={playerB}
+                    label={label}
+                    isCompleted={isCompleted}
+                    shareToken={shareToken || ''}
+                  />
                 );
               })}
             </div>
@@ -535,33 +756,14 @@ export default function PublicView() {
                     {roundMatches.map((match) => {
                       const playerA = getPlayer(match.playerAId);
                       const playerB = getPlayer(match.playerBId);
-                      
                       return (
-                        <div key={match.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                          <div className="flex-1 text-right font-medium">
-                            {playerA?.name || "TBD"}
-                          </div>
-                          
-                          <div className="flex items-center gap-3 px-6">
-                            <span className={cn(
-                              "text-xl font-bold", 
-                              match.scoreA! > match.scoreB! ? "text-primary" : "text-muted-foreground"
-                            )}>
-                              {match.scoreA || 0}
-                            </span>
-                            <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
-                            <span className={cn(
-                              "text-xl font-bold", 
-                              match.scoreB! > match.scoreA! ? "text-primary" : "text-muted-foreground"
-                            )}>
-                              {match.scoreB || 0}
-                            </span>
-                          </div>
-
-                          <div className="flex-1 text-left font-medium">
-                            {playerB?.name || "TBD"}
-                          </div>
-                        </div>
+                        <CompletedMatchRow
+                          key={match.id}
+                          match={match}
+                          playerA={playerA}
+                          playerB={playerB}
+                          shareToken={shareToken || ''}
+                        />
                       );
                     })}
                   </div>

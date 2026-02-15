@@ -894,6 +894,26 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/public/t/:shareToken/match/:matchId/notes', async (req, res) => {
+    try {
+      const { shareToken, matchId } = req.params;
+      const mid = parseInt(matchId, 10);
+      if (isNaN(mid)) return res.status(400).json({ message: "Invalid match ID" });
+
+      const tournament = await storage.getTournamentByShareToken(shareToken);
+      if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+      const match = await storage.getMatch(mid);
+      if (!match || match.tournamentId !== tournament.id) return res.status(404).json({ message: "Match not found" });
+
+      const note = await storage.getMatchNote(mid);
+      res.json(note || null);
+    } catch (err) {
+      console.error("Public match notes error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Board-specific public endpoint: returns data for a single group/board
   app.get('/api/public/t/:shareToken/board/:boardNumber', async (req, res) => {
     const { shareToken, boardNumber } = req.params;

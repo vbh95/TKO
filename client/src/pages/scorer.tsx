@@ -213,12 +213,12 @@ export default function ScorerPage() {
   });
 
   const updateScoreMutation = useMutation({
-    mutationFn: async ({ matchId, scoreA, scoreB }: { matchId: number; scoreA: number; scoreB: number }) => {
+    mutationFn: async ({ matchId, scoreA, scoreB, notes }: { matchId: number; scoreA: number; scoreB: number; notes?: any }) => {
       const res = await fetch(`/api/scorer/matches/${matchId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ scoreA, scoreB }),
+        body: JSON.stringify({ scoreA, scoreB, notes }),
       });
       if (!res.ok) throw new Error("Failed to update score");
       return res.json();
@@ -425,13 +425,47 @@ export default function ScorerPage() {
       newLegsB,
     );
 
+    const allVisitsIncludingCurrent = [...allMatchVisits, ...newVisits];
+    const isMatchFinished = newLegsA >= matchLegsToWin || newLegsB >= matchLegsToWin;
+    let matchNotes: any = undefined;
+    if (isMatchFinished) {
+      const vA = allVisitsIncludingCurrent.filter(v => v.player === 'A');
+      const vB = allVisitsIncludingCurrent.filter(v => v.player === 'B');
+      const cs = checkoutStatsRef.current;
+      const highestCheckoutVal = Math.max(cs.finishA, cs.finishB);
+      const total180s = vA.filter(v => v.score === 180).length + vB.filter(v => v.score === 180).length;
+      matchNotes = {
+        highestCheckout: highestCheckoutVal > 0 ? highestCheckoutVal : undefined,
+        numberOf180s: total180s,
+        totalVisitsA: vA.length,
+        totalVisitsB: vB.length,
+        totalScoredA: vA.reduce((s: number, v: Visit) => s + v.score, 0),
+        totalScoredB: vB.reduce((s: number, v: Visit) => s + v.score, 0),
+        highestVisitA: vA.length > 0 ? Math.max(...vA.map(v => v.score)) : 0,
+        highestVisitB: vB.length > 0 ? Math.max(...vB.map(v => v.score)) : 0,
+        highestFinishA: cs.finishA,
+        highestFinishB: cs.finishB,
+        ton80sA: vA.filter(v => v.score === 180).length,
+        ton80sB: vB.filter(v => v.score === 180).length,
+        ton40sA: vA.filter(v => v.score >= 140 && v.score < 180).length,
+        ton40sB: vB.filter(v => v.score >= 140 && v.score < 180).length,
+        tonsA: vA.filter(v => v.score >= 100 && v.score < 140).length,
+        tonsB: vB.filter(v => v.score >= 100 && v.score < 140).length,
+        checkoutAttemptsA: cs.attemptsA,
+        checkoutAttemptsB: cs.attemptsB,
+        checkoutSuccessA: cs.successA,
+        checkoutSuccessB: cs.successB,
+      };
+    }
+
     updateScoreMutation.mutate({
       matchId: activeMatchId,
       scoreA: newLegsA,
       scoreB: newLegsB,
+      notes: matchNotes,
     });
 
-    setAllMatchVisits(prev => [...prev, ...newVisits]);
+    setAllMatchVisits(allVisitsIncludingCurrent);
 
     if (newLegsA < matchLegsToWin && newLegsB < matchLegsToWin) {
       const playerName = isPlayerA
