@@ -418,29 +418,55 @@ export default function TournamentDetail() {
 
           const renderLiveTab = () => {
             const sortedGroups = [...groups].sort((a: any, b: any) => a.name.localeCompare(b.name));
+            const groupStageMatches = matches.filter((m: any) => m.stage === 'GROUP');
+            const knockoutStageMatches = matches.filter((m: any) => m.stage !== 'GROUP');
+            const groupsFinished = groupStageMatches.length > 0 && groupStageMatches.every((m: any) => m.status === 'COMPLETED');
 
-            const boardMatches: { group: any; match: any; isLive: boolean }[] = [];
+            const boardMatches: { group: any; match: any; isLive: boolean; label: string }[] = [];
 
-            for (const group of sortedGroups) {
-              const inProgress = liveMatches.find((m: any) => m.groupId === group.id);
-              if (inProgress) {
-                boardMatches.push({ group, match: inProgress, isLive: true });
-              } else {
-                const nextPending = pendingMatches.find((m: any) => m.groupId === group.id);
-                if (nextPending) {
-                  boardMatches.push({ group, match: nextPending, isLive: false });
+            if (!groupsFinished) {
+              for (const group of sortedGroups) {
+                const inProgress = liveMatches.find((m: any) => m.groupId === group.id);
+                if (inProgress) {
+                  boardMatches.push({ group, match: inProgress, isLive: true, label: `${group.name} — Board ${sortedGroups.indexOf(group) + 1}` });
+                } else {
+                  const nextPending = pendingMatches.find((m: any) => m.groupId === group.id);
+                  if (nextPending) {
+                    boardMatches.push({ group, match: nextPending, isLive: false, label: `${group.name} — Board ${sortedGroups.indexOf(group) + 1}` });
+                  }
                 }
               }
-            }
+            } else if (knockoutStageMatches.length > 0) {
+              const knockoutRounds = Array.from(new Set(knockoutStageMatches.map((m: any) => m.roundKey))) as string[];
+              knockoutRounds.sort((a: string, b: string) => {
+                const order: Record<string, number> = { QF: 1, SF: 2, F: 3 };
+                return (order[a] || 0) - (order[b] || 0);
+              });
 
-            // Also include non-group matches (knockout stage)
-            const nonGroupLive = liveMatches.find((m: any) => !m.groupId);
-            if (nonGroupLive) {
-              boardMatches.push({ group: null, match: nonGroupLive, isLive: true });
-            } else {
-              const nonGroupPending = pendingMatches.find((m: any) => !m.groupId);
-              if (nonGroupPending) {
-                boardMatches.push({ group: null, match: nonGroupPending, isLive: false });
+              let currentRoundKey: string | null = null;
+              for (const rk of knockoutRounds) {
+                const roundMatches = knockoutStageMatches.filter((m: any) => m.roundKey === rk);
+                const allDone = roundMatches.every((m: any) => m.status === 'COMPLETED');
+                if (!allDone) {
+                  currentRoundKey = rk;
+                  break;
+                }
+              }
+
+              if (currentRoundKey) {
+                const currentRoundMatches = knockoutStageMatches.filter((m: any) => m.roundKey === currentRoundKey);
+                currentRoundMatches.forEach((match: any, i: number) => {
+                  const isLive = match.status === 'IN_PROGRESS';
+                  const isPending = match.status === 'PENDING';
+                  if (isLive || isPending) {
+                    boardMatches.push({
+                      group: null,
+                      match,
+                      isLive,
+                      label: `${getRoundDisplayName(currentRoundKey!)} ${currentRoundMatches.length > 1 ? i + 1 : ''}`
+                    });
+                  }
+                });
               }
             }
 
@@ -456,10 +482,9 @@ export default function TournamentDetail() {
 
             return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {boardMatches.map(({ group, match, isLive }, idx) => {
+                {boardMatches.map(({ group, match, isLive, label }, idx) => {
                   const playerA = getPlayer(match.playerAId);
                   const playerB = getPlayer(match.playerBId);
-                  const label = group ? `${group.name} — Board ${idx + 1}` : getRoundDisplayName(match.roundKey || '');
 
                   return (
                     <Card
