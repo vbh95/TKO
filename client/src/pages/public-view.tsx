@@ -135,15 +135,26 @@ export default function PublicView() {
     return acc;
   }, {} as Record<string, typeof matches>);
 
-  const sortedRoundEntries = Object.entries(matchesByRound).sort(([a], [b]) => {
+  const sortedRoundEntries = Object.entries(matchesByRound).sort(([a, aMatches], [b, bMatches]) => {
     const aIsGroup = groups.some(g => g.name === a);
     const bIsGroup = groups.some(g => g.name === b);
-    if (aIsGroup && !bIsGroup) return -1;
-    if (!aIsGroup && bIsGroup) return 1;
-    if (aIsGroup && bIsGroup) return a.localeCompare(b);
-    const aOrder = knockoutRoundOrder[a] ?? 0;
-    const bOrder = knockoutRoundOrder[b] ?? 0;
-    return aOrder - bOrder;
+    const aAllCompleted = aMatches.every(m => m.status === 'COMPLETED');
+    const bAllCompleted = bMatches.every(m => m.status === 'COMPLETED');
+
+    if (aIsGroup && bIsGroup) {
+      if (aAllCompleted && !bAllCompleted) return 1;
+      if (!aAllCompleted && bAllCompleted) return -1;
+      return a.localeCompare(b);
+    }
+    if (!aIsGroup && !bIsGroup) {
+      const aOrder = knockoutRoundOrder[a] ?? 0;
+      const bOrder = knockoutRoundOrder[b] ?? 0;
+      return aOrder - bOrder;
+    }
+    if (aIsGroup && aAllCompleted) return 1;
+    if (bIsGroup && bAllCompleted) return -1;
+    if (aIsGroup) return -1;
+    return 1;
   });
 
   const getPlayer = (id: number | null) => players.find(p => p.id === id) || null;
