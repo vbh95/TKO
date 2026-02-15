@@ -1,5 +1,5 @@
 import { useParams } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { usePublicTournament } from "@/hooks/use-tournaments";
 import { Loader2, Trophy, Eye, Sun, Moon, Check } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
@@ -40,21 +40,26 @@ interface LiveScoring {
 export default function PublicView() {
   const { shareToken } = useParams();
   const { data, isLoading, error, refetch } = usePublicTournament(shareToken || "");
-  const { joinPublic, on } = useSocket();
+  const { socket, joinPublic, on } = useSocket();
   const [liveScorings, setLiveScorings] = useState<Map<number, LiveScoring>>(new Map());
+  const matchesRef = useRef(data?.matches);
+  matchesRef.current = data?.matches;
 
   useEffect(() => {
-    if (shareToken) joinPublic(shareToken);
-  }, [shareToken, joinPublic]);
+    if (!shareToken) return;
+    joinPublic(shareToken);
+    const handleReconnect = () => {
+      joinPublic(shareToken);
+      refetch();
+    };
+    socket.on("connect", handleReconnect);
+    return () => { socket.off("connect", handleReconnect); };
+  }, [shareToken, joinPublic, socket, refetch]);
 
   useEffect(() => {
     const cleanup1 = on("match:updated", () => { refetch(); });
     const cleanup2 = on("tournament:updated", () => refetch());
     const cleanup3 = on("leg:scoring", (incoming: LiveScoring) => {
-      const currentMatches = data?.matches;
-      if (!currentMatches) return;
-      const isOurMatch = currentMatches.some(m => m.id === incoming.matchId && m.status === 'IN_PROGRESS');
-      if (!isOurMatch) return;
       setLiveScorings(prev => {
         const next = new Map(prev);
         next.set(incoming.matchId, incoming);
@@ -62,7 +67,7 @@ export default function PublicView() {
       });
     });
     return () => { cleanup1(); cleanup2(); cleanup3(); };
-  }, [on, refetch, data?.matches]);
+  }, [on, refetch]);
 
   if (isLoading) {
     return (

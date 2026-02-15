@@ -147,6 +147,6 @@ export function usePublicTournament(token: string) {
       if (!res.ok) throw new Error("Failed to fetch tournament");
       return api.public.get.responses[200].parse(await res.json());
     },
-    refetchInterval: 30000, // Auto-refresh for spectators
+    refetchInterval: 10000,
   });
 }

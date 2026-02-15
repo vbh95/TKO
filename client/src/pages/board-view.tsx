@@ -82,15 +82,22 @@ export default function BoardView() {
       if (!res.ok) throw new Error("Failed to fetch board data");
       return res.json();
     },
-    refetchInterval: 30000,
+    refetchInterval: 10000,
   });
 
   useEffect(() => {
-    if (shareToken) joinPublic(shareToken);
-    if (data?.tournament?.id && boardNumber && shareToken) {
-      joinBoard(data.tournament.id, parseInt(boardNumber), shareToken);
-    }
-  }, [shareToken, data?.tournament?.id, boardNumber, joinPublic, joinBoard]);
+    if (!shareToken) return;
+    const rejoin = () => {
+      joinPublic(shareToken);
+      if (data?.tournament?.id && boardNumber) {
+        joinBoard(data.tournament.id, parseInt(boardNumber), shareToken);
+      }
+      refetch();
+    };
+    rejoin();
+    socket.on("connect", rejoin);
+    return () => { socket.off("connect", rejoin); };
+  }, [shareToken, data?.tournament?.id, boardNumber, joinPublic, joinBoard, socket, refetch]);
 
   useEffect(() => {
     const cleanup1 = on("connect", () => setIsConnected(true));
@@ -98,16 +105,11 @@ export default function BoardView() {
     const cleanup3 = on("match:updated", () => { setLiveScoring(null); refetch(); });
     const cleanup4 = on("tournament:updated", () => refetch());
     const cleanup5 = on("leg:scoring", (incoming: LiveScoring) => {
-      const currentMatches = data?.matches;
-      if (!currentMatches) return;
-      const current = currentMatches.find(m => m.status === 'IN_PROGRESS');
-      if (current && incoming.matchId === current.id) {
-        setLiveScoring(incoming);
-      }
+      setLiveScoring(incoming);
     });
     setIsConnected(socket.connected);
     return () => { cleanup1(); cleanup2(); cleanup3(); cleanup4(); cleanup5(); };
-  }, [on, socket, refetch, data?.matches]);
+  }, [on, socket, refetch]);
 
   if (isLoading) {
     return (
