@@ -417,9 +417,34 @@ export default function TournamentDetail() {
           };
 
           const renderLiveTab = () => {
-            const allActiveMatches = [...liveMatches, ...pendingMatches];
-            
-            if (allActiveMatches.length === 0) {
+            const sortedGroups = [...groups].sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+            const boardMatches: { group: any; match: any; isLive: boolean }[] = [];
+
+            for (const group of sortedGroups) {
+              const inProgress = liveMatches.find((m: any) => m.groupId === group.id);
+              if (inProgress) {
+                boardMatches.push({ group, match: inProgress, isLive: true });
+              } else {
+                const nextPending = pendingMatches.find((m: any) => m.groupId === group.id);
+                if (nextPending) {
+                  boardMatches.push({ group, match: nextPending, isLive: false });
+                }
+              }
+            }
+
+            // Also include non-group matches (knockout stage)
+            const nonGroupLive = liveMatches.find((m: any) => !m.groupId);
+            if (nonGroupLive) {
+              boardMatches.push({ group: null, match: nonGroupLive, isLive: true });
+            } else {
+              const nonGroupPending = pendingMatches.find((m: any) => !m.groupId);
+              if (nonGroupPending) {
+                boardMatches.push({ group: null, match: nonGroupPending, isLive: false });
+              }
+            }
+
+            if (boardMatches.length === 0) {
               return (
                 <div className="text-center py-12 text-muted-foreground">
                   <Radio className="w-12 h-12 mx-auto mb-4 opacity-40" />
@@ -429,120 +454,73 @@ export default function TournamentDetail() {
               );
             }
 
-            const groupedLive: Record<string, any[]> = {};
-            const groupedPending: Record<string, any[]> = {};
-
-            liveMatches.forEach((m: any) => {
-              const group = getGroupForMatch(m);
-              const key = group ? group.name : (m.stage === 'GROUP' ? 'Ungrouped' : getRoundDisplayName(m.roundKey || ''));
-              if (!groupedLive[key]) groupedLive[key] = [];
-              groupedLive[key].push(m);
-            });
-
-            pendingMatches.forEach((m: any) => {
-              const group = getGroupForMatch(m);
-              const key = group ? group.name : (m.stage === 'GROUP' ? 'Ungrouped' : getRoundDisplayName(m.roundKey || ''));
-              if (!groupedPending[key]) groupedPending[key] = [];
-              groupedPending[key].push(m);
-            });
-
             return (
-              <div className="space-y-8">
-                {liveMatches.length > 0 && (
-                  <div className="space-y-4">
-                    <h2 className="text-xl font-bold flex items-center gap-2" data-testid="live-now-heading">
-                      <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                      Now Playing
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {liveMatches.map((match: any) => {
-                        const playerA = getPlayer(match.playerAId);
-                        const playerB = getPlayer(match.playerBId);
-                        const group = getGroupForMatch(match);
-                        return (
-                          <Card
-                            key={match.id}
-                            onClick={() => setSelectedMatch(match)}
-                            className="overflow-hidden cursor-pointer transition-all hover:shadow-md border-2 border-green-500/50"
-                            data-testid={`live-match-card-${match.id}`}
-                          >
-                            <div className="bg-green-600 dark:bg-green-700 px-4 py-2 flex items-center justify-between">
-                              <span className="text-white font-bold text-sm flex items-center gap-2">
-                                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                                {group ? group.name : getRoundDisplayName(match.roundKey || '')}
-                              </span>
-                              <Badge className="bg-white/20 text-white text-xs">Live</Badge>
-                            </div>
-                            <CardContent className="p-0">
-                              <div className="flex items-center justify-between px-4 py-3 border-b">
-                                <span className={cn("text-sm font-medium flex-1", match.scoreA > match.scoreB && "text-primary font-bold")}>
-                                  {playerA?.name || "TBD"}
-                                </span>
-                                <div className={cn(
-                                  "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
-                                  match.scoreA > match.scoreB ? "bg-primary text-primary-foreground" : "bg-muted"
-                                )}>
-                                  {match.scoreA || 0}
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between px-4 py-3">
-                                <span className={cn("text-sm font-medium flex-1", match.scoreB > match.scoreA && "text-primary font-bold")}>
-                                  {playerB?.name || "TBD"}
-                                </span>
-                                <div className={cn(
-                                  "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
-                                  match.scoreB > match.scoreA ? "bg-primary text-primary-foreground" : "bg-muted"
-                                )}>
-                                  {match.scoreB || 0}
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {boardMatches.map(({ group, match, isLive }, idx) => {
+                  const playerA = getPlayer(match.playerAId);
+                  const playerB = getPlayer(match.playerBId);
+                  const label = group ? `${group.name} — Board ${idx + 1}` : getRoundDisplayName(match.roundKey || '');
 
-                {pendingMatches.length > 0 && (
-                  <div className="space-y-4">
-                    <h2 className="text-xl font-bold text-muted-foreground" data-testid="up-next-heading">
-                      Up Next ({pendingMatches.length} matches remaining)
-                    </h2>
-                    {Object.entries(groupedPending).map(([groupName, gMatches]) => (
-                      <div key={groupName} className="space-y-3">
-                        {Object.keys(groupedPending).length > 1 && (
-                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{groupName}</h3>
+                  return (
+                    <Card
+                      key={match.id}
+                      onClick={() => setSelectedMatch(match)}
+                      className={cn(
+                        "overflow-hidden cursor-pointer transition-all hover:shadow-md",
+                        isLive ? "border-2 border-green-500/50" : "border-dashed"
+                      )}
+                      data-testid={`live-board-card-${idx + 1}`}
+                    >
+                      <div className={cn(
+                        "px-4 py-2 flex items-center justify-between",
+                        isLive ? "bg-green-600 dark:bg-green-700" : "bg-muted"
+                      )}>
+                        <span className={cn(
+                          "font-bold text-sm flex items-center gap-2",
+                          isLive ? "text-white" : "text-muted-foreground"
+                        )}>
+                          {isLive && <span className="w-2 h-2 bg-white rounded-full animate-pulse" />}
+                          {label}
+                        </span>
+                        {isLive ? (
+                          <Badge className="bg-white/20 text-white text-xs">Live</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">Up Next</Badge>
                         )}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {gMatches.map((match: any) => {
-                            const playerA = getPlayer(match.playerAId);
-                            const playerB = getPlayer(match.playerBId);
-                            return (
-                              <Card
-                                key={match.id}
-                                onClick={() => setSelectedMatch(match)}
-                                className="overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-primary/50 border-dashed"
-                                data-testid={`pending-match-card-${match.id}`}
-                              >
-                                <CardContent className="p-0">
-                                  <div className="flex items-center justify-between px-4 py-3 border-b">
-                                    <span className="text-sm font-medium flex-1">{playerA?.name || "TBD"}</span>
-                                    <div className="w-7 h-7 flex items-center justify-center rounded text-sm font-bold bg-muted">-</div>
-                                  </div>
-                                  <div className="flex items-center justify-between px-4 py-3">
-                                    <span className="text-sm font-medium flex-1">{playerB?.name || "TBD"}</span>
-                                    <div className="w-7 h-7 flex items-center justify-center rounded text-sm font-bold bg-muted">-</div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
-                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <CardContent className="p-0">
+                        <div className="flex items-center justify-between px-4 py-3 border-b">
+                          <span className={cn(
+                            "text-sm font-medium flex-1",
+                            isLive && match.scoreA > match.scoreB && "text-primary font-bold"
+                          )}>
+                            {playerA?.name || "TBD"}
+                          </span>
+                          <div className={cn(
+                            "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
+                            isLive && match.scoreA > match.scoreB ? "bg-primary text-primary-foreground" : "bg-muted"
+                          )}>
+                            {isLive ? (match.scoreA || 0) : "-"}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <span className={cn(
+                            "text-sm font-medium flex-1",
+                            isLive && match.scoreB > match.scoreA && "text-primary font-bold"
+                          )}>
+                            {playerB?.name || "TBD"}
+                          </span>
+                          <div className={cn(
+                            "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
+                            isLive && match.scoreB > match.scoreA ? "bg-primary text-primary-foreground" : "bg-muted"
+                          )}>
+                            {isLive ? (match.scoreB || 0) : "-"}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             );
           };
