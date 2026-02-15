@@ -11,7 +11,8 @@ import {
   Copy, 
   Check, 
   ExternalLink,
-  Users
+  Users,
+  Target
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -330,14 +331,15 @@ export default function TournamentDetail() {
                         <Input 
                           readOnly 
                           value={`${window.location.origin}/public/t/${tournament.shareToken}`} 
+                          data-testid="input-share-link"
                         />
-                        <Button size="icon" onClick={handleCopyLink}>
+                        <Button size="icon" onClick={handleCopyLink} data-testid="button-copy-share-link">
                           {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                         </Button>
                       </div>
                       <div className="flex justify-between">
                         <Button variant="ghost" asChild className="px-0">
-                          <a href={`/public/t/${tournament.shareToken}`} target="_blank" rel="noopener noreferrer">
+                          <a href={`/public/t/${tournament.shareToken}`} target="_blank" rel="noopener noreferrer" data-testid="link-open-public-view">
                             Open Public View <ExternalLink className="w-3 h-3 ml-1" />
                           </a>
                         </Button>
@@ -345,10 +347,46 @@ export default function TournamentDetail() {
                           variant="ghost" 
                           className="text-destructive hover:text-destructive/90"
                           onClick={() => disableShare.mutate()}
+                          data-testid="button-disable-sharing"
                         >
                           Disable Sharing
                         </Button>
                       </div>
+
+                      {groups.length > 0 && (
+                        <div className="border-t pt-4 mt-2" data-testid="section-board-links">
+                          <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                            <Target className="w-4 h-4 text-primary" />
+                            Board-Specific Links (for scoring app)
+                          </p>
+                          <div className="space-y-2">
+                            {[...groups].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((group: any, idx: number) => {
+                              const boardUrl = `${window.location.origin}/public/t/${tournament.shareToken}/board/${idx + 1}`;
+                              return (
+                                <div key={group.id} className="flex items-center gap-2" data-testid={`board-link-${idx + 1}`}>
+                                  <span className="text-xs text-muted-foreground w-20 shrink-0">Board {idx + 1}</span>
+                                  <Input readOnly value={boardUrl} className="text-xs h-8" />
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-8 w-8 shrink-0"
+                                    data-testid={`button-copy-board-${idx + 1}`}
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(boardUrl);
+                                      toast({ title: `Board ${idx + 1} link copied!` });
+                                    }}
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Each board link shows only that group's matches and standings.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

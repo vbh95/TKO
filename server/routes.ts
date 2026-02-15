@@ -294,8 +294,62 @@ export async function registerRoutes(
 
   // === PUBLIC ===
   app.get(api.public.get.path, async (req, res) => {
-     // TODO: Implement public fetch by token
-     res.status(501).json({ message: "Not implemented yet" }); 
+    const { shareToken } = req.params;
+    const tournament = await storage.getTournamentByShareToken(shareToken);
+    if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+    const [playersList, groupsList, matchesList] = await Promise.all([
+      storage.getPlayersByTournamentId(tournament.id),
+      storage.getGroupsByTournamentId(tournament.id),
+      storage.getMatchesByTournamentId(tournament.id),
+    ]);
+
+    res.json({
+      tournament,
+      players: playersList,
+      groups: groupsList,
+      matches: matchesList,
+    });
+  });
+
+  // Board-specific public endpoint: returns data for a single group/board
+  app.get('/api/public/t/:shareToken/board/:boardNumber', async (req, res) => {
+    const { shareToken, boardNumber } = req.params;
+    const boardNum = parseInt(boardNumber, 10);
+    if (isNaN(boardNum) || boardNum < 1) return res.status(400).json({ message: "Invalid board number" });
+
+    const tournament = await storage.getTournamentByShareToken(shareToken);
+    if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+    const [playersList, groupsList, allMatches, allMemberships] = await Promise.all([
+      storage.getPlayersByTournamentId(tournament.id),
+      storage.getGroupsByTournamentId(tournament.id),
+      storage.getMatchesByTournamentId(tournament.id),
+      storage.getGroupMembershipsByTournamentId(tournament.id),
+    ]);
+
+    // Sort groups alphabetically (Group A = board 1, Group B = board 2, etc.)
+    const sortedGroups = groupsList.sort((a, b) => a.name.localeCompare(b.name));
+    const group = sortedGroups[boardNum - 1];
+    if (!group) return res.status(404).json({ message: `Board ${boardNum} not found. This tournament has ${sortedGroups.length} group(s).` });
+
+    // Filter matches for this group only
+    const groupMatches = allMatches.filter(m => m.groupId === group.id);
+    
+    // Get players in this group via memberships
+    const groupMembershipPlayerIds = allMemberships
+      .filter(m => m.groupId === group.id)
+      .map(m => m.playerId);
+    const groupPlayers = playersList.filter(p => groupMembershipPlayerIds.includes(p.id));
+
+    res.json({
+      tournament,
+      group,
+      boardNumber: boardNum,
+      totalBoards: sortedGroups.length,
+      players: groupPlayers,
+      matches: groupMatches,
+    });
   });
 
   return httpServer;
