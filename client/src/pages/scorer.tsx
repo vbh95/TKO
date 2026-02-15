@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Loader2, Target, Trophy, Wifi, WifiOff, Play, ChevronRight, ArrowLeft, Undo2, RotateCcw, Check, Eye, Grid2x2 } from "lucide-react";
+import { Loader2, Target, Trophy, Wifi, WifiOff, Play, ChevronRight, ArrowLeft, Undo2, RotateCcw, Check, Eye, Grid2x2, Delete } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -554,14 +554,10 @@ export default function ScorerPage() {
             <p className="text-gray-400 text-xs uppercase tracking-wider">
               Leg {currentLeg} — Best of {matchBestOf}
             </p>
-            <div className="flex items-center justify-center gap-3 mt-0.5">
-              <span className="text-white text-sm font-medium truncate max-w-[100px]">{playerA?.name || 'Player 1'}</span>
-              <div className="tabular-nums">
-                <span className={cn("text-2xl font-bold", legsWonA >= legsWonB ? "text-white" : "text-gray-500")}>{legsWonA}</span>
-                <span className="text-gray-600 mx-1.5 text-xl">-</span>
-                <span className={cn("text-2xl font-bold", legsWonB >= legsWonA ? "text-white" : "text-gray-500")}>{legsWonB}</span>
-              </div>
-              <span className="text-white text-sm font-medium truncate max-w-[100px]">{playerB?.name || 'Player 2'}</span>
+            <div className="tabular-nums mt-0.5">
+              <span className={cn("text-3xl font-bold", legsWonA >= legsWonB ? "text-white" : "text-gray-500")}>{legsWonA}</span>
+              <span className="text-gray-600 mx-2 text-2xl">-</span>
+              <span className={cn("text-3xl font-bold", legsWonB >= legsWonA ? "text-white" : "text-gray-500")}>{legsWonB}</span>
             </div>
           </div>
 
@@ -584,19 +580,11 @@ export default function ScorerPage() {
               <p className="text-sm font-bold text-white/90 truncate" data-testid="text-player-a-name">
                 {playerA?.name || "Player 1"}
               </p>
-              <div className="flex items-start justify-between">
-                <div
-                  className="text-5xl font-bold text-white tabular-nums leading-tight"
-                  data-testid="text-remaining-a"
-                >
-                  {remainingA}
-                </div>
-                <div
-                  className="w-7 h-7 rounded-full bg-black/30 flex items-center justify-center"
-                  data-testid="text-legs-a"
-                >
-                  <span className="text-sm font-bold text-white/80 tabular-nums">{legsWonA}</span>
-                </div>
+              <div
+                className="text-6xl font-bold text-white tabular-nums leading-none mt-1"
+                data-testid="text-remaining-a"
+              >
+                {remainingA}
               </div>
               <div className="mt-2 space-y-0.5 text-xs">
                 <div className="flex justify-between text-white/60">
@@ -632,19 +620,11 @@ export default function ScorerPage() {
               <p className="text-sm font-bold text-white/90 truncate" data-testid="text-player-b-name">
                 {playerB?.name || "Player 2"}
               </p>
-              <div className="flex items-start justify-between">
-                <div
-                  className="text-5xl font-bold text-white tabular-nums leading-tight"
-                  data-testid="text-remaining-b"
-                >
-                  {remainingB}
-                </div>
-                <div
-                  className="w-7 h-7 rounded-full bg-black/30 flex items-center justify-center"
-                  data-testid="text-legs-b"
-                >
-                  <span className="text-sm font-bold text-white/80 tabular-nums">{legsWonB}</span>
-                </div>
+              <div
+                className="text-6xl font-bold text-white tabular-nums leading-none mt-1"
+                data-testid="text-remaining-b"
+              >
+                {remainingB}
               </div>
               <div className="mt-2 space-y-0.5 text-xs">
                 <div className="flex justify-between text-white/60">
@@ -729,10 +709,19 @@ export default function ScorerPage() {
                 <Grid2x2 className="w-5 h-5 text-gray-400" />
               </button>
               <div
-                className="flex-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl px-4 h-11 text-lg text-gray-400 font-medium tabular-nums flex items-center"
+                className="flex-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl px-4 h-11 text-lg font-medium tabular-nums flex items-center justify-between"
                 data-testid="text-input-value"
               >
-                {inputValue || 'Enter a score'}
+                <span className={inputValue ? "text-white" : "text-gray-500"}>{inputValue || 'Enter a score'}</span>
+                {inputValue && (
+                  <button
+                    className="ml-2 p-1 touch-manipulation"
+                    onClick={() => setInputValue(prev => prev.slice(0, -1))}
+                    data-testid="button-backspace"
+                  >
+                    <Delete className="w-5 h-5 text-gray-400" />
+                  </button>
+                )}
               </div>
               <button
                 className={cn(
