@@ -2,6 +2,7 @@ import { useParams } from "wouter";
 import { useEffect, useState } from "react";
 import { usePublicTournament } from "@/hooks/use-tournaments";
 import { Loader2, Trophy, Eye } from "lucide-react";
+import tkoLogoFull from "@assets/Untitled-1-03_1771177331378.png";
 import { useSocket } from "@/hooks/use-socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -138,9 +139,9 @@ export default function PublicView() {
         <div className="container max-w-6xl mx-auto flex justify-between items-center">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <Trophy className="w-8 h-8" />
-              <h1 className="text-3xl md:text-4xl font-display font-bold">{tournament.name}</h1>
+              <img src={tkoLogoFull} alt="TKO" className="h-10" />
             </div>
+            <h1 className="text-2xl md:text-3xl font-display font-bold">{tournament.name}</h1>
             <div className="flex gap-2 items-center text-primary-foreground/80">
               <Badge variant="outline" className="border-white/30 text-white">
                 {tournament.type.replace('_', ' ')}

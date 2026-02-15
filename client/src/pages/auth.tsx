@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trophy, Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
+import tkoLogo from "@assets/Untitled-1-02_1771177331378.png";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -75,11 +76,9 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4 shadow-lg shadow-primary/30">
-            <Trophy className="w-8 h-8" />
-          </div>
-          <h1 className="text-3xl font-display font-bold tracking-tight">Welcome to UDT</h1>
-          <p className="text-muted-foreground">The Ultimate Darts Tournament Generator</p>
+          <img src={tkoLogo} alt="TKO" className="w-20 h-20 mx-auto mb-2" />
+          <h1 className="text-3xl font-display font-bold tracking-tight">Welcome to TKO</h1>
+          <p className="text-muted-foreground">Tournament Knockout Organiser</p>
         </div>
 
         <Card className="border-none shadow-xl">

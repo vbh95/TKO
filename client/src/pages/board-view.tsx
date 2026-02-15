@@ -2,6 +2,7 @@ import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Loader2, Trophy, Target, Wifi, WifiOff, Eye } from "lucide-react";
+import tkoLogoFull from "@assets/Untitled-1-03_1771177331378.png";
 import { useSocket } from "@/hooks/use-socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -177,9 +178,9 @@ export default function BoardView() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <Target className="w-7 h-7" />
-                <h1 className="text-2xl md:text-3xl font-display font-bold" data-testid="text-tournament-name">{tournament.name}</h1>
+                <img src={tkoLogoFull} alt="TKO" className="h-8" />
               </div>
+              <h1 className="text-xl md:text-2xl font-display font-bold" data-testid="text-tournament-name">{tournament.name}</h1>
               <p className="text-primary-foreground/80 text-sm" data-testid="text-board-subtitle">
                 {group.name} — Board {boardNum} of {totalBoards}
               </p>
