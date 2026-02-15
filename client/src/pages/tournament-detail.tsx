@@ -206,31 +206,17 @@ export default function TournamentDetail() {
     const groupCount = groups.length;
     const pairings: { a: string; b: string }[] = [];
 
-    if (groupCount === 2) {
-      pairings.push(
-        { a: `1st ${groups[0].name}`, b: `2nd ${groups[1].name}` },
-        { a: `1st ${groups[1].name}`, b: `2nd ${groups[0].name}` },
-      );
-    } else if (groupCount === 4) {
-      pairings.push(
-        { a: `1st ${groups[0].name}`, b: `2nd ${groups[1].name}` },
-        { a: `2nd ${groups[2].name}`, b: `1st ${groups[3].name}` },
-        { a: `1st ${groups[2].name}`, b: `2nd ${groups[3].name}` },
-        { a: `2nd ${groups[0].name}`, b: `1st ${groups[1].name}` },
-      );
-    } else if (groupCount === 3) {
-      pairings.push(
-        { a: `1st ${groups[0].name}`, b: `2nd ${groups[2].name}` },
-        { a: `1st ${groups[1].name}`, b: `2nd ${groups[0].name}` },
-        { a: `1st ${groups[2].name}`, b: `2nd ${groups[1].name}` },
-      );
-    } else {
-      for (let i = 0; i < groupCount; i++) {
-        const oppIdx = (groupCount - 1 - i) % groupCount;
-        pairings.push({
-          a: `1st ${groups[i].name}`,
-          b: `2nd ${groups[oppIdx].name}`,
-        });
+    for (let i = 0; i < groupCount; i += 2) {
+      const oppIdx = i + 1;
+      if (oppIdx < groupCount) {
+        pairings.push(
+          { a: `1st ${groups[i].name}`, b: `2nd ${groups[oppIdx].name}` },
+          { a: `2nd ${groups[i].name}`, b: `1st ${groups[oppIdx].name}` },
+        );
+      } else {
+        pairings.push(
+          { a: `1st ${groups[i].name}`, b: `2nd ${groups[i].name}` },
+        );
       }
     }
 

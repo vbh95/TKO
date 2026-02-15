@@ -330,7 +330,6 @@ export async function registerRoutes(
       const tournamentData = await storage.getTournament(match.tournamentId);
       const settings = (tournamentData?.settings || {}) as any;
       const ptsWin = settings.pointsForWin ?? 2;
-      const ptsDraw = settings.pointsForDraw ?? 1;
       const ptsLoss = settings.pointsForLoss ?? 0;
 
       if (match.stage === 'GROUP') {
@@ -362,8 +361,9 @@ export async function registerRoutes(
 
               const stats = groupPlayers.map(player => {
                 const playerMs = completedGMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
-                let won = 0, drawn = 0, lost = 0, legsFor = 0, legsAgainst = 0;
+                let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
                 playerMs.forEach(m => {
+                  played++;
                   const isA = m.playerAId === player.id;
                   const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
                   const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
@@ -371,32 +371,93 @@ export async function registerRoutes(
                   legsAgainst += oppScore;
                   const mWinnerId = m.id === id ? winnerId : m.winnerId;
                   if (mWinnerId === player.id) won++;
-                  else if (mWinnerId === null) drawn++;
                   else lost++;
                 });
                 return {
                   id: player.id,
-                  pts: (won * ptsWin) + (drawn * ptsDraw) + (lost * ptsLoss),
+                  played,
+                  pts: (won * ptsWin) + (lost * ptsLoss),
                   legsFor,
                   legsAgainst,
                   diff: legsFor - legsAgainst,
                 };
               });
 
-              return stats.sort((a, b) => {
+              // Sort by: Points desc, Score Diff desc, Score For desc, then played asc
+              stats.sort((a, b) => {
                 if (b.pts !== a.pts) return b.pts - a.pts;
+                if (b.diff !== a.diff) return b.diff - a.diff;
                 if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-                const h2h = completedGMatches.find(m =>
-                  (m.playerAId === a.id && m.playerBId === b.id) ||
-                  (m.playerAId === b.id && m.playerBId === a.id)
-                );
-                if (h2h) {
-                  const h2hWinner = h2h.id === id ? winnerId : h2h.winnerId;
-                  if (h2hWinner === a.id) return -1;
-                  if (h2hWinner === b.id) return 1;
-                }
-                return 0;
+                return a.played - b.played;
               });
+
+              // Apply head-to-head for tied groups
+              let i = 0;
+              while (i < stats.length) {
+                let j = i + 1;
+                while (j < stats.length && stats[j].pts === stats[i].pts && stats[j].diff === stats[i].diff && stats[j].legsFor === stats[i].legsFor) {
+                  j++;
+                }
+                if (j - i > 1) {
+                  const tiedGroup = stats.slice(i, j);
+                  const tiedIds = new Set(tiedGroup.map(p => p.id));
+                  const h2hMatches = completedGMatches.filter(m =>
+                    m.playerAId !== null && m.playerBId !== null &&
+                    tiedIds.has(m.playerAId) && tiedIds.has(m.playerBId)
+                  );
+                  const expectedPairings = tiedGroup.length * (tiedGroup.length - 1) / 2;
+                  const pairingSet = new Set<string>();
+                  h2hMatches.forEach(m => {
+                    const pair = [m.playerAId!, m.playerBId!].sort((a, b) => a - b).join('-');
+                    pairingSet.add(pair);
+                  });
+
+                  if (pairingSet.size >= expectedPairings) {
+                    const matchCounts = new Map<number, number>();
+                    tiedGroup.forEach(p => matchCounts.set(p.id, 0));
+                    h2hMatches.forEach(m => {
+                      matchCounts.set(m.playerAId!, (matchCounts.get(m.playerAId!) || 0) + 1);
+                      matchCounts.set(m.playerBId!, (matchCounts.get(m.playerBId!) || 0) + 1);
+                    });
+                    const counts = Array.from(matchCounts.values());
+                    if (counts.every(c => c === counts[0])) {
+                      const h2hStats = tiedGroup.map(player => {
+                        const playerH2H = h2hMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
+                        let hWon = 0, hLost = 0, hFor = 0, hAgainst = 0;
+                        playerH2H.forEach(m => {
+                          const isA = m.playerAId === player.id;
+                          const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
+                          const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
+                          hFor += myScore;
+                          hAgainst += oppScore;
+                          const mWinnerId = m.id === id ? winnerId : m.winnerId;
+                          if (mWinnerId === player.id) hWon++;
+                          else hLost++;
+                        });
+                        return {
+                          id: player.id,
+                          pts: hWon * ptsWin + hLost * ptsLoss,
+                          diff: hFor - hAgainst,
+                          legsFor: hFor,
+                        };
+                      });
+                      h2hStats.sort((a, b) => {
+                        if (b.pts !== a.pts) return b.pts - a.pts;
+                        if (b.diff !== a.diff) return b.diff - a.diff;
+                        if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+                        return 0;
+                      });
+                      const reordered = h2hStats.map(h => tiedGroup.find(p => p.id === h.id)!);
+                      for (let k = 0; k < reordered.length; k++) {
+                        stats[i + k] = reordered[k];
+                      }
+                    }
+                  }
+                }
+                i = j;
+              }
+
+              return stats;
             };
 
             // Build pairings (same logic as frontend knockoutSlotLabels)
@@ -404,28 +465,17 @@ export async function registerRoutes(
             type Pairing = { aGroupIdx: number; aPos: number; bGroupIdx: number; bPos: number };
             const pairings: Pairing[] = [];
 
-            if (groupCount === 2) {
-              pairings.push(
-                { aGroupIdx: 0, aPos: 0, bGroupIdx: 1, bPos: 1 },
-                { aGroupIdx: 1, aPos: 0, bGroupIdx: 0, bPos: 1 },
-              );
-            } else if (groupCount === 4) {
-              pairings.push(
-                { aGroupIdx: 0, aPos: 0, bGroupIdx: 1, bPos: 1 },
-                { aGroupIdx: 2, aPos: 1, bGroupIdx: 3, bPos: 0 },
-                { aGroupIdx: 2, aPos: 0, bGroupIdx: 3, bPos: 1 },
-                { aGroupIdx: 0, aPos: 1, bGroupIdx: 1, bPos: 0 },
-              );
-            } else if (groupCount === 3) {
-              pairings.push(
-                { aGroupIdx: 0, aPos: 0, bGroupIdx: 2, bPos: 1 },
-                { aGroupIdx: 1, aPos: 0, bGroupIdx: 0, bPos: 1 },
-                { aGroupIdx: 2, aPos: 0, bGroupIdx: 1, bPos: 1 },
-              );
-            } else {
-              for (let i = 0; i < groupCount; i++) {
-                const oppIdx = (groupCount - 1 - i) % groupCount;
-                pairings.push({ aGroupIdx: i, aPos: 0, bGroupIdx: oppIdx, bPos: 1 });
+            for (let i = 0; i < groupCount; i += 2) {
+              const oppIdx = i + 1;
+              if (oppIdx < groupCount) {
+                pairings.push(
+                  { aGroupIdx: i, aPos: 0, bGroupIdx: oppIdx, bPos: 1 },
+                  { aGroupIdx: i, aPos: 1, bGroupIdx: oppIdx, bPos: 0 },
+                );
+              } else {
+                pairings.push(
+                  { aGroupIdx: i, aPos: 0, bGroupIdx: i, bPos: 1 },
+                );
               }
             }
 
