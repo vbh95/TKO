@@ -301,18 +301,22 @@ export async function registerRoutes(
     
     const input = api.matches.update.input.parse(req.body);
     
+    const isReset = input.scoreA === 0 && input.scoreB === 0;
+
     let winnerId: number | null = null;
-    if (input.scoreA > input.scoreB && match.playerAId) {
-      winnerId = match.playerAId;
-    } else if (input.scoreB > input.scoreA && match.playerBId) {
-      winnerId = match.playerBId;
+    if (!isReset) {
+      if (input.scoreA > input.scoreB && match.playerAId) {
+        winnerId = match.playerAId;
+      } else if (input.scoreB > input.scoreA && match.playerBId) {
+        winnerId = match.playerBId;
+      }
     }
 
     const updatedMatch = await storage.updateMatch(id, {
         scoreA: input.scoreA,
         scoreB: input.scoreB,
         winnerId,
-        status: "COMPLETED"
+        status: isReset ? "PENDING" : "COMPLETED"
     });
     
     if (input.notes) {
