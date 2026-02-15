@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, ArrowLeft } from "lucide-react";
-import tkoLogo from "@assets/Untitled-1-02_1771177331378.png";
+import tkoLogoDark from "@assets/Untitled-1-02_1771177331378.png";
+import tkoLogoWhite from "@assets/TKO_White-02_1771177730966.png";
+import { useTheme } from "@/hooks/use-theme";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -25,6 +27,8 @@ export default function AuthPage() {
   const login = useLogin();
   const signup = useSignup();
   const { toast } = useToast();
+  const { theme } = useTheme();
+  const tkoLogo = theme === 'dark' ? tkoLogoWhite : tkoLogoDark;
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();

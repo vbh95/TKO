@@ -2,7 +2,7 @@
 
 ## Overview
 
-TKO is a full-stack web application for creating and managing darts tournaments. It supports multiple tournament formats (Round Robin, Knockout, Double Elimination, Multi-Stage), per-stage match formats (Best of 3/5/7/9/11 legs), and includes features like public spectator mode via shareable links, CSV/XLSX export, and user account management. The app is designed to be iPad-friendly with a clean, touch-responsive admin UI. Brand assets: icon logo (`attached_assets/Untitled-1-02_1771177331378.png`) and full TKO wordmark (`attached_assets/Untitled-1-03_1771177331378.png`).
+TKO is a full-stack web application for creating and managing darts tournaments. It supports multiple tournament formats (Round Robin, Knockout, Double Elimination, Multi-Stage), per-stage match formats (Best of 3/5/7/9/11 legs), and includes features like public spectator mode via shareable links, CSV/XLSX export, and user account management. The app is designed to be iPad-friendly with a clean, touch-responsive admin UI. Brand assets: icon logo (`attached_assets/Untitled-1-02_1771177331378.png`) and full TKO wordmark (`attached_assets/Untitled-1-03_1771177331378.png`). White variants for dark backgrounds: icon (`attached_assets/TKO_White-02_1771177730966.png`) and wordmark (`attached_assets/TKO_White-03_1771177730967.png`).
 
 ## User Preferences
 

@@ -2,7 +2,7 @@ import { useParams } from "wouter";
 import { useEffect, useState } from "react";
 import { usePublicTournament } from "@/hooks/use-tournaments";
 import { Loader2, Trophy, Eye } from "lucide-react";
-import tkoLogoFull from "@assets/Untitled-1-03_1771177331378.png";
+import tkoLogoFull from "@assets/TKO_White-03_1771177730967.png";
 import { useSocket } from "@/hooks/use-socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {

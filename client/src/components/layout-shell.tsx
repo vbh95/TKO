@@ -12,7 +12,8 @@ import {
   Moon,
   Trophy
 } from "lucide-react";
-import tkoLogo from "@assets/Untitled-1-02_1771177331378.png";
+import tkoLogoDark from "@assets/Untitled-1-02_1771177331378.png";
+import tkoLogoWhite from "@assets/TKO_White-02_1771177730966.png";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,8 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
     { name: 'Create New', href: '/create', icon: Plus },
     { name: 'Profile', href: '/account', icon: User },
   ];
+
+  const tkoLogo = theme === 'dark' ? tkoLogoWhite : tkoLogoDark;
 
   const NavContent = () => (
     <div className="flex flex-col h-full bg-card">
