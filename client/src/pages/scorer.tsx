@@ -880,17 +880,6 @@ export default function ScorerPage() {
                   </button>
                 )}
               </div>
-              <button
-                className={cn(
-                  "px-5 h-11 rounded-xl text-base font-semibold touch-manipulation",
-                  "bg-[#4a4a4a] text-white active:bg-[#5a5a5a]"
-                )}
-                onClick={() => handleNumpad('OK')}
-                disabled={updateScoreMutation.isPending}
-                data-testid="button-submit"
-              >
-                Submit
-              </button>
             </div>
 
             {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
