@@ -672,16 +672,18 @@ export default function ScorerPage() {
         </div>
 
         <div className="flex-1 flex flex-col w-full max-w-lg mx-auto px-3 py-1 overflow-hidden">
-          <div className="flex justify-center mb-1 shrink-0">
-            <button
-              className="flex items-center gap-1 text-gray-400 text-xs px-3 py-1 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] touch-manipulation active:bg-[#3a3a3a] transition-colors"
-              onClick={() => setView("bullThrow")}
-              data-testid="button-back-to-bull"
-            >
-              <ArrowLeft className="w-3 h-3" />
-              Bull Throw
-            </button>
-          </div>
+          {legVisits.length === 0 && legsWonA === 0 && legsWonB === 0 && (
+            <div className="flex justify-center mb-1 shrink-0">
+              <button
+                className="flex items-center gap-1 text-gray-400 text-xs px-3 py-1 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                onClick={() => setView("bullThrow")}
+                data-testid="button-back-to-bull"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                Bull Throw
+              </button>
+            </div>
+          )}
           <div className="text-center py-1 shrink-0">
             <p className="text-gray-400 text-xs uppercase tracking-wider">
               Leg {currentLeg} — Best of {matchBestOf}
