@@ -558,34 +558,24 @@ export default function ScorerPage() {
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center px-6">
-          <div className="text-center mb-6">
-            <Target className="w-12 h-12 text-yellow-400 mx-auto mb-3" />
-            <h2 className="text-white text-2xl font-bold mb-1">Bull Throw</h2>
-            <p className="text-gray-400 text-sm">Best of {matchBestOf} legs</p>
-          </div>
-
-          <div className="w-full max-w-sm mb-8">
-            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 text-center mb-3">
-              <p className="text-gray-400 text-xs uppercase tracking-wider mb-2">Match</p>
-              <p className="text-white text-xl font-bold">{playerA?.name || 'Player 1'}</p>
-              <p className="text-gray-500 text-sm my-1">vs</p>
-              <p className="text-white text-xl font-bold">{playerB?.name || 'Player 2'}</p>
-            </div>
-          </div>
-
-          <p className="text-gray-300 text-base font-semibold mb-4">Who throws first?</p>
+          <Target className="w-14 h-14 text-yellow-400 mb-4" />
+          <h2 className="text-white text-2xl font-bold mb-1">Throw for the Bull</h2>
+          <p className="text-gray-400 text-sm mb-8">Select player to start</p>
 
           <div className="w-full max-w-sm space-y-3">
             <button
-              className="w-full h-16 rounded-xl bg-[#c0392b] text-white text-lg font-bold touch-manipulation active:bg-[#a93226] transition-colors"
+              className="w-full h-16 rounded-xl bg-[#3a6635] border border-[#4a8045] text-white text-lg font-bold touch-manipulation active:bg-[#4a7a3a] transition-colors"
               onClick={() => handleFirstThrower('A')}
               disabled={startMatchMutation.isPending}
               data-testid="button-first-thrower-a"
             >
               {playerA?.name || 'Player 1'}
             </button>
+
+            <p className="text-gray-500 text-center text-sm font-medium">vs</p>
+
             <button
-              className="w-full h-16 rounded-xl bg-[#2980b9] text-white text-lg font-bold touch-manipulation active:bg-[#2471a3] transition-colors"
+              className="w-full h-16 rounded-xl bg-[#3a6635] border border-[#4a8045] text-white text-lg font-bold touch-manipulation active:bg-[#4a7a3a] transition-colors"
               onClick={() => handleFirstThrower('B')}
               disabled={startMatchMutation.isPending}
               data-testid="button-first-thrower-b"
