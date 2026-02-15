@@ -81,6 +81,8 @@ const STARTING_SCORE = 501;
 
 const QUICK_SCORES = [26, 41, 45, 60, 85, 100, 140, 180];
 
+const IMPOSSIBLE_SCORES = new Set([163, 166, 169, 172, 173, 175, 176, 178, 179]);
+
 export default function ScorerPage() {
   const params = useParams<{ tournamentId: string; boardNumber: string }>();
   const tournamentId = parseInt(params.tournamentId || "0");
@@ -264,6 +266,20 @@ export default function ScorerPage() {
     if (activeMatchId === null) return;
     const activeM = data?.matches.find(m => m.id === activeMatchId);
     if (!activeM) return;
+
+    if (score > 180) {
+      setBustMessage("Impossible! Max score is 180");
+      setTimeout(() => setBustMessage(null), 2000);
+      setInputValue("");
+      return;
+    }
+
+    if (IMPOSSIBLE_SCORES.has(score)) {
+      setBustMessage(`Impossible score! ${score} cannot be scored with 3 darts`);
+      setTimeout(() => setBustMessage(null), 2500);
+      setInputValue("");
+      return;
+    }
 
     const matchBestOf = activeM.bestOf || 3;
     const matchLegsToWin = Math.ceil(matchBestOf / 2);
