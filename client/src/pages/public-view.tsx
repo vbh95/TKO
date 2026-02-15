@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { useEffect, useState } from "react";
 import { usePublicTournament } from "@/hooks/use-tournaments";
-import { Loader2, Trophy, Eye, Sun, Moon } from "lucide-react";
+import { Loader2, Trophy, Eye, Sun, Moon, Check } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import tkoLogoFull from "@assets/TKO_White-04_1771178906649.png";
 import { useSocket } from "@/hooks/use-socket";
@@ -140,6 +140,17 @@ export default function PublicView() {
       const groupB = b.groupId ? (groups.find(g => g.id === b.groupId)?.name || '') : '';
       return groupA.localeCompare(groupB);
     });
+
+  const completedGroups = groups.length > 0
+    ? groups
+        .filter(group => {
+          const groupMatches = matches.filter(m => m.groupId === group.id);
+          return groupMatches.length > 0 &&
+            groupMatches.every(m => m.status === 'COMPLETED') &&
+            liveMatches.length > 0;
+        })
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    : [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -309,6 +320,19 @@ export default function PublicView() {
                   </Card>
                 );
               })}
+              {completedGroups.map(group => (
+                <Card key={`completed-${group.id}`} className="border border-dashed border-muted-foreground/30 shadow-none" data-testid={`completed-group-${group.id}`}>
+                  <CardHeader className="bg-muted/30 border-b py-2.5 px-4">
+                    <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
+                      <Check className="w-4 h-4 text-green-500" />
+                      {group.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-center py-8 px-4">
+                    <p className="text-sm text-muted-foreground text-center">All matches completed — waiting for other groups to finish</p>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
         )}
