@@ -109,6 +109,7 @@ export default function ScorerPage() {
   const [allMatchVisits, setAllMatchVisits] = useState<Visit[]>([]);
   const [matchReport, setMatchReport] = useState<MatchStats | null>(null);
   const [pendingCheckout, setPendingCheckout] = useState<{ player: 'A' | 'B'; newLegsA: number; newLegsB: number; newVisits: Visit[] } | null>(null);
+  const [pendingDartsAtDouble, setPendingDartsAtDouble] = useState(false);
   const [impossibleWarning, setImpossibleWarning] = useState<string | null>(null);
   const [swapPlayers, setSwapPlayers] = useState(false);
 
@@ -349,8 +350,13 @@ export default function ScorerPage() {
     );
   };
 
-  const confirmCheckout = () => {
+  const handleConfirmCheckoutClick = () => {
+    setPendingDartsAtDouble(true);
+  };
+
+  const confirmCheckout = (dartsAtDouble: number) => {
     if (!pendingCheckout || !activeMatchId) return;
+    setPendingDartsAtDouble(false);
     const { player, newLegsA, newLegsB, newVisits } = pendingCheckout;
     const activeM = data?.matches.find(m => m.id === activeMatchId);
     if (!activeM) return;
@@ -403,6 +409,7 @@ export default function ScorerPage() {
       }
     }
     setPendingCheckout(null);
+    setPendingDartsAtDouble(false);
   };
 
   const handleUndo = () => {
@@ -830,7 +837,7 @@ export default function ScorerPage() {
             </div>
           )}
 
-          {pendingCheckout && (
+          {pendingCheckout && !pendingDartsAtDouble && (
             <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 mb-2 shrink-0" data-testid="checkout-confirm">
               <div className="text-center mb-3">
                 <Trophy className="w-8 h-8 text-yellow-400 mx-auto mb-1" />
@@ -849,12 +856,35 @@ export default function ScorerPage() {
                 </button>
                 <button
                   className="flex-1 h-12 rounded-xl bg-[#4a7a3a] text-white font-semibold text-base touch-manipulation active:bg-[#5a8a4a] transition-colors"
-                  onClick={confirmCheckout}
+                  onClick={handleConfirmCheckoutClick}
                   disabled={updateScoreMutation.isPending}
                   data-testid="button-confirm-checkout"
                 >
-                  {updateScoreMutation.isPending ? 'Confirming...' : 'Confirm Checkout'}
+                  Confirm Checkout
                 </button>
+              </div>
+            </div>
+          )}
+
+          {pendingCheckout && pendingDartsAtDouble && (
+            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 mb-2 shrink-0" data-testid="darts-at-double">
+              <div className="text-center mb-3">
+                <Target className="w-8 h-8 text-yellow-400 mx-auto mb-1" />
+                <p className="text-white font-bold text-lg">Darts at Double?</p>
+                <p className="text-gray-400 text-sm">How many darts were used on the double</p>
+              </div>
+              <div className="flex gap-3">
+                {[1, 2, 3].map(n => (
+                  <button
+                    key={n}
+                    className="flex-1 h-14 rounded-xl bg-[#4a7a3a] text-white font-bold text-xl touch-manipulation active:bg-[#5a8a4a] transition-colors"
+                    onClick={() => confirmCheckout(n)}
+                    disabled={updateScoreMutation.isPending}
+                    data-testid={`button-darts-at-double-${n}`}
+                  >
+                    {n}
+                  </button>
+                ))}
               </div>
             </div>
           )}
