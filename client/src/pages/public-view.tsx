@@ -155,45 +155,35 @@ export default function PublicView() {
   return (
     <div className="min-h-screen bg-background">
       {/* Public Header */}
-      <div className="bg-primary text-primary-foreground py-6 px-4 shadow-lg mb-6">
+      <div className="bg-primary text-primary-foreground py-6 px-4 shadow-lg">
         <div className="container max-w-6xl mx-auto flex items-center justify-between">
           <div className="shrink-0">
             <img src={tkoLogoFull} alt="TKO" className="h-10 md:h-12" data-testid="img-tko-logo" />
             <p className="text-primary-foreground/70 text-xs mt-1 tracking-wide whitespace-nowrap">The Ultimate Tournament Generator</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-            <h1 className="text-xl md:text-2xl font-display font-bold mb-2" data-testid="text-tournament-name">{tournament.name}</h1>
-            <div className="flex flex-wrap gap-2 items-center justify-end text-primary-foreground/80 text-sm">
-              <Badge variant="outline" className="border-white/30 text-white">
-                {tournament.type.replace('_', ' ')}
-              </Badge>
-              <span>•</span>
-              <span>{players.length} Players</span>
-              {liveMatches.length > 0 && (
-                <>
-                  <span>•</span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                    {liveMatches.length} Live {liveMatches.length === 1 ? 'Game' : 'Games'}
-                  </span>
-                </>
-              )}
-            </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container max-w-6xl mx-auto px-4 pb-12">
-        <div className="flex justify-end mb-4">
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
+            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
             data-testid="button-toggle-theme-public"
           >
             {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
           </button>
+        </div>
+      </div>
+
+      <div className="container max-w-6xl mx-auto px-4 pb-12">
+        <div className="flex flex-wrap items-center gap-3 py-4 mb-4 border-b">
+          <h1 className="text-xl md:text-2xl font-display font-bold" data-testid="text-tournament-name">{tournament.name}</h1>
+          <Badge variant="outline">
+            {tournament.type.replace('_', ' ')}
+          </Badge>
+          <span className="text-muted-foreground text-sm">{players.length} Players</span>
+          {liveMatches.length > 0 && (
+            <span className="flex items-center gap-1 text-sm">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              {liveMatches.length} Live {liveMatches.length === 1 ? 'Game' : 'Games'}
+            </span>
+          )}
         </div>
         {liveMatches.length > 0 && (
           <div className="mb-8">
