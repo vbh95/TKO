@@ -135,29 +135,27 @@ export default function PublicView() {
   return (
     <div className="min-h-screen bg-background">
       {/* Public Header */}
-      <div className="bg-primary text-primary-foreground py-8 px-4 shadow-lg mb-6">
-        <div className="container max-w-6xl mx-auto flex justify-between items-center">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <img src={tkoLogoFull} alt="TKO" className="h-10" />
-            </div>
-            <h1 className="text-2xl md:text-3xl font-display font-bold">{tournament.name}</h1>
-            <div className="flex gap-2 items-center text-primary-foreground/80">
-              <Badge variant="outline" className="border-white/30 text-white">
-                {tournament.type.replace('_', ' ')}
-              </Badge>
-              <span>•</span>
-              <span>{players.length} Players</span>
-              {liveMatches.length > 0 && (
-                <>
-                  <span>•</span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                    {liveMatches.length} Live {liveMatches.length === 1 ? 'Game' : 'Games'}
-                  </span>
-                </>
-              )}
-            </div>
+      <div className="bg-primary text-primary-foreground py-6 px-4 shadow-lg mb-6">
+        <div className="container max-w-6xl mx-auto">
+          <div className="flex items-center gap-4 mb-2">
+            <img src={tkoLogoFull} alt="TKO" className="h-14 md:h-16" data-testid="img-tko-logo" />
+            <h1 className="text-2xl md:text-3xl font-display font-bold" data-testid="text-tournament-name">{tournament.name}</h1>
+          </div>
+          <div className="flex flex-wrap gap-2 items-center text-primary-foreground/80 text-sm pl-1">
+            <Badge variant="outline" className="border-white/30 text-white">
+              {tournament.type.replace('_', ' ')}
+            </Badge>
+            <span>•</span>
+            <span>{players.length} Players</span>
+            {liveMatches.length > 0 && (
+              <>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  {liveMatches.length} Live {liveMatches.length === 1 ? 'Game' : 'Games'}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>
