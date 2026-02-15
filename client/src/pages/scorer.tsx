@@ -108,6 +108,7 @@ export default function ScorerPage() {
   const [matchReport, setMatchReport] = useState<MatchStats | null>(null);
   const [pendingCheckout, setPendingCheckout] = useState<{ player: 'A' | 'B'; newLegsA: number; newLegsB: number; newVisits: Visit[] } | null>(null);
   const [impossibleWarning, setImpossibleWarning] = useState<string | null>(null);
+  const [swapPlayers, setSwapPlayers] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/scorer/board-data'],
@@ -504,6 +505,7 @@ export default function ScorerPage() {
       setLegsWonA(match.scoreA || 0);
       setLegsWonB(match.scoreB || 0);
       setAllMatchVisits([]);
+      setSwapPlayers(false);
       resetLeg(starter);
       setView("scoring");
     } else if (match.status === 'PENDING') {
@@ -527,6 +529,7 @@ export default function ScorerPage() {
           setAllMatchVisits([]);
           resetLeg(thrower);
           setLegStartingThrower(thrower);
+          setSwapPlayers(thrower === 'B');
           setView("scoring");
           refetch();
         }
@@ -612,6 +615,21 @@ export default function ScorerPage() {
     const lastScoreA = visitsA.length > 0 ? visitsA[visitsA.length - 1].score : null;
     const lastScoreB = visitsB.length > 0 ? visitsB[visitsB.length - 1].score : null;
 
+    const leftPlayer = swapPlayers ? playerB : playerA;
+    const rightPlayer = swapPlayers ? playerA : playerB;
+    const leftThrower: 'A' | 'B' = swapPlayers ? 'B' : 'A';
+    const rightThrower: 'A' | 'B' = swapPlayers ? 'A' : 'B';
+    const leftRemaining = swapPlayers ? remainingB : remainingA;
+    const rightRemaining = swapPlayers ? remainingA : remainingB;
+    const leftLegs = swapPlayers ? legsWonB : legsWonA;
+    const rightLegs = swapPlayers ? legsWonA : legsWonB;
+    const leftAvg = swapPlayers ? avgB : avgA;
+    const rightAvg = swapPlayers ? avgA : avgB;
+    const leftDarts = swapPlayers ? dartsB : dartsA;
+    const rightDarts = swapPlayers ? dartsA : dartsB;
+    const leftLastScore = swapPlayers ? lastScoreB : lastScoreA;
+    const rightLastScore = swapPlayers ? lastScoreA : lastScoreB;
+
     return (
       <div className="min-h-[100dvh] bg-[#1a1a1a] flex flex-col overflow-hidden" data-testid="scorer-match-view">
         <div className="bg-primary text-primary-foreground py-2 px-3 shadow-lg shrink-0">
@@ -651,9 +669,9 @@ export default function ScorerPage() {
               Leg {currentLeg} — Best of {matchBestOf}
             </p>
             <div className="tabular-nums mt-0.5">
-              <span className={cn("text-3xl font-bold", legsWonA >= legsWonB ? "text-white" : "text-gray-500")}>{legsWonA}</span>
+              <span className={cn("text-3xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
               <span className="text-gray-600 mx-2 text-2xl">-</span>
-              <span className={cn("text-3xl font-bold", legsWonB >= legsWonA ? "text-white" : "text-gray-500")}>{legsWonB}</span>
+              <span className={cn("text-3xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
             </div>
           </div>
 
@@ -661,14 +679,14 @@ export default function ScorerPage() {
             <div
               className={cn(
                 "rounded-xl p-3 transition-all",
-                currentThrower === 'A'
+                currentThrower === leftThrower
                   ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a]"
                   : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a]"
               )}
               data-testid="panel-player-a"
             >
               <div className="h-4 mb-1">
-                {currentThrower === 'A' && (
+                {currentThrower === leftThrower && (
                   <div className="flex items-center gap-1">
                     <Eye className="w-3 h-3 text-white/90" />
                     <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Throwing</span>
@@ -676,26 +694,26 @@ export default function ScorerPage() {
                 )}
               </div>
               <p className="text-sm font-bold text-white/90 truncate" data-testid="text-player-a-name">
-                {playerA?.name || "Player 1"}
+                {leftPlayer?.name || "Player 1"}
               </p>
               <div
                 className="text-6xl font-bold text-white tabular-nums leading-none mt-1"
                 data-testid="text-remaining-a"
               >
-                {remainingA}
+                {leftRemaining}
               </div>
               <div className="mt-2 space-y-0.5 text-xs">
                 <div className="flex justify-between text-white/60">
                   <span>3-dart avg.</span>
-                  <span className="text-white font-medium tabular-nums">{avgA}</span>
+                  <span className="text-white font-medium tabular-nums">{leftAvg}</span>
                 </div>
                 <div className="flex justify-between text-white/60">
                   <span>Last score</span>
-                  <span className="text-white font-medium tabular-nums">{lastScoreA !== null ? lastScoreA : '-'}</span>
+                  <span className="text-white font-medium tabular-nums">{leftLastScore !== null ? leftLastScore : '-'}</span>
                 </div>
                 <div className="flex justify-between text-white/60">
                   <span>Darts thrown</span>
-                  <span className="text-white font-medium tabular-nums">{dartsA}</span>
+                  <span className="text-white font-medium tabular-nums">{leftDarts}</span>
                 </div>
               </div>
             </div>
@@ -703,14 +721,14 @@ export default function ScorerPage() {
             <div
               className={cn(
                 "rounded-xl p-3 transition-all",
-                currentThrower === 'B'
+                currentThrower === rightThrower
                   ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a]"
                   : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a]"
               )}
               data-testid="panel-player-b"
             >
               <div className="h-4 mb-1">
-                {currentThrower === 'B' && (
+                {currentThrower === rightThrower && (
                   <div className="flex items-center gap-1">
                     <Eye className="w-3 h-3 text-white/90" />
                     <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Throwing</span>
@@ -718,26 +736,26 @@ export default function ScorerPage() {
                 )}
               </div>
               <p className="text-sm font-bold text-white/90 truncate" data-testid="text-player-b-name">
-                {playerB?.name || "Player 2"}
+                {rightPlayer?.name || "Player 2"}
               </p>
               <div
                 className="text-6xl font-bold text-white tabular-nums leading-none mt-1"
                 data-testid="text-remaining-b"
               >
-                {remainingB}
+                {rightRemaining}
               </div>
               <div className="mt-2 space-y-0.5 text-xs">
                 <div className="flex justify-between text-white/60">
                   <span>3-dart avg.</span>
-                  <span className="text-white font-medium tabular-nums">{avgB}</span>
+                  <span className="text-white font-medium tabular-nums">{rightAvg}</span>
                 </div>
                 <div className="flex justify-between text-white/60">
                   <span>Last score</span>
-                  <span className="text-white font-medium tabular-nums">{lastScoreB !== null ? lastScoreB : '-'}</span>
+                  <span className="text-white font-medium tabular-nums">{rightLastScore !== null ? rightLastScore : '-'}</span>
                 </div>
                 <div className="flex justify-between text-white/60">
                   <span>Darts thrown</span>
-                  <span className="text-white font-medium tabular-nums">{dartsB}</span>
+                  <span className="text-white font-medium tabular-nums">{rightDarts}</span>
                 </div>
               </div>
             </div>
@@ -774,7 +792,7 @@ export default function ScorerPage() {
                 <Trophy className="w-8 h-8 text-yellow-400 mx-auto mb-1" />
                 <p className="text-white font-bold text-lg">Checkout!</p>
                 <p className="text-gray-400 text-sm">
-                  {pendingCheckout.player === 'A' ? (playerA?.name || 'Player 1') : (playerB?.name || 'Player 2')} checked out
+                  {pendingCheckout.player === 'A' ? (getPlayer(activeMatch.playerAId)?.name || 'Player 1') : (getPlayer(activeMatch.playerBId)?.name || 'Player 2')} checked out
                 </p>
               </div>
               <div className="flex gap-3">
