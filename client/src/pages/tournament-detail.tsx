@@ -120,7 +120,9 @@ export default function TournamentDetail() {
 
     const nonGroupRounds: { roundKey: string; matches: any[] }[] = [];
     if (nonGroupMatches.length > 0) {
+      const roundOrder: Record<string, number> = { R32: 1, R16: 2, QF: 3, SF: 4, F: 5 };
       const roundKeys = Array.from(new Set(nonGroupMatches.map((m: any) => m.roundKey))) as string[];
+      roundKeys.sort((a: string, b: string) => (roundOrder[a] || 0) - (roundOrder[b] || 0));
       for (const rk of roundKeys) {
         nonGroupRounds.push({
           roundKey: rk,
