@@ -53,7 +53,29 @@ interface BoardData {
 
 type Visit = { player: 'A' | 'B'; score: number };
 
-type ScorerView = "matchList" | "scoring";
+interface MatchStats {
+  totalVisitsA: number;
+  totalVisitsB: number;
+  totalScoredA: number;
+  totalScoredB: number;
+  highestVisitA: number;
+  highestVisitB: number;
+  ton80sA: number;
+  ton80sB: number;
+  ton40sA: number;
+  ton40sB: number;
+  tonsA: number;
+  tonsB: number;
+  legsWonA: number;
+  legsWonB: number;
+  playerAName: string;
+  playerBName: string;
+  winnerId: number | null;
+  playerAId: number | null;
+  playerBId: number | null;
+}
+
+type ScorerView = "matchList" | "scoring" | "matchReport";
 
 const STARTING_SCORE = 501;
 
@@ -80,6 +102,8 @@ export default function ScorerPage() {
   const [bustMessage, setBustMessage] = useState<string | null>(null);
   const [legStartingThrower, setLegStartingThrower] = useState<'A' | 'B'>('A');
   const [showQuickScores, setShowQuickScores] = useState(false);
+  const [allMatchVisits, setAllMatchVisits] = useState<Visit[]>([]);
+  const [matchReport, setMatchReport] = useState<MatchStats | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/scorer/board-data'],
@@ -109,6 +133,7 @@ export default function ScorerPage() {
         setActiveMatchId(inProgress.id);
         setLegsWonA(inProgress.scoreA || 0);
         setLegsWonB(inProgress.scoreB || 0);
+        setAllMatchVisits([]);
         resetLeg(starter);
         setView("scoring");
       }
@@ -142,6 +167,7 @@ export default function ScorerPage() {
       setActiveMatchId(matchId);
       setLegsWonA(0);
       setLegsWonB(0);
+      setAllMatchVisits([]);
       resetLeg('A');
       setView("scoring");
       refetch();
@@ -164,9 +190,33 @@ export default function ScorerPage() {
     },
     onSuccess: (updatedMatch) => {
       if (updatedMatch.status === 'COMPLETED') {
-        toast({ title: "Match complete!" });
+        const vA = allMatchVisits.filter(v => v.player === 'A');
+        const vB = allMatchVisits.filter(v => v.player === 'B');
+        const pA = data?.players.find(p => p.id === updatedMatch.playerAId);
+        const pB = data?.players.find(p => p.id === updatedMatch.playerBId);
+        setMatchReport({
+          totalVisitsA: vA.length,
+          totalVisitsB: vB.length,
+          totalScoredA: vA.reduce((s: number, v: Visit) => s + v.score, 0),
+          totalScoredB: vB.reduce((s: number, v: Visit) => s + v.score, 0),
+          highestVisitA: vA.length > 0 ? Math.max(...vA.map(v => v.score)) : 0,
+          highestVisitB: vB.length > 0 ? Math.max(...vB.map(v => v.score)) : 0,
+          ton80sA: vA.filter(v => v.score === 180).length,
+          ton80sB: vB.filter(v => v.score === 180).length,
+          ton40sA: vA.filter(v => v.score >= 140 && v.score < 180).length,
+          ton40sB: vB.filter(v => v.score >= 140 && v.score < 180).length,
+          tonsA: vA.filter(v => v.score >= 100 && v.score < 140).length,
+          tonsB: vB.filter(v => v.score >= 100 && v.score < 140).length,
+          legsWonA: updatedMatch.scoreA || 0,
+          legsWonB: updatedMatch.scoreB || 0,
+          playerAName: pA?.name || 'Player 1',
+          playerBName: pB?.name || 'Player 2',
+          winnerId: updatedMatch.winnerId,
+          playerAId: updatedMatch.playerAId,
+          playerBId: updatedMatch.playerBId,
+        });
         setActiveMatchId(null);
-        setView("matchList");
+        setView("matchReport");
       }
       refetch();
     },
@@ -261,6 +311,8 @@ export default function ScorerPage() {
         scoreA: newLegsA,
         scoreB: newLegsB,
       });
+
+      setAllMatchVisits(prev => [...prev, ...newVisits]);
 
       if (newLegsA < matchLegsToWin && newLegsB < matchLegsToWin) {
         const playerName = isPlayerA
@@ -406,6 +458,7 @@ export default function ScorerPage() {
       setActiveMatchId(matchId);
       setLegsWonA(match.scoreA || 0);
       setLegsWonB(match.scoreB || 0);
+      setAllMatchVisits([]);
       resetLeg(starter);
       setView("scoring");
     } else if (match.status === 'PENDING') {
@@ -466,13 +519,19 @@ export default function ScorerPage() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col w-full max-w-lg mx-auto px-3 py-2 overflow-hidden">
+        <div className="flex-1 flex flex-col w-full max-w-lg mx-auto px-3 py-1 overflow-hidden">
           <div className="text-center py-1 shrink-0">
-            <span className="text-white font-bold text-sm tracking-wide">LEG {currentLeg}</span>
-            <span className="text-gray-500 text-xs ml-2">Best of {matchBestOf}</span>
+            <p className="text-gray-400 text-xs uppercase tracking-wider">{group.name} {tournament.type === 'KNOCKOUT' ? '— Knockout' : '— Round Robin'}</p>
+            <p className="text-white font-bold text-base tracking-wide">LEG {currentLeg}</p>
+            <p className="text-gray-300 text-sm tabular-nums">
+              <span className={legsWonA >= legsWonB ? "text-white font-bold" : "text-gray-500"}>{legsWonA}</span>
+              <span className="text-gray-600 mx-1.5">-</span>
+              <span className={legsWonB >= legsWonA ? "text-white font-bold" : "text-gray-500"}>{legsWonB}</span>
+              <span className="text-gray-600 text-xs ml-2">(First to {matchLegsToWin})</span>
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mb-3 shrink-0">
+          <div className="grid grid-cols-2 gap-2 mb-2 shrink-0">
             <div
               className={cn(
                 "rounded-xl p-3 relative transition-all",
@@ -681,6 +740,122 @@ export default function ScorerPage() {
               <span className="text-xs text-gray-500">Updating...</span>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "matchReport" && matchReport) {
+    const stats = matchReport;
+    const avgA = stats.totalVisitsA > 0 ? ((stats.totalScoredA / stats.totalVisitsA) * 1).toFixed(1) : '0.0';
+    const avgB = stats.totalVisitsB > 0 ? ((stats.totalScoredB / stats.totalVisitsB) * 1).toFixed(1) : '0.0';
+    const winnerName = stats.winnerId === null ? null : stats.winnerId === stats.playerAId ? stats.playerAName : stats.playerBName;
+
+    const statRows: Array<{ label: string; valA: string | number; valB: string | number }> = [
+      { label: 'Legs Won', valA: stats.legsWonA, valB: stats.legsWonB },
+      { label: '3-Dart Avg', valA: avgA, valB: avgB },
+      { label: 'Total Scored', valA: stats.totalScoredA, valB: stats.totalScoredB },
+      { label: 'Visits', valA: stats.totalVisitsA, valB: stats.totalVisitsB },
+      { label: 'Darts Thrown', valA: stats.totalVisitsA * 3, valB: stats.totalVisitsB * 3 },
+      { label: 'Highest Visit', valA: stats.highestVisitA, valB: stats.highestVisitB },
+      { label: '180s', valA: stats.ton80sA, valB: stats.ton80sB },
+      { label: '140+', valA: stats.ton40sA, valB: stats.ton40sB },
+      { label: '100+', valA: stats.tonsA, valB: stats.tonsB },
+    ];
+
+    return (
+      <div className="min-h-[100dvh] bg-[#1a1a1a] flex flex-col" data-testid="match-report-view">
+        <div className="bg-primary text-primary-foreground py-2 px-3 shadow-lg shrink-0">
+          <div className="flex items-center gap-2 max-w-4xl mx-auto">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-primary-foreground shrink-0 h-8 w-8"
+              onClick={() => {
+                setMatchReport(null);
+                setView("matchList");
+              }}
+              data-testid="button-back-from-report"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-primary-foreground/80 truncate">
+                {tournament.name} — {group.name} — Board {boardNumber}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto w-full max-w-lg mx-auto px-4 py-4">
+          <div className="text-center mb-6">
+            <Trophy className="w-10 h-10 text-yellow-400 mx-auto mb-2" />
+            <h2 className="text-white text-xl font-bold">Match Report</h2>
+            <p className="text-gray-400 text-sm mt-1">{winnerName ? `${winnerName} wins!` : 'Match drawn!'}</p>
+          </div>
+
+          <div className="flex items-center justify-between mb-6 px-2">
+            <div className="text-center flex-1">
+              <div className="w-12 h-12 rounded-full bg-[#c0392b] flex items-center justify-center mx-auto mb-1">
+                <span className="text-white font-bold text-lg">{stats.playerAName.charAt(0)}</span>
+              </div>
+              <p className="text-white text-sm font-medium truncate max-w-[120px] mx-auto">{stats.playerAName}</p>
+            </div>
+            <div className="text-center px-4">
+              <div className="text-3xl font-bold tabular-nums">
+                <span className={stats.legsWonA > stats.legsWonB ? "text-white" : "text-gray-500"}>{stats.legsWonA}</span>
+                <span className="text-gray-600 mx-2">-</span>
+                <span className={stats.legsWonB > stats.legsWonA ? "text-white" : "text-gray-500"}>{stats.legsWonB}</span>
+              </div>
+            </div>
+            <div className="text-center flex-1">
+              <div className="w-12 h-12 rounded-full bg-[#4a6741] flex items-center justify-center mx-auto mb-1">
+                <span className="text-white font-bold text-lg">{stats.playerBName.charAt(0)}</span>
+              </div>
+              <p className="text-white text-sm font-medium truncate max-w-[120px] mx-auto">{stats.playerBName}</p>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            {statRows.map((row, i) => {
+              const aNum = typeof row.valA === 'string' ? parseFloat(row.valA) : row.valA;
+              const bNum = typeof row.valB === 'string' ? parseFloat(row.valB) : row.valB;
+              const aHigher = aNum > bNum;
+              const bHigher = bNum > aNum;
+              return (
+                <div
+                  key={i}
+                  className="flex items-center py-2.5 px-3 rounded-lg bg-[#222]"
+                  data-testid={`stat-row-${i}`}
+                >
+                  <span className={cn(
+                    "flex-1 text-left tabular-nums font-semibold text-sm",
+                    aHigher ? "text-white" : "text-gray-500"
+                  )}>
+                    {row.valA}
+                  </span>
+                  <span className="text-gray-400 text-xs font-medium text-center min-w-[100px]">{row.label}</span>
+                  <span className={cn(
+                    "flex-1 text-right tabular-nums font-semibold text-sm",
+                    bHigher ? "text-white" : "text-gray-500"
+                  )}>
+                    {row.valB}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <Button
+            className="w-full mt-6 h-12 text-base font-semibold bg-primary hover:bg-primary/90"
+            onClick={() => {
+              setMatchReport(null);
+              setView("matchList");
+            }}
+            data-testid="button-back-to-matches"
+          >
+            Back to Matches
+          </Button>
         </div>
       </div>
     );
