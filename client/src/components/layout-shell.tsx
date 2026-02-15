@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useLogout } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme";
 import { 
   Trophy, 
   User, 
   LogOut, 
   Menu, 
   X,
-  Plus
+  Plus,
+  Sun,
+  Moon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,6 +25,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: user } = useUser();
   const { mutate: logout } = useLogout();
+  const { theme, toggleTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
 
   const navigation = [
@@ -62,7 +66,15 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      <div className="p-4 border-t bg-muted/30">
+      <div className="p-4 border-t bg-muted/30 space-y-2">
+        <button
+          onClick={toggleTheme}
+          className="flex items-center gap-3 px-4 py-2.5 w-full rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
+          data-testid="button-toggle-theme"
+        >
+          {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+          {theme === "light" ? "Dark Mode" : "Light Mode"}
+        </button>
         <div className="flex items-center gap-3 px-4 py-3">
           <Avatar className="h-9 w-9 bg-primary/10 text-primary border border-primary/20">
             <AvatarFallback>{user?.name?.charAt(0).toUpperCase()}</AvatarFallback>
