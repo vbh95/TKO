@@ -383,18 +383,19 @@ export async function registerRoutes(
                 };
               });
 
-              // Sort by: Points desc, Leg Diff desc, then temp fallback
+              // Sort by: Points desc, Leg Diff desc, Legs For desc, then fallback
               stats.sort((a, b) => {
                 if (b.pts !== a.pts) return b.pts - a.pts;
                 if (b.diff !== a.diff) return b.diff - a.diff;
+                if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
                 return a.id - b.id;
               });
 
-              // Apply head-to-head for players tied on points + leg diff
+              // Apply head-to-head for players tied on points + leg diff + legs for
               let i = 0;
               while (i < stats.length) {
                 let j = i + 1;
-                while (j < stats.length && stats[j].pts === stats[i].pts && stats[j].diff === stats[i].diff) {
+                while (j < stats.length && stats[j].pts === stats[i].pts && stats[j].diff === stats[i].diff && stats[j].legsFor === stats[i].legsFor) {
                   j++;
                 }
                 if (j - i > 1) {
@@ -458,7 +459,6 @@ export async function registerRoutes(
                   }
                   if (!resolved) {
                     const fallback = tiedGroup.sort((a, b) => {
-                      if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
                       if (a.played !== b.played) return a.played - b.played;
                       return a.id - b.id;
                     });

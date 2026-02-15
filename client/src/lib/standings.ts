@@ -70,7 +70,6 @@ function resolveH2HTied(
 
   if (pairings.size < expectedPairings) {
     return tiedGroup.sort((a, b) => {
-      if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
       if (a.played !== b.played) return a.played - b.played;
       return a.id - b.id;
     });
@@ -85,7 +84,6 @@ function resolveH2HTied(
   const counts = Array.from(matchCounts.values());
   if (!counts.every(c => c === counts[0])) {
     return tiedGroup.sort((a, b) => {
-      if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
       if (a.played !== b.played) return a.played - b.played;
       return a.id - b.id;
     });
@@ -115,6 +113,7 @@ export function calcStandings<P extends PlayerLike>(
   stats.sort((a, b) => {
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.diff !== a.diff) return b.diff - a.diff;
+    if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
     return a.id - b.id;
   });
 
@@ -124,7 +123,8 @@ export function calcStandings<P extends PlayerLike>(
     while (
       j < stats.length &&
       stats[j].pts === stats[i].pts &&
-      stats[j].diff === stats[i].diff
+      stats[j].diff === stats[i].diff &&
+      stats[j].legsFor === stats[i].legsFor
     ) {
       j++;
     }
