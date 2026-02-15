@@ -104,6 +104,7 @@ export default function ScorerPage() {
   const [showQuickScores, setShowQuickScores] = useState(false);
   const [allMatchVisits, setAllMatchVisits] = useState<Visit[]>([]);
   const [matchReport, setMatchReport] = useState<MatchStats | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<{ player: 'A' | 'B'; newLegsA: number; newLegsB: number; newVisits: Visit[] } | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/scorer/board-data'],
@@ -289,8 +290,6 @@ export default function ScorerPage() {
     if (newRemaining === 0) {
       const newLegsA = isPlayerA ? legsWonA + 1 : legsWonA;
       const newLegsB = !isPlayerA ? legsWonB + 1 : legsWonB;
-      setLegsWonA(newLegsA);
-      setLegsWonB(newLegsB);
 
       if (isPlayerA) {
         setRemainingA(0);
@@ -298,32 +297,7 @@ export default function ScorerPage() {
         setRemainingB(0);
       }
 
-      emitLiveState(
-        isPlayerA ? 0 : remainingA,
-        !isPlayerA ? 0 : remainingB,
-        currentThrower,
-        newLegsA,
-        newLegsB,
-      );
-
-      updateScoreMutation.mutate({
-        matchId: activeMatchId,
-        scoreA: newLegsA,
-        scoreB: newLegsB,
-      });
-
-      setAllMatchVisits(prev => [...prev, ...newVisits]);
-
-      if (newLegsA < matchLegsToWin && newLegsB < matchLegsToWin) {
-        const playerName = isPlayerA
-          ? data?.players.find(p => p.id === activeM.playerAId)?.name
-          : data?.players.find(p => p.id === activeM.playerBId)?.name;
-        toast({ title: `Leg won by ${playerName || 'Player'}!` });
-
-        const nextStarter = legStartingThrower === 'A' ? 'B' : 'A';
-        setTimeout(() => resetLeg(nextStarter), 1500);
-      }
-
+      setPendingCheckout({ player: currentThrower, newLegsA, newLegsB, newVisits });
       return;
     }
 
@@ -344,6 +318,62 @@ export default function ScorerPage() {
       legsWonA,
       legsWonB,
     );
+  };
+
+  const confirmCheckout = () => {
+    if (!pendingCheckout || !activeMatchId) return;
+    const { player, newLegsA, newLegsB, newVisits } = pendingCheckout;
+    const activeM = data?.matches.find(m => m.id === activeMatchId);
+    if (!activeM) return;
+    const matchBestOf = activeM.bestOf || 3;
+    const matchLegsToWin = Math.ceil(matchBestOf / 2);
+    const isPlayerA = player === 'A';
+
+    setLegsWonA(newLegsA);
+    setLegsWonB(newLegsB);
+
+    emitLiveState(
+      isPlayerA ? 0 : remainingA,
+      !isPlayerA ? 0 : remainingB,
+      player,
+      newLegsA,
+      newLegsB,
+    );
+
+    updateScoreMutation.mutate({
+      matchId: activeMatchId,
+      scoreA: newLegsA,
+      scoreB: newLegsB,
+    });
+
+    setAllMatchVisits(prev => [...prev, ...newVisits]);
+
+    if (newLegsA < matchLegsToWin && newLegsB < matchLegsToWin) {
+      const playerName = isPlayerA
+        ? data?.players.find(p => p.id === activeM.playerAId)?.name
+        : data?.players.find(p => p.id === activeM.playerBId)?.name;
+      toast({ title: `Leg won by ${playerName || 'Player'}!` });
+
+      const nextStarter = legStartingThrower === 'A' ? 'B' : 'A';
+      setTimeout(() => resetLeg(nextStarter), 1500);
+    }
+
+    setPendingCheckout(null);
+  };
+
+  const cancelCheckout = () => {
+    if (!pendingCheckout) return;
+    const lastVisit = legVisits[legVisits.length - 1];
+    if (lastVisit) {
+      const restored = legVisits.slice(0, -1);
+      setLegVisits(restored);
+      if (lastVisit.player === 'A') {
+        setRemainingA(remainingA + lastVisit.score);
+      } else {
+        setRemainingB(remainingB + lastVisit.score);
+      }
+    }
+    setPendingCheckout(null);
   };
 
   const handleUndo = () => {
@@ -521,14 +551,18 @@ export default function ScorerPage() {
 
         <div className="flex-1 flex flex-col w-full max-w-lg mx-auto px-3 py-1 overflow-hidden">
           <div className="text-center py-1 shrink-0">
-            <p className="text-gray-400 text-xs uppercase tracking-wider">{group.name} {tournament.type === 'KNOCKOUT' ? '— Knockout' : '— Round Robin'}</p>
-            <p className="text-white font-bold text-base tracking-wide">LEG {currentLeg}</p>
-            <p className="text-gray-300 text-sm tabular-nums">
-              <span className={legsWonA >= legsWonB ? "text-white font-bold" : "text-gray-500"}>{legsWonA}</span>
-              <span className="text-gray-600 mx-1.5">-</span>
-              <span className={legsWonB >= legsWonA ? "text-white font-bold" : "text-gray-500"}>{legsWonB}</span>
-              <span className="text-gray-600 text-xs ml-2">(First to {matchLegsToWin})</span>
+            <p className="text-gray-400 text-xs uppercase tracking-wider">
+              Leg {currentLeg} — Best of {matchBestOf}
             </p>
+            <div className="flex items-center justify-center gap-3 mt-0.5">
+              <span className="text-white text-sm font-medium truncate max-w-[100px]">{playerA?.name || 'Player 1'}</span>
+              <div className="tabular-nums">
+                <span className={cn("text-2xl font-bold", legsWonA >= legsWonB ? "text-white" : "text-gray-500")}>{legsWonA}</span>
+                <span className="text-gray-600 mx-1.5 text-xl">-</span>
+                <span className={cn("text-2xl font-bold", legsWonB >= legsWonA ? "text-white" : "text-gray-500")}>{legsWonB}</span>
+              </div>
+              <span className="text-white text-sm font-medium truncate max-w-[100px]">{playerB?.name || 'Player 2'}</span>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 mb-2 shrink-0">
@@ -635,7 +669,36 @@ export default function ScorerPage() {
             </div>
           )}
 
-          {showQuickScores && (
+          {pendingCheckout && (
+            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 mb-2 shrink-0" data-testid="checkout-confirm">
+              <div className="text-center mb-3">
+                <Trophy className="w-8 h-8 text-yellow-400 mx-auto mb-1" />
+                <p className="text-white font-bold text-lg">Checkout!</p>
+                <p className="text-gray-400 text-sm">
+                  {pendingCheckout.player === 'A' ? (playerA?.name || 'Player 1') : (playerB?.name || 'Player 2')} checked out
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  className="flex-1 h-12 rounded-xl bg-[#3a3a3a] text-gray-300 font-semibold text-base touch-manipulation active:bg-[#4a4a4a] transition-colors"
+                  onClick={cancelCheckout}
+                  data-testid="button-cancel-checkout"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="flex-1 h-12 rounded-xl bg-[#4a7a3a] text-white font-semibold text-base touch-manipulation active:bg-[#5a8a4a] transition-colors"
+                  onClick={confirmCheckout}
+                  disabled={updateScoreMutation.isPending}
+                  data-testid="button-confirm-checkout"
+                >
+                  {updateScoreMutation.isPending ? 'Confirming...' : 'Confirm Checkout'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showQuickScores && !pendingCheckout && (
             <div className="grid grid-cols-4 gap-1.5 mb-2 shrink-0">
               {QUICK_SCORES.map(qs => (
                 <button
@@ -656,7 +719,7 @@ export default function ScorerPage() {
             </div>
           )}
 
-          <div className="flex-1 flex flex-col justify-end pb-2">
+          <div className={cn("flex-1 flex flex-col justify-end pb-2", pendingCheckout && "opacity-30 pointer-events-none")}>
             <div className="flex gap-1.5 items-center mb-1.5 shrink-0">
               <button
                 className="w-11 h-11 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
