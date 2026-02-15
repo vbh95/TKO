@@ -1,7 +1,8 @@
 import { useParams } from "wouter";
 import { useEffect, useState } from "react";
 import { usePublicTournament } from "@/hooks/use-tournaments";
-import { Loader2, Trophy, Eye } from "lucide-react";
+import { Loader2, Trophy, Eye, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/hooks/use-theme";
 import tkoLogoFull from "@assets/TKO_White-04_1771178906649.png";
 import { useSocket } from "@/hooks/use-socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,7 +131,15 @@ export default function PublicView() {
 
   const getPlayer = (id: number | null) => players.find(p => p.id === id) || null;
 
-  const liveMatches = matches.filter(m => m.status === 'IN_PROGRESS');
+  const { theme, toggleTheme } = useTheme();
+
+  const liveMatches = matches
+    .filter(m => m.status === 'IN_PROGRESS')
+    .sort((a, b) => {
+      const groupA = a.groupId ? (groups.find(g => g.id === a.groupId)?.name || '') : '';
+      const groupB = b.groupId ? (groups.find(g => g.id === b.groupId)?.name || '') : '';
+      return groupA.localeCompare(groupB);
+    });
 
   return (
     <div className="min-h-screen bg-background">
@@ -141,7 +150,8 @@ export default function PublicView() {
             <img src={tkoLogoFull} alt="TKO" className="h-10 md:h-12" data-testid="img-tko-logo" />
             <p className="text-primary-foreground/70 text-xs mt-1 tracking-wide whitespace-nowrap">The Ultimate Tournament Generator</p>
           </div>
-          <div className="text-right">
+          <div className="flex items-center gap-4">
+            <div className="text-right">
             <h1 className="text-xl md:text-2xl font-display font-bold mb-2" data-testid="text-tournament-name">{tournament.name}</h1>
             <div className="flex flex-wrap gap-2 items-center justify-end text-primary-foreground/80 text-sm">
               <Badge variant="outline" className="border-white/30 text-white">
@@ -159,6 +169,14 @@ export default function PublicView() {
                 </>
               )}
             </div>
+            </div>
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              data-testid="button-toggle-theme-public"
+            >
+              {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+            </button>
           </div>
         </div>
       </div>
@@ -171,12 +189,7 @@ export default function PublicView() {
               <h2 className="text-xl font-display font-bold">Live Games</h2>
               <Badge variant="secondary" className="ml-1">{liveMatches.length}</Badge>
             </div>
-            <div className={cn(
-              "grid gap-4",
-              liveMatches.length === 1 ? "grid-cols-1 max-w-2xl" :
-              liveMatches.length === 2 ? "grid-cols-1 md:grid-cols-2" :
-              "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
-            )}>
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
               {liveMatches.map(match => {
                 const ls = liveScorings.get(match.id);
                 const playerA = getPlayer(match.playerAId);

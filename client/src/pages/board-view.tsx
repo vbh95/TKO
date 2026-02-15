@@ -1,7 +1,8 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Loader2, Trophy, Target, Wifi, WifiOff, Eye } from "lucide-react";
+import { Loader2, Trophy, Target, Wifi, WifiOff, Eye, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/hooks/use-theme";
 import tkoLogoFull from "@assets/TKO_White-03_1771177730967.png";
 import { useSocket } from "@/hooks/use-socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +72,8 @@ export default function BoardView() {
   const { joinPublic, joinBoard, on, socket } = useSocket();
   const [isConnected, setIsConnected] = useState(false);
   const [liveScoring, setLiveScoring] = useState<LiveScoring | null>(null);
+
+  const { theme, toggleTheme } = useTheme();
 
   const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/public/t', shareToken, 'board', boardNumber],
@@ -186,6 +189,13 @@ export default function BoardView() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                data-testid="button-toggle-theme-board"
+              >
+                {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              </button>
               {isConnected ? (
                 <Wifi className="w-4 h-4 text-green-300" />
               ) : (

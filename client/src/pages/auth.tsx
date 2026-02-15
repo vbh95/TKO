@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Sun, Moon } from "lucide-react";
 import tkoLogoDark from "@assets/Untitled-1-02_1771177331378.png";
 import tkoLogoWhite from "@assets/TKO_White-02_1771177730966.png";
 import { useTheme } from "@/hooks/use-theme";
@@ -27,7 +27,7 @@ export default function AuthPage() {
   const login = useLogin();
   const signup = useSignup();
   const { toast } = useToast();
-  const { theme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const tkoLogo = theme === 'dark' ? tkoLogoWhite : tkoLogoDark;
 
   const handleLogin = (e: React.FormEvent) => {
@@ -77,7 +77,14 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 relative">
+      <button
+        onClick={toggleTheme}
+        className="absolute top-4 right-4 p-2 rounded-lg bg-card hover:bg-muted transition-colors"
+        data-testid="button-toggle-theme-auth"
+      >
+        {theme === "light" ? <Moon className="w-5 h-5 text-muted-foreground" /> : <Sun className="w-5 h-5 text-muted-foreground" />}
+      </button>
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
           <img src={tkoLogo} alt="TKO" className="w-20 h-20 mx-auto mb-2" />

@@ -1,7 +1,8 @@
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Loader2, Target, Trophy, Wifi, WifiOff, Play, ChevronRight, ArrowLeft, Undo2, RotateCcw, Check, Eye, Grid2x2, Delete } from "lucide-react";
+import { Loader2, Target, Trophy, Wifi, WifiOff, Play, ChevronRight, ArrowLeft, Undo2, RotateCcw, Check, Eye, Grid2x2, Delete, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/hooks/use-theme";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,7 @@ export default function ScorerPage() {
   const tournamentId = parseInt(params.tournamentId || "0");
   const boardNumber = parseInt(params.boardNumber || "0");
   const { toast } = useToast();
+  const { theme, toggleTheme } = useTheme();
   const { joinScorer, joinBoard, on, socket } = useSocket();
   const [isConnected, setIsConnected] = useState(false);
   const [view, setView] = useState<ScorerView>("matchList");
@@ -674,6 +676,13 @@ export default function ScorerPage() {
                 {tournament.name} — {group.name} — Board {boardNumber}
               </p>
             </div>
+            <button
+              onClick={toggleTheme}
+              className="p-1 rounded hover:bg-white/10 transition-colors"
+              data-testid="button-toggle-theme-scorer"
+            >
+              {theme === "light" ? <Moon className="w-3.5 h-3.5 text-primary-foreground" /> : <Sun className="w-3.5 h-3.5 text-primary-foreground" />}
+            </button>
             {isConnected ? (
               <Badge variant="outline" className="border-green-400 text-green-100 gap-1 text-xs py-0">
                 <Wifi className="w-3 h-3" /> Live
@@ -1082,6 +1091,13 @@ export default function ScorerPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 rounded hover:bg-white/10 transition-colors"
+                data-testid="button-toggle-theme-scorer-list"
+              >
+                {theme === "light" ? <Moon className="w-4 h-4 text-primary-foreground" /> : <Sun className="w-4 h-4 text-primary-foreground" />}
+              </button>
               {isConnected ? (
                 <Badge variant="outline" className="border-green-400 text-green-100 gap-1">
                   <Wifi className="w-3 h-3" /> Live
