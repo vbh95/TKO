@@ -1,4 +1,4 @@
-import { users, tournaments, players, groups, groupMemberships, matches, matchNotes } from "@shared/schema";
+import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -6,7 +6,8 @@ import type {
   Group, InsertGroup,
   GroupMembership, InsertGroupMembership,
   Match, InsertMatch,
-  MatchNote, InsertMatchNote
+  MatchNote, InsertMatchNote,
+  BoardSession, InsertBoardSession
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -53,6 +54,14 @@ export interface IStorage {
   getMatchNote(matchId: number): Promise<MatchNote | undefined>;
   createMatchNote(note: InsertMatchNote): Promise<MatchNote>;
   updateMatchNote(matchId: number, note: Partial<InsertMatchNote>): Promise<MatchNote>;
+  
+  // Board Sessions
+  createBoardSession(session: InsertBoardSession): Promise<BoardSession>;
+  getBoardSessionByToken(pairingToken: string): Promise<BoardSession | undefined>;
+  getBoardSessionByAccessToken(accessToken: string): Promise<BoardSession | undefined>;
+  markBoardSessionPaired(id: number, accessToken: string): Promise<BoardSession>;
+  getBoardSessionsByTournamentId(tournamentId: number): Promise<BoardSession[]>;
+  deleteBoardSession(id: number): Promise<void>;
   
   // Session Store
   sessionStore: session.Store;
@@ -228,6 +237,35 @@ export class DatabaseStorage implements IStorage {
     } else {
         return this.createMatchNote({ ...note, matchId } as InsertMatchNote);
     }
+  }
+
+  // Board Sessions
+  async createBoardSession(bs: InsertBoardSession): Promise<BoardSession> {
+    const [newSession] = await db.insert(boardSessions).values(bs).returning();
+    return newSession;
+  }
+
+  async getBoardSessionByToken(pairingToken: string): Promise<BoardSession | undefined> {
+    const [bs] = await db.select().from(boardSessions).where(eq(boardSessions.pairingToken, pairingToken));
+    return bs;
+  }
+
+  async getBoardSessionByAccessToken(accessToken: string): Promise<BoardSession | undefined> {
+    const [bs] = await db.select().from(boardSessions).where(eq(boardSessions.accessToken, accessToken));
+    return bs;
+  }
+
+  async markBoardSessionPaired(id: number, accessToken: string): Promise<BoardSession> {
+    const [updated] = await db.update(boardSessions).set({ accessToken, pairedAt: new Date() }).where(eq(boardSessions.id, id)).returning();
+    return updated;
+  }
+
+  async getBoardSessionsByTournamentId(tournamentId: number): Promise<BoardSession[]> {
+    return await db.select().from(boardSessions).where(eq(boardSessions.tournamentId, tournamentId));
+  }
+
+  async deleteBoardSession(id: number): Promise<void> {
+    await db.delete(boardSessions).where(eq(boardSessions.id, id));
   }
 }
 

@@ -1,6 +1,8 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Trophy, Target } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, Trophy, Target, Wifi, WifiOff } from "lucide-react";
+import { useSocket } from "@/hooks/use-socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -47,16 +49,34 @@ interface BoardData {
 
 export default function BoardView() {
   const { shareToken, boardNumber } = useParams();
+  const { joinPublic, joinBoard, on, socket } = useSocket();
+  const [isConnected, setIsConnected] = useState(false);
 
-  const { data, isLoading, error } = useQuery<BoardData>({
+  const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/public/t', shareToken, 'board', boardNumber],
     queryFn: async () => {
       const res = await fetch(`/api/public/t/${shareToken}/board/${boardNumber}`);
       if (!res.ok) throw new Error("Failed to fetch board data");
       return res.json();
     },
-    refetchInterval: 15000,
+    refetchInterval: 30000,
   });
+
+  useEffect(() => {
+    if (shareToken) joinPublic(shareToken);
+    if (data?.tournament?.id && boardNumber && shareToken) {
+      joinBoard(data.tournament.id, parseInt(boardNumber), shareToken);
+    }
+  }, [shareToken, data?.tournament?.id, boardNumber, joinPublic, joinBoard]);
+
+  useEffect(() => {
+    const cleanup1 = on("connect", () => setIsConnected(true));
+    const cleanup2 = on("disconnect", () => setIsConnected(false));
+    const cleanup3 = on("match:updated", () => refetch());
+    const cleanup4 = on("tournament:updated", () => refetch());
+    setIsConnected(socket.connected);
+    return () => { cleanup1(); cleanup2(); cleanup3(); cleanup4(); };
+  }, [on, socket, refetch]);
 
   if (isLoading) {
     return (
@@ -137,9 +157,16 @@ export default function BoardView() {
                 {group.name} — Board {boardNum} of {totalBoards}
               </p>
             </div>
-            <Badge variant="outline" className="border-white/30 text-white text-base px-3 py-1" data-testid="badge-board-number">
-              Board {boardNum}
-            </Badge>
+            <div className="flex items-center gap-2">
+              {isConnected ? (
+                <Wifi className="w-4 h-4 text-green-300" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-red-300" />
+              )}
+              <Badge variant="outline" className="border-white/30 text-white text-base px-3 py-1" data-testid="badge-board-number">
+                Board {boardNum}
+              </Badge>
+            </div>
           </div>
         </div>
       </div>

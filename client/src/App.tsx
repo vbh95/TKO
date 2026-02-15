@@ -15,6 +15,7 @@ import TournamentDetail from "@/pages/tournament-detail";
 import Account from "@/pages/account";
 import PublicView from "@/pages/public-view";
 import BoardView from "@/pages/board-view";
+import ScorerPage from "@/pages/scorer";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: user, isLoading } = useUser();
@@ -38,6 +39,7 @@ function Router() {
   return (
     <Switch>
       {/* Public Routes */}
+      <Route path="/scorer/:tournamentId/:boardNumber" component={ScorerPage} />
       <Route path="/public/t/:shareToken/board/:boardNumber" component={BoardView} />
       <Route path="/public/t/:shareToken" component={PublicView} />
       

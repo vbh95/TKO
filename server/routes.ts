@@ -10,6 +10,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { generateMatches } from "./match-generator";
 import type { TournamentSettings } from "@shared/schema";
+import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate } from "./socket";
 
 const scryptAsync = promisify(scrypt);
 
@@ -485,6 +486,22 @@ export async function registerRoutes(
     } catch (progressionError) {
       console.error("Auto-progression error (non-fatal):", progressionError);
     }
+
+    // Emit real-time updates
+    try {
+      const tournamentForEmit = await storage.getTournament(match.tournamentId);
+      emitMatchUpdate(match.tournamentId, tournamentForEmit?.shareToken || null, updatedMatch);
+      if (match.groupId) {
+        const groupsList = await storage.getGroupsByTournamentId(match.tournamentId);
+        const sortedGroups = groupsList.sort((a, b) => a.name.localeCompare(b.name));
+        const boardIdx = sortedGroups.findIndex(g => g.id === match.groupId);
+        if (boardIdx >= 0) {
+          emitBoardMatchUpdate(match.tournamentId, boardIdx + 1, updatedMatch);
+        }
+      }
+    } catch (emitError) {
+      console.error("WebSocket emit error (non-fatal):", emitError);
+    }
     
     res.json(updatedMatch);
   });
@@ -507,6 +524,203 @@ export async function registerRoutes(
       groups: groupsList,
       matches: matchesList,
     });
+  });
+
+  // === BOARD SESSION ROUTES ===
+  app.post('/api/tournaments/:id/board-sessions', isAuthenticated, async (req, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id);
+      const tournament = await storage.getTournament(tournamentId);
+      if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+
+      const { boardNumber } = req.body;
+      if (!boardNumber || typeof boardNumber !== 'number') {
+        return res.status(400).json({ message: "boardNumber is required" });
+      }
+
+      const existingSessions = await storage.getBoardSessionsByTournamentId(tournamentId);
+      const existing = existingSessions.find(s => s.boardNumber === boardNumber);
+      if (existing) {
+        await storage.deleteBoardSession(existing.id);
+      }
+
+      const pairingToken = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      const session = await storage.createBoardSession({
+        tournamentId,
+        boardNumber,
+        pairingToken,
+        expiresAt,
+        accessToken: null,
+        pairedAt: null,
+      });
+
+      res.json({ session, pairingToken });
+    } catch (err) {
+      console.error("Create board session error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/tournaments/:id/board-sessions', isAuthenticated, async (req, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id);
+      const tournament = await storage.getTournament(tournamentId);
+      if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+
+      const sessions = await storage.getBoardSessionsByTournamentId(tournamentId);
+      res.json(sessions);
+    } catch (err) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete('/api/board-sessions/:id', isAuthenticated, async (req, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      await storage.deleteBoardSession(sessionId);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // === PAIRING ENDPOINT ===
+  app.get('/pair', async (req, res) => {
+    try {
+      const token = req.query.token as string;
+      if (!token) {
+        return res.status(400).send("Missing pairing token");
+      }
+
+      const boardSession = await storage.getBoardSessionByToken(token);
+      if (!boardSession) {
+        return res.status(404).send("Invalid or expired pairing token");
+      }
+
+      if (boardSession.expiresAt && new Date() > boardSession.expiresAt) {
+        return res.status(410).send("Pairing token has expired");
+      }
+
+      const accessToken = randomBytes(32).toString("hex");
+      await storage.markBoardSessionPaired(boardSession.id, accessToken);
+
+      res.cookie("boardAccessToken", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 1000 * 60 * 60 * 24,
+        path: "/",
+      });
+
+      res.redirect(`/scorer/${boardSession.tournamentId}/${boardSession.boardNumber}`);
+    } catch (err) {
+      console.error("Pairing error:", err);
+      res.status(500).send("Pairing failed");
+    }
+  });
+
+  // === SCORER API (board-authenticated) ===
+  const isBoardAuthenticated = async (req: any, res: any, next: any) => {
+    const accessToken = req.cookies?.boardAccessToken;
+    if (!accessToken) return res.status(401).json({ message: "No board access token" });
+
+    const boardSession = await storage.getBoardSessionByAccessToken(accessToken);
+    if (!boardSession || !boardSession.pairedAt) {
+      return res.status(401).json({ message: "Invalid board session" });
+    }
+    if (boardSession.expiresAt && new Date() > boardSession.expiresAt) {
+      return res.status(401).json({ message: "Board session has expired" });
+    }
+    req.boardSession = boardSession;
+    next();
+  };
+
+  app.get('/api/scorer/board-data', isBoardAuthenticated, async (req: any, res) => {
+    try {
+      const { tournamentId, boardNumber } = req.boardSession;
+      const tournament = await storage.getTournament(tournamentId);
+      if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+      const [playersList, groupsList, allMatches, allMemberships] = await Promise.all([
+        storage.getPlayersByTournamentId(tournamentId),
+        storage.getGroupsByTournamentId(tournamentId),
+        storage.getMatchesByTournamentId(tournamentId),
+        storage.getGroupMembershipsByTournamentId(tournamentId),
+      ]);
+
+      const sortedGroups = groupsList.sort((a, b) => a.name.localeCompare(b.name));
+      const group = sortedGroups[boardNumber - 1];
+      if (!group) return res.status(404).json({ message: "Board not found" });
+
+      const groupMatches = allMatches.filter(m => m.groupId === group.id);
+      const groupMembershipPlayerIds = allMemberships
+        .filter(m => m.groupId === group.id)
+        .map(m => m.playerId);
+      const groupPlayers = playersList.filter(p => groupMembershipPlayerIds.includes(p.id));
+
+      res.json({
+        tournament,
+        group,
+        boardNumber,
+        totalBoards: sortedGroups.length,
+        players: groupPlayers,
+        matches: groupMatches,
+        accessToken: req.cookies?.boardAccessToken,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put('/api/scorer/matches/:matchId', isBoardAuthenticated, async (req: any, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      const match = await storage.getMatch(matchId);
+      if (!match) return res.status(404).json({ message: "Match not found" });
+
+      const { tournamentId, boardNumber } = req.boardSession;
+      if (match.tournamentId !== tournamentId) {
+        return res.status(403).json({ message: "Match does not belong to this tournament" });
+      }
+
+      const { scoreA, scoreB } = req.body;
+      if (typeof scoreA !== 'number' || typeof scoreB !== 'number') {
+        return res.status(400).json({ message: "scoreA and scoreB are required" });
+      }
+
+      let winnerId: number | null = null;
+      if (scoreA > scoreB && match.playerAId) winnerId = match.playerAId;
+      else if (scoreB > scoreA && match.playerBId) winnerId = match.playerBId;
+
+      const updatedMatch = await storage.updateMatch(matchId, {
+        scoreA,
+        scoreB,
+        winnerId,
+        status: "COMPLETED",
+      });
+
+      if (req.body.notes) {
+        const noteValues = Object.fromEntries(
+          Object.entries(req.body.notes).filter(([, v]) => v !== undefined)
+        );
+        if (Object.keys(noteValues).length > 0) {
+          await storage.updateMatchNote(matchId, noteValues);
+        }
+      }
+
+      const tournament = await storage.getTournament(tournamentId);
+      emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
+      emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
+
+      res.json(updatedMatch);
+    } catch (err) {
+      console.error("Scorer match update error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
   });
 
   // Board-specific public endpoint: returns data for a single group/board

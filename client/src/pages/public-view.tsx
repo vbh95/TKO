@@ -1,6 +1,8 @@
 import { useParams } from "wouter";
+import { useEffect } from "react";
 import { usePublicTournament } from "@/hooks/use-tournaments";
 import { Loader2, Trophy } from "lucide-react";
+import { useSocket } from "@/hooks/use-socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -16,7 +18,18 @@ import { cn } from "@/lib/utils";
 
 export default function PublicView() {
   const { shareToken } = useParams();
-  const { data, isLoading, error } = usePublicTournament(shareToken || "");
+  const { data, isLoading, error, refetch } = usePublicTournament(shareToken || "");
+  const { joinPublic, on } = useSocket();
+
+  useEffect(() => {
+    if (shareToken) joinPublic(shareToken);
+  }, [shareToken, joinPublic]);
+
+  useEffect(() => {
+    const cleanup1 = on("match:updated", () => refetch());
+    const cleanup2 = on("tournament:updated", () => refetch());
+    return () => { cleanup1(); cleanup2(); };
+  }, [on, refetch]);
 
   if (isLoading) {
     return (

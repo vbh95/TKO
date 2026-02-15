@@ -100,6 +100,19 @@ export const matchNotes = pgTable("match_notes", {
 
 export const insertMatchNoteSchema = createInsertSchema(matchNotes).omit({ id: true });
 
+// === BOARD SESSIONS ===
+export const boardSessions = pgTable("board_sessions", {
+  id: serial("id").primaryKey(),
+  tournamentId: integer("tournament_id").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+  boardNumber: integer("board_number").notNull(),
+  pairingToken: text("pairing_token").notNull().unique(),
+  accessToken: text("access_token"),
+  expiresAt: timestamp("expires_at"),
+  pairedAt: timestamp("paired_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBoardSessionSchema = createInsertSchema(boardSessions).omit({ id: true, createdAt: true });
 
 // === RELATIONS ===
 export const usersRelations = relations(users, ({ many }) => ({
@@ -111,6 +124,7 @@ export const tournamentsRelations = relations(tournaments, ({ one, many }) => ({
   players: many(players),
   groups: many(groups),
   matches: many(matches),
+  boardSessions: many(boardSessions),
 }));
 
 export const groupsRelations = relations(groups, ({ one, many }) => ({
@@ -145,6 +159,10 @@ export const matchNotesRelations = relations(matchNotes, ({ one }) => ({
   match: one(matches, { fields: [matchNotes.matchId], references: [matches.id] }),
 }));
 
+export const boardSessionsRelations = relations(boardSessions, ({ one }) => ({
+  tournament: one(tournaments, { fields: [boardSessions.tournamentId], references: [tournaments.id] }),
+}));
+
 // === TYPES ===
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -166,6 +184,9 @@ export type InsertMatch = z.infer<typeof insertMatchSchema>;
 
 export type MatchNote = typeof matchNotes.$inferSelect;
 export type InsertMatchNote = z.infer<typeof insertMatchNoteSchema>;
+
+export type BoardSession = typeof boardSessions.$inferSelect;
+export type InsertBoardSession = z.infer<typeof insertBoardSessionSchema>;
 
 // === API DTOs ===
 export type TournamentSettings = {

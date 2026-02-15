@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { QRCodeSVG } from "qrcode.react";
 import { useTournament, useTournamentShare, useBulkUpdatePlayers } from "@/hooks/use-tournaments";
 import { LayoutShell } from "@/components/layout-shell";
 import { MatchScoreInput } from "@/components/match-score-input";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   Loader2, 
   Share2, 
@@ -15,7 +16,11 @@ import {
   Users,
   Target,
   Radio,
-  TabletSmartphone
+  TabletSmartphone,
+  Wifi,
+  WifiOff,
+  QrCode,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +52,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import type { Match, Player, GroupMembership } from "@shared/schema";
+import { useSocket } from "@/hooks/use-socket";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Match, Player, GroupMembership, BoardSession } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 export default function TournamentDetail() {
@@ -58,11 +65,28 @@ export default function TournamentDetail() {
   const { mutate: bulkUpdate, isPending: isUpdatingPlayers } = useBulkUpdatePlayers(tournamentId);
   const { toast } = useToast();
 
+  const { joinTournament, on, socket } = useSocket();
+  const [boardStatuses, setBoardStatuses] = useState<Record<number, boolean>>({});
+
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [copied, setCopied] = useState(false);
   const [bulkInput, setBulkInput] = useState("");
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
   const [isDevicesDialogOpen, setIsDevicesDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (tournamentId) joinTournament(tournamentId);
+  }, [tournamentId, joinTournament]);
+
+  useEffect(() => {
+    const cleanup1 = on("match:updated", () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+    });
+    const cleanup2 = on("board:status", (status: { boardNumber: number; online: boolean }) => {
+      setBoardStatuses(prev => ({ ...prev, [status.boardNumber]: status.online }));
+    });
+    return () => { cleanup1(); cleanup2(); };
+  }, [on, tournamentId]);
 
   if (isLoading || !data) {
     return (
@@ -419,73 +443,15 @@ export default function TournamentDetail() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Dialog open={isDevicesDialogOpen} onOpenChange={setIsDevicesDialogOpen}>
-              <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto" data-testid="dialog-connected-devices">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <TabletSmartphone className="w-5 h-5 text-primary" />
-                    Connected Devices
-                  </DialogTitle>
-                  <DialogDescription>
-                    Use these links or QR codes to connect your scoring app to each board. Each board maps to a group in the tournament.
-                  </DialogDescription>
-                </DialogHeader>
-
-                {!tournament.shareEnabled ? (
-                  <div className="text-center py-6 space-y-3">
-                    <p className="text-sm text-muted-foreground">Sharing must be enabled to generate device links.</p>
-                    <Button onClick={() => { enableShare.mutate(); }} data-testid="button-enable-sharing-devices">
-                      <Share2 className="w-4 h-4 mr-2" />
-                      Enable Sharing
-                    </Button>
-                  </div>
-                ) : groups.length === 0 ? (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-muted-foreground">No groups found. Start the tournament to generate boards.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {[...groups].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((group: any, idx: number) => {
-                      const boardUrl = `${window.location.origin}/public/t/${tournament.shareToken}/board/${idx + 1}`;
-                      return (
-                        <div key={group.id} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${idx + 1}`}>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-bold text-sm">Board {idx + 1}</h3>
-                              <p className="text-xs text-muted-foreground">{group.name}</p>
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              <Target className="w-3 h-3 mr-1" />
-                              Board {idx + 1}
-                            </Badge>
-                          </div>
-
-                          <div className="flex justify-center bg-white rounded-lg p-4">
-                            <QRCodeSVG value={boardUrl} size={160} level="M" />
-                          </div>
-
-                          <div className="flex gap-2">
-                            <Input readOnly value={boardUrl} className="text-xs h-8" data-testid={`input-device-url-${idx + 1}`} />
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              className="h-8 w-8 shrink-0"
-                              data-testid={`button-copy-device-${idx + 1}`}
-                              onClick={() => {
-                                navigator.clipboard.writeText(boardUrl);
-                                toast({ title: `Board ${idx + 1} link copied!` });
-                              }}
-                            >
-                              <Copy className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
+            <BoardSessionsDialog
+              open={isDevicesDialogOpen}
+              onOpenChange={setIsDevicesDialogOpen}
+              tournament={tournament}
+              groups={groups}
+              enableShare={enableShare}
+              toast={toast}
+              boardStatuses={boardStatuses}
+            />
           </div>
         </div>
 
@@ -970,5 +936,183 @@ export default function TournamentDetail() {
         )}
       </div>
     </LayoutShell>
+  );
+}
+
+function BoardSessionsDialog({ open, onOpenChange, tournament, groups, enableShare, toast, boardStatuses }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  tournament: any;
+  groups: any[];
+  enableShare: any;
+  toast: any;
+  boardStatuses: Record<number, boolean>;
+}) {
+  const { data: boardSessions = [], refetch: refetchSessions } = useQuery<BoardSession[]>({
+    queryKey: ['/api/tournaments', tournament.id, 'board-sessions'],
+    queryFn: async () => {
+      const res = await fetch(`/api/tournaments/${tournament.id}/board-sessions`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  const createSession = useMutation({
+    mutationFn: async (boardNumber: number) => {
+      const res = await apiRequest("POST", `/api/tournaments/${tournament.id}/board-sessions`, { boardNumber });
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchSessions();
+      toast({ title: "Scorer tablet session created" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create session", variant: "destructive" });
+    },
+  });
+
+  const deleteSession = useMutation({
+    mutationFn: async (sessionId: number) => {
+      await apiRequest("DELETE", `/api/board-sessions/${sessionId}`);
+    },
+    onSuccess: () => {
+      refetchSessions();
+      toast({ title: "Session removed" });
+    },
+  });
+
+  const sortedGroups = [...groups].sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto" data-testid="dialog-connected-devices">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <TabletSmartphone className="w-5 h-5 text-primary" />
+            Connected Devices
+          </DialogTitle>
+          <DialogDescription>
+            Create scorer tablet sessions for each board. Scan the QR code on a tablet to pair it as a scorer.
+          </DialogDescription>
+        </DialogHeader>
+
+        {groups.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-sm text-muted-foreground">No groups found. Start the tournament to generate boards.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {sortedGroups.map((group: any, idx: number) => {
+              const boardNumber = idx + 1;
+              const session = boardSessions.find((s: any) => s.boardNumber === boardNumber);
+              const isPaired = session?.pairedAt != null;
+              const pairUrl = session ? `${window.location.origin}/pair?token=${session.pairingToken}` : null;
+              const spectatorUrl = tournament.shareEnabled && tournament.shareToken
+                ? `${window.location.origin}/public/t/${tournament.shareToken}/board/${boardNumber}`
+                : null;
+
+              return (
+                <div key={group.id} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${boardNumber}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-sm">Board {boardNumber}</h3>
+                      <p className="text-xs text-muted-foreground">{group.name}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isPaired && boardStatuses[boardNumber] && (
+                        <Badge variant="outline" className="text-xs text-green-600 border-green-300 gap-1">
+                          <Wifi className="w-3 h-3" /> Online
+                        </Badge>
+                      )}
+                      {isPaired && !boardStatuses[boardNumber] && (
+                        <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 gap-1">
+                          <WifiOff className="w-3 h-3" /> Paired
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs">
+                        <Target className="w-3 h-3 mr-1" />
+                        Board {boardNumber}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {session && pairUrl ? (
+                    <div className="space-y-3">
+                      <div className="flex justify-center bg-white rounded-lg p-4">
+                        <QRCodeSVG value={pairUrl} size={160} level="M" />
+                      </div>
+                      <p className="text-xs text-center text-muted-foreground">
+                        {isPaired ? "Tablet is paired. Scan again to re-pair a new device." : "Scan this QR code on the scorer tablet to pair it."}
+                      </p>
+                      <div className="flex gap-2">
+                        <Input readOnly value={pairUrl} className="text-xs h-8" data-testid={`input-pair-url-${boardNumber}`} />
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => {
+                            navigator.clipboard.writeText(pairUrl);
+                            toast({ title: `Pairing link copied!` });
+                          }}
+                          data-testid={`button-copy-pair-${boardNumber}`}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-8 w-8 shrink-0 text-destructive"
+                          onClick={() => deleteSession.mutate(session.id)}
+                          data-testid={`button-delete-session-${boardNumber}`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+
+                      {spectatorUrl && (
+                        <div className="pt-2 border-t">
+                          <p className="text-xs text-muted-foreground mb-1">Spectator view (read-only):</p>
+                          <div className="flex gap-2">
+                            <Input readOnly value={spectatorUrl} className="text-xs h-8" data-testid={`input-spectator-url-${boardNumber}`} />
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => {
+                                navigator.clipboard.writeText(spectatorUrl);
+                                toast({ title: `Spectator link copied!` });
+                              }}
+                              data-testid={`button-copy-spectator-${boardNumber}`}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => createSession.mutate(boardNumber)}
+                      disabled={createSession.isPending}
+                      data-testid={`button-create-scorer-${boardNumber}`}
+                    >
+                      {createSession.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <QrCode className="w-4 h-4 mr-2" />
+                      )}
+                      Create Scorer Tablet for Board {boardNumber}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

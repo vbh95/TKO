@@ -23,7 +23,7 @@ The project is a single-workspace monorepo with three main directories:
 - **UI Components**: shadcn/ui component library (new-york style) built on Radix UI primitives
 - **Styling**: Tailwind CSS with CSS variables for theming, custom fonts (Outfit for display, Plus Jakarta Sans for body)
 - **Path Aliases**: `@/` maps to `client/src/`, `@shared/` maps to `shared/`
-- **Key Pages**: Dashboard (tournament list), Create Tournament, Tournament Detail, Account Settings, Auth (login/signup), Public Spectator View
+- **Key Pages**: Dashboard (tournament list), Create Tournament, Tournament Detail, Account Settings, Auth (login/signup), Public Spectator View, Board View (spectator per-board), Scorer Tablet (paired scorer device)
 - **Protected Routes**: Implemented via a `ProtectedRoute` wrapper that checks auth state and redirects to login
 
 ### Backend Architecture
@@ -50,7 +50,7 @@ The project is a single-workspace monorepo with three main directories:
 - **Schema**: Defined in `shared/schema.ts` using Drizzle's `pgTable` definitions with Zod schema generation via `drizzle-zod`
 - **Migration**: Uses `drizzle-kit push` command (`npm run db:push`) to sync schema to database
 - **Connection**: PostgreSQL via `DATABASE_URL` environment variable, using `pg` Pool
-- **Tables**: `users`, `tournaments`, `players`, `groups`, `group_memberships`, `matches`, `match_notes`
+- **Tables**: `users`, `tournaments`, `players`, `groups`, `group_memberships`, `matches`, `match_notes`, `board_sessions`
 - **Key Relationships**: Users own tournaments (cascade delete), tournaments contain players/groups/matches, groups have memberships linking to players
 
 ### Data Model Highlights
@@ -59,6 +59,14 @@ The project is a single-workspace monorepo with three main directories:
 - Tournament types: `ROUND_ROBIN`, `KNOCKOUT`, `DOUBLE_ELIMINATION`, `MULTI_STAGE`
 - Tournament statuses: `NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`
 - Matches track scores for both players, status, round/group info
+- Board sessions store pairing tokens and access tokens for scorer tablet pairing
+
+### Real-Time (WebSocket)
+- **Socket.IO** server attached to httpServer in `server/socket.ts`
+- Room-based architecture: `tournament:{id}`, `board:{tournamentId}:{boardNumber}`, `public:{shareToken}`
+- Events: `match:updated`, `tournament:updated`, `board:status` (online/offline)
+- Board pairing flow: admin creates session → QR code with pairing token → tablet scans → server validates token, sets httpOnly cookie → redirects to scorer page
+- Scorer tablets authenticate via `boardAccessToken` cookie, validated by `isBoardAuthenticated` middleware
 
 ### Storage Layer
 - `server/storage.ts` defines an `IStorage` interface abstracting all data operations
@@ -87,6 +95,8 @@ The project is a single-workspace monorepo with three main directories:
 - **lucide-react** — Icon library
 - **zod** — Runtime validation (shared between client and server)
 - **react-hook-form** + **@hookform/resolvers** — Form management
+- **socket.io-client** — Real-time WebSocket client
+- **qrcode.react** — QR code generation for board pairing
 
 ### Build Tools
 - **Vite** — Frontend dev server and bundler
