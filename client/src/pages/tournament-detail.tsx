@@ -458,12 +458,20 @@ export default function TournamentDetail() {
                 currentRoundMatches.forEach((match: any, i: number) => {
                   const isLive = match.status === 'IN_PROGRESS';
                   const isPending = match.status === 'PENDING';
-                  if (isLive || isPending) {
+                  const isCompleted = match.status === 'COMPLETED';
+                  if (isLive || isPending || isCompleted) {
+                    const slotLabel = knockoutSlotLabels[match.id];
+                    const playerA = getPlayer(match.playerAId);
+                    const playerB = getPlayer(match.playerBId);
                     boardMatches.push({
                       group: null,
-                      match,
+                      match: {
+                        ...match,
+                        _labelA: playerA?.name || slotLabel?.a || 'TBD',
+                        _labelB: playerB?.name || slotLabel?.b || 'TBD',
+                      },
                       isLive,
-                      label: `${getRoundDisplayName(currentRoundKey!)} ${currentRoundMatches.length > 1 ? i + 1 : ''}`
+                      label: `${getRoundDisplayName(currentRoundKey!)}${currentRoundMatches.length > 1 ? ` ${i + 1}` : ''}`
                     });
                   }
                 });
@@ -485,6 +493,9 @@ export default function TournamentDetail() {
                 {boardMatches.map(({ group, match, isLive, label }, idx) => {
                   const playerA = getPlayer(match.playerAId);
                   const playerB = getPlayer(match.playerBId);
+                  const nameA = match._labelA || playerA?.name || "TBD";
+                  const nameB = match._labelB || playerB?.name || "TBD";
+                  const isCompleted = match.status === 'COMPLETED';
 
                   return (
                     <Card
@@ -492,7 +503,7 @@ export default function TournamentDetail() {
                       onClick={() => setSelectedMatch(match)}
                       className={cn(
                         "overflow-hidden cursor-pointer transition-all hover:shadow-md",
-                        isLive ? "border-2 border-green-500/50" : "border-dashed"
+                        isLive ? "border-2 border-green-500/50" : isCompleted ? "bg-muted/30" : "border-dashed"
                       )}
                       data-testid={`live-board-card-${idx + 1}`}
                     >
@@ -509,6 +520,8 @@ export default function TournamentDetail() {
                         </span>
                         {isLive ? (
                           <Badge className="bg-white/20 text-white text-xs">Live</Badge>
+                        ) : isCompleted ? (
+                          <Badge variant="secondary" className="text-xs">Completed</Badge>
                         ) : (
                           <Badge variant="secondary" className="text-xs">Up Next</Badge>
                         )}
@@ -517,29 +530,29 @@ export default function TournamentDetail() {
                         <div className="flex items-center justify-between px-4 py-3 border-b">
                           <span className={cn(
                             "text-sm font-medium flex-1",
-                            isLive && match.scoreA > match.scoreB && "text-primary font-bold"
+                            (isLive || isCompleted) && match.winnerId === match.playerAId && match.playerAId && "text-primary font-bold"
                           )}>
-                            {playerA?.name || "TBD"}
+                            {nameA}
                           </span>
                           <div className={cn(
                             "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
-                            isLive && match.scoreA > match.scoreB ? "bg-primary text-primary-foreground" : "bg-muted"
+                            (isLive || isCompleted) && (match.scoreA || 0) > (match.scoreB || 0) ? "bg-primary text-primary-foreground" : "bg-muted"
                           )}>
-                            {isLive ? (match.scoreA || 0) : "-"}
+                            {isLive || isCompleted ? (match.scoreA || 0) : "-"}
                           </div>
                         </div>
                         <div className="flex items-center justify-between px-4 py-3">
                           <span className={cn(
                             "text-sm font-medium flex-1",
-                            isLive && match.scoreB > match.scoreA && "text-primary font-bold"
+                            (isLive || isCompleted) && match.winnerId === match.playerBId && match.playerBId && "text-primary font-bold"
                           )}>
-                            {playerB?.name || "TBD"}
+                            {nameB}
                           </span>
                           <div className={cn(
                             "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
-                            isLive && match.scoreB > match.scoreA ? "bg-primary text-primary-foreground" : "bg-muted"
+                            (isLive || isCompleted) && (match.scoreB || 0) > (match.scoreA || 0) ? "bg-primary text-primary-foreground" : "bg-muted"
                           )}>
-                            {isLive ? (match.scoreB || 0) : "-"}
+                            {isLive || isCompleted ? (match.scoreB || 0) : "-"}
                           </div>
                         </div>
                       </CardContent>
