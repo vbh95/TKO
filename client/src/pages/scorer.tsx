@@ -764,12 +764,10 @@ export default function ScorerPage() {
               <button
                 className={cn(
                   "px-5 h-11 rounded-xl text-base font-semibold touch-manipulation",
-                  inputValue
-                    ? "bg-[#4a4a4a] text-white"
-                    : "bg-[#2a2a2a] text-gray-600 cursor-not-allowed"
+                  "bg-[#4a4a4a] text-white active:bg-[#5a5a5a]"
                 )}
                 onClick={() => handleNumpad('OK')}
-                disabled={!inputValue || updateScoreMutation.isPending}
+                disabled={updateScoreMutation.isPending}
                 data-testid="button-submit"
               >
                 Submit
@@ -809,17 +807,12 @@ export default function ScorerPage() {
                 0
               </button>
               <button
-                className={cn(
-                  "h-[4.2rem] rounded-xl flex items-center justify-center touch-manipulation transition-colors",
-                  inputValue
-                    ? "bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a]"
-                    : "bg-[#2a3a2a] border border-[#3a4a3a]"
-                )}
+                className="h-[4.2rem] rounded-xl flex items-center justify-center touch-manipulation transition-colors bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a]"
                 onClick={() => handleNumpad('OK')}
-                disabled={!inputValue || updateScoreMutation.isPending}
+                disabled={updateScoreMutation.isPending}
                 data-testid="button-numpad-OK"
               >
-                <Check className={cn("w-7 h-7", inputValue ? "text-white" : "text-gray-600")} />
+                <Check className="w-7 h-7 text-white" />
               </button>
             </div>
           </div>
