@@ -532,6 +532,18 @@ export async function registerRoutes(
                 await storage.updateMatch(km.id, { boardNumber: assignedBoard } as any);
               }
             }
+
+            // Emit updates for all knockout matches so boards see their new matches
+            try {
+              const updatedKnockouts = await storage.getMatchesByTournamentId(match.tournamentId);
+              const koMatches = updatedKnockouts.filter(m => m.stage === 'KNOCKOUT');
+              for (const km of koMatches) {
+                emitMatchUpdate(match.tournamentId, tournamentData?.shareToken || null, km);
+                if ((km as any).boardNumber) {
+                  emitBoardMatchUpdate(match.tournamentId, (km as any).boardNumber, km);
+                }
+              }
+            } catch {}
           }
         }
       } else if (match.stage === 'KNOCKOUT' && winnerId) {
@@ -555,10 +567,18 @@ export async function registerRoutes(
 
           if (nextMatchIndex < nextRoundMatches.length) {
             const nextMatch = nextRoundMatches[nextMatchIndex];
-            await storage.updateMatch(nextMatch.id, isTopSlot
+            const updatedNextMatch = await storage.updateMatch(nextMatch.id, isTopSlot
               ? { playerAId: winnerId } as any
               : { playerBId: winnerId } as any
             );
+            // Emit update for the next-round match so boards/spectators see the new player
+            try {
+              const t = await storage.getTournament(match.tournamentId);
+              emitMatchUpdate(match.tournamentId, t?.shareToken || null, updatedNextMatch);
+              if ((updatedNextMatch as any).boardNumber) {
+                emitBoardMatchUpdate(match.tournamentId, (updatedNextMatch as any).boardNumber, updatedNextMatch);
+              }
+            } catch {}
           }
         }
       }
