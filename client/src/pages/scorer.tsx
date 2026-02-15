@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Loader2, Target, Trophy, Wifi, WifiOff, Play, ChevronRight, ArrowLeft, Undo2, RotateCcw } from "lucide-react";
+import { Loader2, Target, Trophy, Wifi, WifiOff, Play, ChevronRight, ArrowLeft, Undo2, RotateCcw, Check, Eye, Grid2x2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,6 +79,7 @@ export default function ScorerPage() {
   const [inputValue, setInputValue] = useState("");
   const [bustMessage, setBustMessage] = useState<string | null>(null);
   const [legStartingThrower, setLegStartingThrower] = useState<'A' | 'B'>('A');
+  const [showQuickScores, setShowQuickScores] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/scorer/board-data'],
@@ -419,9 +420,21 @@ export default function ScorerPage() {
     const playerB = getPlayer(activeMatch.playerBId);
     const matchBestOf = activeMatch.bestOf || bestOf;
     const matchLegsToWin = Math.ceil(matchBestOf / 2);
+    const currentLeg = legsWonA + legsWonB + 1;
+
+    const visitsA = legVisits.filter(v => v.player === 'A');
+    const visitsB = legVisits.filter(v => v.player === 'B');
+    const dartsA = visitsA.length * 3;
+    const dartsB = visitsB.length * 3;
+    const totalScoreA = visitsA.reduce((s, v) => s + v.score, 0);
+    const totalScoreB = visitsB.reduce((s, v) => s + v.score, 0);
+    const avgA = dartsA > 0 ? (totalScoreA / visitsA.length).toFixed(2) : '0.00';
+    const avgB = dartsB > 0 ? (totalScoreB / visitsB.length).toFixed(2) : '0.00';
+    const lastScoreA = visitsA.length > 0 ? visitsA[visitsA.length - 1].score : null;
+    const lastScoreB = visitsB.length > 0 ? visitsB[visitsB.length - 1].score : null;
 
     return (
-      <div className="min-h-screen bg-background flex flex-col overflow-hidden" data-testid="scorer-match-view">
+      <div className="min-h-[100dvh] bg-[#1a1a1a] flex flex-col overflow-hidden" data-testid="scorer-match-view">
         <div className="bg-primary text-primary-foreground py-2 px-3 shadow-lg shrink-0">
           <div className="flex items-center gap-2 max-w-4xl mx-auto">
             <Button
@@ -453,186 +466,219 @@ export default function ScorerPage() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-3 py-2 overflow-hidden">
-          <div className="grid grid-cols-3 gap-1 mb-2 shrink-0">
+        <div className="flex-1 flex flex-col w-full max-w-lg mx-auto px-3 py-2 overflow-hidden">
+          <div className="text-center py-1 shrink-0">
+            <span className="text-white font-bold text-sm tracking-wide">LEG {currentLeg}</span>
+            <span className="text-gray-500 text-xs ml-2">Best of {matchBestOf}</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mb-3 shrink-0">
             <div
               className={cn(
-                "text-center p-3 rounded-lg transition-colors",
-                currentThrower === 'A' ? "bg-primary/10 ring-2 ring-primary" : "bg-muted/30"
+                "rounded-xl p-3 relative transition-all",
+                currentThrower === 'A'
+                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a]"
+                  : "bg-[#8b3a2a]"
               )}
               data-testid="panel-player-a"
             >
-              <p className="text-sm font-bold truncate mb-1" data-testid="text-player-a-name">
-                {playerA?.name || "Player A"}
+              {currentThrower === 'A' && (
+                <div className="flex items-center gap-1 mb-1">
+                  <Eye className="w-3 h-3 text-white/90" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Throwing</span>
+                </div>
+              )}
+              <p className="text-sm font-bold text-white/90 truncate" data-testid="text-player-a-name">
+                {playerA?.name || "Player 1"}
               </p>
-              <div
-                className={cn(
-                  "text-4xl md:text-5xl font-bold tabular-nums",
-                  remainingA <= 40 ? "text-red-500" : "text-foreground"
-                )}
-                data-testid="text-remaining-a"
-              >
-                {remainingA}
+              <div className="flex items-start justify-between">
+                <div
+                  className="text-5xl font-bold text-white tabular-nums leading-tight"
+                  data-testid="text-remaining-a"
+                >
+                  {remainingA}
+                </div>
+                <div
+                  className="w-7 h-7 rounded-full bg-black/30 flex items-center justify-center"
+                  data-testid="text-legs-a"
+                >
+                  <span className="text-sm font-bold text-white/80 tabular-nums">{legsWonA}</span>
+                </div>
               </div>
-              <div className="mt-1 flex items-center justify-center gap-1">
-                <span className="text-xs text-muted-foreground">Legs:</span>
-                <span className="text-lg font-bold text-primary tabular-nums" data-testid="text-legs-a">{legsWonA}</span>
+              <div className="mt-2 space-y-0.5 text-xs">
+                <div className="flex justify-between text-white/60">
+                  <span>3-dart avg.</span>
+                  <span className="text-white font-medium tabular-nums">{avgA}</span>
+                </div>
+                <div className="flex justify-between text-white/60">
+                  <span>Last score</span>
+                  <span className="text-white font-medium tabular-nums">{lastScoreA !== null ? lastScoreA : '-'}</span>
+                </div>
+                <div className="flex justify-between text-white/60">
+                  <span>Darts thrown</span>
+                  <span className="text-white font-medium tabular-nums">{dartsA}</span>
+                </div>
               </div>
-            </div>
-
-            <div className="flex flex-col items-center justify-center">
-              <p className="text-[10px] uppercase text-muted-foreground tracking-wider mb-1">
-                Best of {matchBestOf}
-              </p>
-              <div className="text-2xl font-bold tabular-nums">
-                <span className={legsWonA > legsWonB ? "text-primary" : "text-muted-foreground"}>{legsWonA}</span>
-                <span className="text-muted-foreground mx-1">-</span>
-                <span className={legsWonB > legsWonA ? "text-primary" : "text-muted-foreground"}>{legsWonB}</span>
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-1">
-                First to {matchLegsToWin}
-              </p>
             </div>
 
             <div
               className={cn(
-                "text-center p-3 rounded-lg transition-colors",
-                currentThrower === 'B' ? "bg-primary/10 ring-2 ring-primary" : "bg-muted/30"
+                "rounded-xl p-3 relative transition-all",
+                currentThrower === 'B'
+                  ? "bg-[#4a6741] ring-2 ring-[#5a8a4f] ring-offset-2 ring-offset-[#1a1a1a]"
+                  : "bg-[#3a5235]"
               )}
               data-testid="panel-player-b"
             >
-              <p className="text-sm font-bold truncate mb-1" data-testid="text-player-b-name">
-                {playerB?.name || "Player B"}
+              {currentThrower === 'B' && (
+                <div className="flex items-center gap-1 mb-1">
+                  <Eye className="w-3 h-3 text-white/90" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Throwing</span>
+                </div>
+              )}
+              <p className="text-sm font-bold text-white/90 truncate" data-testid="text-player-b-name">
+                {playerB?.name || "Player 2"}
               </p>
-              <div
-                className={cn(
-                  "text-4xl md:text-5xl font-bold tabular-nums",
-                  remainingB <= 40 ? "text-red-500" : "text-foreground"
-                )}
-                data-testid="text-remaining-b"
-              >
-                {remainingB}
+              <div className="flex items-start justify-between">
+                <div
+                  className="text-5xl font-bold text-white tabular-nums leading-tight"
+                  data-testid="text-remaining-b"
+                >
+                  {remainingB}
+                </div>
+                <div
+                  className="w-7 h-7 rounded-full bg-black/30 flex items-center justify-center"
+                  data-testid="text-legs-b"
+                >
+                  <span className="text-sm font-bold text-white/80 tabular-nums">{legsWonB}</span>
+                </div>
               </div>
-              <div className="mt-1 flex items-center justify-center gap-1">
-                <span className="text-xs text-muted-foreground">Legs:</span>
-                <span className="text-lg font-bold text-primary tabular-nums" data-testid="text-legs-b">{legsWonB}</span>
+              <div className="mt-2 space-y-0.5 text-xs">
+                <div className="flex justify-between text-white/60">
+                  <span>3-dart avg.</span>
+                  <span className="text-white font-medium tabular-nums">{avgB}</span>
+                </div>
+                <div className="flex justify-between text-white/60">
+                  <span>Last score</span>
+                  <span className="text-white font-medium tabular-nums">{lastScoreB !== null ? lastScoreB : '-'}</span>
+                </div>
+                <div className="flex justify-between text-white/60">
+                  <span>Darts thrown</span>
+                  <span className="text-white font-medium tabular-nums">{dartsB}</span>
+                </div>
               </div>
             </div>
           </div>
 
           {bustMessage && (
-            <div className="bg-red-500 text-white text-center py-2 rounded-lg mb-2 text-sm font-bold animate-pulse shrink-0" data-testid="text-bust">
+            <div className="bg-red-600 text-white text-center py-2 rounded-lg mb-2 text-sm font-bold animate-pulse shrink-0" data-testid="text-bust">
               {bustMessage}
             </div>
           )}
 
-          <div className="bg-muted/50 rounded-lg p-3 mb-2 shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">
-                {currentThrower === 'A' ? (playerA?.name || "Player A") : (playerB?.name || "Player B")} to throw
-              </span>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={handleUndo}
-                  disabled={legVisits.length === 0 || updateScoreMutation.isPending}
-                  data-testid="button-undo"
-                >
-                  <Undo2 className="w-3 h-3 mr-1" />
-                  Undo
-                </Button>
-              </div>
+          <div className="flex gap-2 items-center mb-3 shrink-0">
+            <button
+              className="w-10 h-10 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
+              onClick={() => setShowQuickScores(!showQuickScores)}
+              data-testid="button-toggle-quick"
+            >
+              <Grid2x2 className="w-5 h-5 text-gray-400" />
+            </button>
+            <div
+              className="flex-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg px-4 py-2.5 text-lg text-gray-400 font-medium tabular-nums min-h-[44px] flex items-center"
+              data-testid="text-input-value"
+            >
+              {inputValue || 'Enter a score'}
             </div>
+            <button
+              className={cn(
+                "px-5 py-2.5 rounded-lg text-base font-semibold touch-manipulation min-h-[44px]",
+                inputValue
+                  ? "bg-[#4a4a4a] text-white"
+                  : "bg-[#2a2a2a] text-gray-600 cursor-not-allowed"
+              )}
+              onClick={() => handleNumpad('OK')}
+              disabled={!inputValue || updateScoreMutation.isPending}
+              data-testid="button-submit"
+            >
+              Submit
+            </button>
+          </div>
 
-            <div className="flex gap-2 items-center mb-3">
-              <div
-                className="flex-1 bg-background border-2 border-primary rounded-lg px-4 py-3 text-center text-3xl font-bold tabular-nums min-h-[52px] flex items-center justify-center"
-                data-testid="text-input-value"
-              >
-                {inputValue || <span className="text-muted-foreground/30">0</span>}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 gap-1 mb-2">
+          {showQuickScores && (
+            <div className="grid grid-cols-4 gap-1.5 mb-3 shrink-0">
               {QUICK_SCORES.map(qs => (
-                <Button
+                <button
                   key={qs}
-                  variant="outline"
                   className={cn(
-                    "h-10 text-sm font-bold touch-manipulation",
-                    qs === 180 && "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 text-yellow-700 dark:text-yellow-300"
+                    "h-11 rounded-lg text-sm font-bold touch-manipulation transition-colors",
+                    qs === 180
+                      ? "bg-yellow-700/40 text-yellow-300 border border-yellow-600/50"
+                      : "bg-[#2a2a2a] text-gray-300 border border-[#3a3a3a]"
                   )}
                   onClick={() => handleScoreSubmit(qs)}
                   disabled={updateScoreMutation.isPending}
                   data-testid={`button-quick-${qs}`}
                 >
                   {qs}
-                </Button>
+                </button>
               ))}
-            </div>
-
-            <div className="grid grid-cols-3 gap-1">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'].map(key => (
-                <Button
-                  key={key}
-                  variant={key === 'OK' ? 'default' : key === 'C' ? 'secondary' : 'outline'}
-                  className={cn(
-                    "h-12 text-lg font-bold touch-manipulation",
-                    key === 'OK' && "bg-green-600 hover:bg-green-700 text-white",
-                    key === 'C' && "text-red-500"
-                  )}
-                  onClick={() => handleNumpad(key)}
-                  disabled={
-                    (key === 'OK' && inputValue === '') ||
-                    updateScoreMutation.isPending
-                  }
-                  data-testid={`button-numpad-${key}`}
-                >
-                  {key}
-                </Button>
-              ))}
-            </div>
-
-            <Button
-              variant="outline"
-              className="w-full mt-2 h-10 text-sm touch-manipulation"
-              onClick={() => handleScoreSubmit(0)}
-              disabled={updateScoreMutation.isPending}
-              data-testid="button-no-score"
-            >
-              No Score (0)
-            </Button>
-          </div>
-
-          {legVisits.length > 0 && (
-            <div className="shrink-0 overflow-auto max-h-24 bg-muted/30 rounded-lg px-3 py-2">
-              <p className="text-[10px] uppercase text-muted-foreground font-medium mb-1">Visit History</p>
-              <div className="flex flex-wrap gap-1">
-                {legVisits.map((v, i) => (
-                  <span
-                    key={i}
-                    className={cn(
-                      "text-xs px-2 py-0.5 rounded-full font-medium",
-                      v.player === 'A'
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                        : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
-                      v.score === 0 && "opacity-50"
-                    )}
-                    data-testid={`visit-${i}`}
-                  >
-                    {v.player === 'A' ? (playerA?.name?.charAt(0) || 'A') : (playerB?.name?.charAt(0) || 'B')}: {v.score}
-                  </span>
-                ))}
-              </div>
             </div>
           )}
 
+          <div className="flex-1 flex flex-col justify-end gap-1.5 pb-2">
+            {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
+              <div key={ri} className="grid grid-cols-3 gap-1.5">
+                {row.map(key => (
+                  <button
+                    key={key}
+                    className="h-16 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                    onClick={() => handleNumpad(key)}
+                    disabled={updateScoreMutation.isPending}
+                    data-testid={`button-numpad-${key}`}
+                  >
+                    {key}
+                  </button>
+                ))}
+              </div>
+            ))}
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                className="h-16 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                onClick={handleUndo}
+                disabled={legVisits.length === 0 || updateScoreMutation.isPending}
+                data-testid="button-undo"
+              >
+                <Undo2 className={cn("w-6 h-6", legVisits.length === 0 ? "text-gray-600" : "text-gray-300")} />
+              </button>
+              <button
+                className="h-16 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                onClick={() => handleNumpad('0')}
+                disabled={updateScoreMutation.isPending}
+                data-testid="button-numpad-0"
+              >
+                0
+              </button>
+              <button
+                className={cn(
+                  "h-16 rounded-xl flex items-center justify-center touch-manipulation transition-colors",
+                  inputValue
+                    ? "bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a]"
+                    : "bg-[#2a3a2a] border border-[#3a4a3a]"
+                )}
+                onClick={() => handleNumpad('OK')}
+                disabled={!inputValue || updateScoreMutation.isPending}
+                data-testid="button-numpad-OK"
+              >
+                <Check className={cn("w-7 h-7", inputValue ? "text-white" : "text-gray-600")} />
+              </button>
+            </div>
+          </div>
+
           {updateScoreMutation.isPending && (
-            <div className="flex items-center justify-center py-2 shrink-0">
-              <Loader2 className="w-4 h-4 animate-spin text-primary mr-2" />
-              <span className="text-xs text-muted-foreground">Updating...</span>
+            <div className="flex items-center justify-center py-1 shrink-0">
+              <Loader2 className="w-4 h-4 animate-spin text-green-400 mr-2" />
+              <span className="text-xs text-gray-500">Updating...</span>
             </div>
           )}
         </div>
