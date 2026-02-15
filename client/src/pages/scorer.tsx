@@ -415,6 +415,10 @@ export default function ScorerPage() {
       return;
     }
     if (digit === 'OK') {
+      if (inputValue === "") {
+        handleScoreSubmit(0);
+        return;
+      }
       const score = parseInt(inputValue);
       if (isNaN(score) || score < 0) {
         setBustMessage("Invalid score");
