@@ -38,7 +38,6 @@ export default function CreateTournament() {
     const [fBestOf, setFBestOf] = useState(9);
     const [seeded, setSeeded] = useState(false);
     const [pointsForWin, setPointsForWin] = useState(2);
-    const [pointsForDraw, setPointsForDraw] = useState(1);
     const [pointsForLoss, setPointsForLoss] = useState(0);
 
     const handleAddPlayer = () => {
@@ -91,7 +90,6 @@ export default function CreateTournament() {
           } : undefined,
           seeded: (type === "KNOCKOUT" || type === "MULTI_STAGE") ? seeded : undefined,
           pointsForWin: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForWin : undefined,
-          pointsForDraw: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForDraw : undefined,
           pointsForLoss: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForLoss : undefined,
         }
       }, {
@@ -207,7 +205,7 @@ export default function CreateTournament() {
                 {(type === "ROUND_ROBIN" || type === "MULTI_STAGE") && (
                   <div className="space-y-4 col-span-2 border rounded-xl p-4 bg-muted/30">
                     <Label className="text-base font-bold">Points System</Label>
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="pointsWin">Points for Win</Label>
                         <Input
@@ -219,19 +217,6 @@ export default function CreateTournament() {
                           onChange={(e) => setPointsForWin(parseInt(e.target.value) || 0)}
                           className="h-10"
                           data-testid="input-points-win"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="pointsDraw">Points for Draw</Label>
-                        <Input
-                          id="pointsDraw"
-                          type="number"
-                          min={0}
-                          max={10}
-                          value={pointsForDraw}
-                          onChange={(e) => setPointsForDraw(parseInt(e.target.value) || 0)}
-                          className="h-10"
-                          data-testid="input-points-draw"
                         />
                       </div>
                       <div className="space-y-2">

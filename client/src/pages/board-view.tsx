@@ -131,7 +131,6 @@ export default function BoardView() {
   const getPlayer = (id: number | null) => players.find(p => p.id === id) || null;
 
   const ptsWin = (tournament.settings as any)?.pointsForWin ?? 2;
-  const ptsDraw = (tournament.settings as any)?.pointsForDraw ?? 1;
   const ptsLoss = (tournament.settings as any)?.pointsForLoss ?? 0;
 
   const completedMatches = matches.filter(m => m.status === 'COMPLETED');
@@ -140,7 +139,7 @@ export default function BoardView() {
     const playerMatches = completedMatches.filter(m =>
       m.playerAId === player.id || m.playerBId === player.id
     );
-    let played = 0, won = 0, drawn = 0, lost = 0, legsFor = 0, legsAgainst = 0;
+    let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
     playerMatches.forEach(m => {
       played++;
       const isA = m.playerAId === player.id;
@@ -149,13 +148,12 @@ export default function BoardView() {
       legsFor += myScore;
       legsAgainst += oppScore;
       if (m.winnerId === player.id) won++;
-      else if (m.winnerId === null && m.status === 'COMPLETED') drawn++;
       else lost++;
     });
     return {
-      ...player, played, won, drawn, lost, legsFor, legsAgainst,
+      ...player, played, won, lost, legsFor, legsAgainst,
       diff: legsFor - legsAgainst,
-      pts: (won * ptsWin) + (drawn * ptsDraw) + (lost * ptsLoss)
+      pts: (won * ptsWin) + (lost * ptsLoss)
     };
   }).sort((a, b) => {
     if (b.pts !== a.pts) return b.pts - a.pts;

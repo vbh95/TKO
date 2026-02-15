@@ -169,7 +169,6 @@ export default function TournamentDetail() {
 
   const settings = (tournament.settings || {}) as any;
   const ptsWin = settings.pointsForWin ?? 2;
-  const ptsDraw = settings.pointsForDraw ?? 1;
   const ptsLoss = settings.pointsForLoss ?? 0;
 
   const calcStandings = (playerList: Player[], matchList: typeof matches) => {
@@ -178,7 +177,7 @@ export default function TournamentDetail() {
         (m.playerAId === player.id || m.playerBId === player.id) && m.status === 'COMPLETED'
       );
       
-      let played = 0, won = 0, drawn = 0, lost = 0, legsFor = 0, legsAgainst = 0;
+      let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
       
       playerMatches.forEach((m: any) => {
         played++;
@@ -190,15 +189,14 @@ export default function TournamentDetail() {
         legsAgainst += oppScore;
         
         if (m.winnerId === player.id) won++;
-        else if (m.winnerId === null && m.status === 'COMPLETED') drawn++;
         else lost++;
       });
 
       return {
         ...player,
-        played, won, drawn, lost, legsFor, legsAgainst,
+        played, won, lost, legsFor, legsAgainst,
         diff: legsFor - legsAgainst,
-        pts: (won * ptsWin) + (drawn * ptsDraw) + (lost * ptsLoss)
+        pts: (won * ptsWin) + (lost * ptsLoss)
       };
     });
 
@@ -831,7 +829,6 @@ export default function TournamentDetail() {
                           <TableHead>Player</TableHead>
                           <TableHead className="text-center">P</TableHead>
                           <TableHead className="text-center">W</TableHead>
-                          <TableHead className="text-center">D</TableHead>
                           <TableHead className="text-center">L</TableHead>
                           <TableHead className="text-center hidden md:table-cell">LW</TableHead>
                           <TableHead className="text-center hidden md:table-cell">LL</TableHead>
@@ -853,7 +850,6 @@ export default function TournamentDetail() {
                             <TableCell className={cn("font-bold", qualifying && "text-green-700 dark:text-green-400")}>{player.name}</TableCell>
                             <TableCell className="text-center">{player.played}</TableCell>
                             <TableCell className="text-center text-green-600">{player.won}</TableCell>
-                            <TableCell className="text-center text-muted-foreground">{player.drawn}</TableCell>
                             <TableCell className="text-center text-red-500">{player.lost}</TableCell>
                             <TableCell className="text-center hidden md:table-cell font-mono">{player.legsFor}</TableCell>
                             <TableCell className="text-center hidden md:table-cell font-mono">{player.legsAgainst}</TableCell>

@@ -83,7 +83,6 @@ export default function PublicView() {
   const { tournament, players, matches, groups } = data;
 
   const ptsWin = (tournament.settings as any)?.pointsForWin ?? 2;
-  const ptsDraw = (tournament.settings as any)?.pointsForDraw ?? 1;
   const ptsLoss = (tournament.settings as any)?.pointsForLoss ?? 0;
 
   const calcStandings = (playerList: typeof players, matchList: typeof matches) => {
@@ -91,7 +90,7 @@ export default function PublicView() {
       const playerMatches = matchList.filter(m =>
         (m.playerAId === player.id || m.playerBId === player.id) && m.status === 'COMPLETED'
       );
-      let played = 0, won = 0, drawn = 0, lost = 0, legsFor = 0, legsAgainst = 0;
+      let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
       playerMatches.forEach(m => {
         played++;
         const isA = m.playerAId === player.id;
@@ -100,12 +99,11 @@ export default function PublicView() {
         legsFor += myScore;
         legsAgainst += oppScore;
         if (m.winnerId === player.id) won++;
-        else if (m.winnerId === null && m.status === 'COMPLETED') drawn++;
         else lost++;
       });
-      const pts = won * ptsWin + drawn * ptsDraw + lost * ptsLoss;
+      const pts = won * ptsWin + lost * ptsLoss;
       const diff = legsFor - legsAgainst;
-      return { ...player, played, won, drawn, lost, legsFor, legsAgainst, diff, pts };
+      return { ...player, played, won, lost, legsFor, legsAgainst, diff, pts };
     }).sort((a, b) => b.pts - a.pts || b.diff - a.diff || b.legsFor - a.legsFor);
   };
 
