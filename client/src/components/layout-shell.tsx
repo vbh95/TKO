@@ -10,7 +10,8 @@ import {
   X,
   Plus,
   Sun,
-  Moon
+  Moon,
+  TabletSmartphone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
   const navigation = [
     { name: 'My Tournaments', href: '/tournaments', icon: Trophy },
     { name: 'Create New', href: '/create', icon: Plus },
+    { name: 'Devices', href: '/devices', icon: TabletSmartphone },
     { name: 'Profile', href: '/account', icon: User },
   ];
 
