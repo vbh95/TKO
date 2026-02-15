@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { QRCodeSVG } from "qrcode.react";
 import { useTournament, useTournamentShare, useBulkUpdatePlayers } from "@/hooks/use-tournaments";
+import { calcStandings } from "@/lib/standings";
 import { LayoutShell } from "@/components/layout-shell";
 import { MatchScoreInput } from "@/components/match-score-input";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -171,53 +172,8 @@ export default function TournamentDetail() {
   const ptsWin = settings.pointsForWin ?? 2;
   const ptsLoss = settings.pointsForLoss ?? 0;
 
-  const calcStandings = (playerList: Player[], matchList: typeof matches) => {
-    const stats = playerList.map((player: Player) => {
-      const playerMatches = matchList.filter((m: any) => 
-        (m.playerAId === player.id || m.playerBId === player.id) && m.status === 'COMPLETED'
-      );
-      
-      let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
-      
-      playerMatches.forEach((m: any) => {
-        played++;
-        const isA = m.playerAId === player.id;
-        const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
-        const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
-        
-        legsFor += myScore;
-        legsAgainst += oppScore;
-        
-        if (m.winnerId === player.id) won++;
-        else lost++;
-      });
-
-      return {
-        ...player,
-        played, won, lost, legsFor, legsAgainst,
-        diff: legsFor - legsAgainst,
-        pts: (won * ptsWin) + (lost * ptsLoss)
-      };
-    });
-
-    const completedMatches = matchList.filter((m: any) => m.status === 'COMPLETED');
-
-    const headToHead = (a: any, b: any): number => {
-      const h2h = completedMatches.find((m: any) =>
-        (m.playerAId === a.id && m.playerBId === b.id) ||
-        (m.playerAId === b.id && m.playerBId === a.id)
-      );
-      if (!h2h) return 0;
-      if (h2h.winnerId === a.id) return -1;
-      if (h2h.winnerId === b.id) return 1;
-      return 0;
-    };
-
-    return stats.sort((a: any, b: any) => {
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-      return headToHead(a, b);
-    });
+  const computeStandings = (playerList: Player[], matchList: typeof matches) => {
+    return calcStandings(playerList, matchList, ptsWin, ptsLoss);
   };
 
   const getRoundDisplayName = (roundKey: string): string => {
@@ -315,10 +271,10 @@ export default function TournamentDetail() {
         const groupMatches = matches.filter((m: any) => m.groupId === group.id);
         return {
           group,
-          standings: calcStandings(groupPlayers, groupMatches),
+          standings: computeStandings(groupPlayers, groupMatches),
         };
       })
-    : [{ group: { name: "All Players" }, standings: calcStandings(players, matches) }];
+    : [{ group: { name: "All Players" }, standings: computeStandings(players, matches) }];
 
   return (
     <LayoutShell>

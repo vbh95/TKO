@@ -5,6 +5,7 @@ import { Loader2, Trophy, Eye, Sun, Moon, Check } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import tkoLogoFull from "@assets/TKO_White-04_1771178906649.png";
 import { useSocket } from "@/hooks/use-socket";
+import { calcStandings } from "@/lib/standings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -85,26 +86,8 @@ export default function PublicView() {
   const ptsWin = (tournament.settings as any)?.pointsForWin ?? 2;
   const ptsLoss = (tournament.settings as any)?.pointsForLoss ?? 0;
 
-  const calcStandings = (playerList: typeof players, matchList: typeof matches) => {
-    return playerList.map(player => {
-      const playerMatches = matchList.filter(m =>
-        (m.playerAId === player.id || m.playerBId === player.id) && m.status === 'COMPLETED'
-      );
-      let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
-      playerMatches.forEach(m => {
-        played++;
-        const isA = m.playerAId === player.id;
-        const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
-        const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
-        legsFor += myScore;
-        legsAgainst += oppScore;
-        if (m.winnerId === player.id) won++;
-        else lost++;
-      });
-      const pts = won * ptsWin + lost * ptsLoss;
-      const diff = legsFor - legsAgainst;
-      return { ...player, played, won, lost, legsFor, legsAgainst, diff, pts };
-    }).sort((a, b) => b.pts - a.pts || b.diff - a.diff || b.legsFor - a.legsFor);
+  const computeStandings = (playerList: typeof players, matchList: typeof matches) => {
+    return calcStandings(playerList, matchList, ptsWin, ptsLoss);
   };
 
   const groupStandings = groups.length > 0
@@ -116,9 +99,9 @@ export default function PublicView() {
           if (m.playerBId) groupPlayerIds.add(m.playerBId);
         });
         const groupPlayers = players.filter(p => groupPlayerIds.has(p.id));
-        return { group, standings: calcStandings(groupPlayers, groupMatches) };
+        return { group, standings: computeStandings(groupPlayers, groupMatches) };
       })
-    : [{ group: null, standings: calcStandings(players, matches) }];
+    : [{ group: null, standings: computeStandings(players, matches) }];
 
   const knockoutRoundOrder: Record<string, number> = {
     'QF': 1,
