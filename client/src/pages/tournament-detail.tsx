@@ -23,7 +23,8 @@ import {
   QrCode,
   Trash2,
   ChevronDown,
-  Pencil
+  Pencil,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -163,6 +164,23 @@ export default function TournamentDetail() {
   const [isDevicesDialogOpen, setIsDevicesDialogOpen] = useState(false);
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
   const [editingPlayerName, setEditingPlayerName] = useState("");
+  const [liveScorings, setLiveScorings] = useState<Map<number, {
+    matchId: number;
+    remainingA: number;
+    remainingB: number;
+    currentThrower: 'A' | 'B';
+    legsWonA: number;
+    legsWonB: number;
+    playerAName: string;
+    playerBName: string;
+    bestOf: number;
+    avgA: string;
+    avgB: string;
+    dartsA: number;
+    dartsB: number;
+    lastScoreA: number | null;
+    lastScoreB: number | null;
+  }>>(new Map());
 
   useEffect(() => {
     if (tournamentId) joinTournament(tournamentId);
@@ -175,7 +193,14 @@ export default function TournamentDetail() {
     const cleanup2 = on("board:status", (status: { boardNumber: number; online: boolean }) => {
       setBoardStatuses(prev => ({ ...prev, [status.boardNumber]: status.online }));
     });
-    return () => { cleanup1(); cleanup2(); };
+    const cleanup3 = on("leg:scoring", (incoming: any) => {
+      setLiveScorings(prev => {
+        const next = new Map(prev);
+        next.set(incoming.matchId, incoming);
+        return next;
+      });
+    });
+    return () => { cleanup1(); cleanup2(); cleanup3(); };
   }, [on, tournamentId]);
 
   if (isLoading || !data) {
@@ -580,6 +605,7 @@ export default function TournamentDetail() {
                   const nameA = match._labelA || playerA?.name || "TBD";
                   const nameB = match._labelB || playerB?.name || "TBD";
                   const isCompleted = match.status === 'COMPLETED';
+                  const ls = isLive ? liveScorings.get(match.id) : undefined;
 
                   return (
                     <Card
@@ -602,43 +628,110 @@ export default function TournamentDetail() {
                           {isLive && <span className="w-2 h-2 bg-white rounded-full animate-pulse" />}
                           {label}
                         </span>
-                        {isLive ? (
-                          <Badge className="bg-white/20 text-white text-xs">Live</Badge>
-                        ) : isCompleted ? (
-                          <Badge variant="secondary" className="text-xs">Completed</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">Up Next</Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {isLive && ls && (
+                            <span className={cn("text-xs", isLive ? "text-white/70" : "text-muted-foreground")}>
+                              Leg {(ls.legsWonA + ls.legsWonB + 1)} / Best of {ls.bestOf}
+                            </span>
+                          )}
+                          {isLive ? (
+                            <Badge className="bg-white/20 text-white text-xs">Live</Badge>
+                          ) : isCompleted ? (
+                            <Badge variant="secondary" className="text-xs">Completed</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">Up Next</Badge>
+                          )}
+                        </div>
                       </div>
                       <CardContent className="p-0">
-                        <div className="flex items-center justify-between px-4 py-3 border-b">
-                          <span className={cn(
-                            "text-sm font-medium flex-1",
-                            (isLive || isCompleted) && match.winnerId === match.playerAId && match.playerAId && "text-primary font-bold"
-                          )}>
-                            {nameA}
-                          </span>
-                          <div className={cn(
-                            "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
-                            (isLive || isCompleted) && (match.scoreA || 0) > (match.scoreB || 0) ? "bg-primary text-primary-foreground" : "bg-muted"
-                          )}>
-                            {isLive || isCompleted ? (match.scoreA || 0) : "-"}
+                        {isLive && ls ? (
+                          <div className="p-3">
+                            <div className="text-center mb-2">
+                              <div className="flex items-center justify-center gap-3 tabular-nums">
+                                <span className={cn("text-2xl font-bold", ls.legsWonA >= ls.legsWonB ? "text-primary" : "text-muted-foreground")}>{ls.legsWonA}</span>
+                                <span className="text-muted-foreground text-sm">-</span>
+                                <span className={cn("text-2xl font-bold", ls.legsWonB >= ls.legsWonA ? "text-primary" : "text-muted-foreground")}>{ls.legsWonB}</span>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className={cn(
+                                "rounded-lg p-3 transition-all",
+                                ls.currentThrower === 'A'
+                                  ? "bg-red-600/15 ring-2 ring-red-500/50"
+                                  : "bg-green-600/15 ring-2 ring-green-500/50"
+                              )}>
+                                <div className="h-3.5 mb-0.5">
+                                  {ls.currentThrower === 'A' && (
+                                    <div className="flex items-center gap-1">
+                                      <Eye className="w-3 h-3 text-red-500" />
+                                      <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-xs font-bold truncate">{nameA}</p>
+                                <p className="text-3xl font-bold tabular-nums leading-none mt-1">{ls.remainingA}</p>
+                                <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                                  <div className="flex justify-between"><span>Avg</span><span className="font-medium tabular-nums text-foreground">{ls.avgA}</span></div>
+                                  <div className="flex justify-between"><span>Last</span><span className="font-medium tabular-nums text-foreground">{ls.lastScoreA !== null ? ls.lastScoreA : '-'}</span></div>
+                                  <div className="flex justify-between"><span>Darts</span><span className="font-medium tabular-nums text-foreground">{ls.dartsA}</span></div>
+                                </div>
+                              </div>
+                              <div className={cn(
+                                "rounded-lg p-3 transition-all",
+                                ls.currentThrower === 'B'
+                                  ? "bg-red-600/15 ring-2 ring-red-500/50"
+                                  : "bg-green-600/15 ring-2 ring-green-500/50"
+                              )}>
+                                <div className="h-3.5 mb-0.5">
+                                  {ls.currentThrower === 'B' && (
+                                    <div className="flex items-center gap-1">
+                                      <Eye className="w-3 h-3 text-red-500" />
+                                      <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-xs font-bold truncate">{nameB}</p>
+                                <p className="text-3xl font-bold tabular-nums leading-none mt-1">{ls.remainingB}</p>
+                                <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                                  <div className="flex justify-between"><span>Avg</span><span className="font-medium tabular-nums text-foreground">{ls.avgB}</span></div>
+                                  <div className="flex justify-between"><span>Last</span><span className="font-medium tabular-nums text-foreground">{ls.lastScoreB !== null ? ls.lastScoreB : '-'}</span></div>
+                                  <div className="flex justify-between"><span>Darts</span><span className="font-medium tabular-nums text-foreground">{ls.dartsB}</span></div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-3">
-                          <span className={cn(
-                            "text-sm font-medium flex-1",
-                            (isLive || isCompleted) && match.winnerId === match.playerBId && match.playerBId && "text-primary font-bold"
-                          )}>
-                            {nameB}
-                          </span>
-                          <div className={cn(
-                            "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
-                            (isLive || isCompleted) && (match.scoreB || 0) > (match.scoreA || 0) ? "bg-primary text-primary-foreground" : "bg-muted"
-                          )}>
-                            {isLive || isCompleted ? (match.scoreB || 0) : "-"}
-                          </div>
-                        </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between px-4 py-3 border-b">
+                              <span className={cn(
+                                "text-sm font-medium flex-1",
+                                (isLive || isCompleted) && match.winnerId === match.playerAId && match.playerAId && "text-primary font-bold"
+                              )}>
+                                {nameA}
+                              </span>
+                              <div className={cn(
+                                "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
+                                (isLive || isCompleted) && (match.scoreA || 0) > (match.scoreB || 0) ? "bg-primary text-primary-foreground" : "bg-muted"
+                              )}>
+                                {isLive || isCompleted ? (match.scoreA || 0) : "-"}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <span className={cn(
+                                "text-sm font-medium flex-1",
+                                (isLive || isCompleted) && match.winnerId === match.playerBId && match.playerBId && "text-primary font-bold"
+                              )}>
+                                {nameB}
+                              </span>
+                              <div className={cn(
+                                "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
+                                (isLive || isCompleted) && (match.scoreB || 0) > (match.scoreA || 0) ? "bg-primary text-primary-foreground" : "bg-muted"
+                              )}>
+                                {isLive || isCompleted ? (match.scoreB || 0) : "-"}
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </CardContent>
                     </Card>
                   );
