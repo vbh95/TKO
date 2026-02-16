@@ -221,6 +221,8 @@ export default function TournamentDetail() {
   const [bulkInput, setBulkInput] = useState("");
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
   const [isDevicesDialogOpen, setIsDevicesDialogOpen] = useState(false);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [renameName, setRenameName] = useState("");
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
   const [editingPlayerName, setEditingPlayerName] = useState("");
   const [liveScorings, setLiveScorings] = useState<Map<number, {
@@ -552,6 +554,10 @@ export default function TournamentDetail() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem data-testid="menu-item-rename" className="gap-2 cursor-pointer" onSelect={() => { setRenameName(tournament.name); setIsRenameDialogOpen(true); }}>
+                  <Pencil className="w-4 h-4" />
+                  Rename Tournament
+                </DropdownMenuItem>
                 <DropdownMenuItem data-testid="menu-item-devices" className="gap-2 cursor-pointer" onSelect={() => setIsDevicesDialogOpen(true)}>
                   <TabletSmartphone className="w-4 h-4" />
                   Connected Devices
@@ -568,6 +574,51 @@ export default function TournamentDetail() {
               toast={toast}
               boardStatuses={boardStatuses}
             />
+
+            <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+              <DialogContent className="max-w-sm" onClick={(e) => e.stopPropagation()}>
+                <DialogHeader>
+                  <DialogTitle>Rename Tournament</DialogTitle>
+                </DialogHeader>
+                <Input
+                  data-testid="input-rename-tournament"
+                  value={renameName}
+                  onChange={(e) => setRenameName(e.target.value)}
+                  placeholder="Tournament name"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && renameName.trim()) {
+                      apiRequest('PUT', `/api/tournaments/${tournament.id}`, { name: renameName.trim() })
+                        .then(() => {
+                          queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+                          queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
+                          toast({ title: "Tournament renamed" });
+                          setIsRenameDialogOpen(false);
+                        })
+                        .catch(() => toast({ title: "Error", description: "Failed to rename.", variant: "destructive" }));
+                    }
+                  }}
+                />
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsRenameDialogOpen(false)} data-testid="button-cancel-rename">Cancel</Button>
+                  <Button
+                    data-testid="button-save-rename"
+                    disabled={!renameName.trim()}
+                    onClick={() => {
+                      apiRequest('PUT', `/api/tournaments/${tournament.id}`, { name: renameName.trim() })
+                        .then(() => {
+                          queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+                          queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
+                          toast({ title: "Tournament renamed" });
+                          setIsRenameDialogOpen(false);
+                        })
+                        .catch(() => toast({ title: "Error", description: "Failed to rename.", variant: "destructive" }));
+                    }}
+                  >
+                    Save
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
