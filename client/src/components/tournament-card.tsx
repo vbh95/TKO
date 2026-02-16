@@ -243,7 +243,7 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
       }
 
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournament.id] });
 
       toast({
         title: reset ? "Tournament restarted" : "Settings saved",

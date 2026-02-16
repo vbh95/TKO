@@ -590,7 +590,7 @@ export default function TournamentDetail() {
                       apiRequest('PUT', `/api/tournaments/${tournament.id}`, { name: renameName.trim() })
                         .then(() => {
                           queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
-                          queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
+                          queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournament.id] });
                           toast({ title: "Tournament renamed" });
                           setIsRenameDialogOpen(false);
                         })
@@ -607,7 +607,7 @@ export default function TournamentDetail() {
                       apiRequest('PUT', `/api/tournaments/${tournament.id}`, { name: renameName.trim() })
                         .then(() => {
                           queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
-                          queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
+                          queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournament.id] });
                           toast({ title: "Tournament renamed" });
                           setIsRenameDialogOpen(false);
                         })
