@@ -47,7 +47,7 @@ function assignScorersToMatches(
 
   const scorerIds: (number | null)[] = new Array(scheduled.length).fill(null);
 
-  const unscoredPlayers = new Set(groupPlayers.map(p => p.id));
+  let previousScorerId: number | null = null;
 
   for (let i = 0; i < scheduled.length; i++) {
     const current = scheduled[i];
@@ -61,6 +61,10 @@ function assignScorersToMatches(
       ineligible.add(nextMatch.playerB.id);
     }
 
+    if (previousScorerId !== null) {
+      ineligible.add(previousScorerId);
+    }
+
     let eligible = groupPlayers.filter(p => !ineligible.has(p.id));
 
     if (eligible.length === 0) {
@@ -71,15 +75,12 @@ function assignScorersToMatches(
 
     if (eligible.length === 0) continue;
 
-    const unscoredEligible = eligible.filter(p => unscoredPlayers.has(p.id));
-    const pool = unscoredEligible.length > 0 ? unscoredEligible : eligible;
-
-    const minCount = Math.min(...pool.map(p => scorerCounts.get(p.id)!));
-    const candidates = pool.filter(p => scorerCounts.get(p.id)! === minCount);
+    const minCount = Math.min(...eligible.map(p => scorerCounts.get(p.id)!));
+    const candidates = eligible.filter(p => scorerCounts.get(p.id)! === minCount);
     const chosen = candidates[Math.floor(Math.random() * candidates.length)];
     scorerIds[i] = chosen.id;
     scorerCounts.set(chosen.id, scorerCounts.get(chosen.id)! + 1);
-    unscoredPlayers.delete(chosen.id);
+    previousScorerId = chosen.id;
   }
 
   return scorerIds;
