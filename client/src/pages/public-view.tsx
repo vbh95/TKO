@@ -548,7 +548,22 @@ export default function PublicView() {
     return names[rk] || rk;
   };
 
-  const knockoutCards: { match: typeof matches[0]; isLive: boolean; label: string }[] = [];
+  const groupSlots = groups.length > 0 && !groupsFinished
+    ? groups
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .map(group => {
+          const gMatches = matches
+            .filter(m => m.groupId === group.id)
+            .sort((a, b) => (a.order || 0) - (b.order || 0));
+          const allDone = gMatches.length > 0 && gMatches.every(m => m.status === 'COMPLETED');
+          const liveMatch = gMatches.find(m => m.status === 'IN_PROGRESS');
+          const nextPending = gMatches.find(m => m.status === 'PENDING' || m.status === 'NOT_STARTED');
+          const currentMatch = liveMatch || nextPending || null;
+          return { group, currentMatch, isLive: !!liveMatch, allDone };
+        })
+    : [];
+
+  const knockoutCards: { match: typeof matches[0]; isLive: boolean; label: string; allDone?: boolean }[] = [];
   if (groupsFinished && knockoutStageMatches.length > 0) {
     const knockoutRounds = Array.from(new Set(knockoutStageMatches.map(m => m.roundKey))) as string[];
     const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
@@ -561,6 +576,10 @@ export default function PublicView() {
         currentRoundKey = rk;
         break;
       }
+    }
+
+    if (!currentRoundKey) {
+      currentRoundKey = knockoutRounds[knockoutRounds.length - 1];
     }
 
     if (currentRoundKey) {
@@ -577,16 +596,8 @@ export default function PublicView() {
     }
   }
 
-  const completedGroups = groups.length > 0 && !groupsFinished
-    ? groups
-        .filter(group => {
-          const gm = matches.filter(m => m.groupId === group.id);
-          return gm.length > 0 && gm.every(m => m.status === 'COMPLETED') && liveMatches.length > 0;
-        })
-        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-    : [];
-
-  const showLiveSection = !groupsFinished && liveMatches.length > 0;
+  const hasGroupMatches = groupStageMatches.length > 0;
+  const showGroupSlots = hasGroupMatches && !groupsFinished && groupSlots.length > 0;
   const showKnockoutSection = groupsFinished && knockoutCards.length > 0;
 
   return (
@@ -623,36 +634,77 @@ export default function PublicView() {
           )}
         </div>
 
-        {showLiveSection && (
+        {showGroupSlots && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
               <h2 className="text-xl font-display font-bold">Live Games</h2>
-              <Badge variant="secondary" className="ml-1">{liveMatches.length}</Badge>
+              {liveMatches.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{liveMatches.length}</Badge>
+              )}
             </div>
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              {liveMatches.map(match => {
-                const ls = liveScorings.get(match.id);
-                const playerA = getPlayer(match.playerAId);
-                const playerB = getPlayer(match.playerBId);
-                const groupName = match.groupId ? groups.find(g => g.id === match.groupId)?.name : null;
+              {groupSlots.map(({ group, currentMatch, isLive, allDone }) => {
+                if (allDone) {
+                  return (
+                    <Card key={`completed-${group.id}`} className="border border-dashed border-muted-foreground/30 shadow-none" data-testid={`completed-group-${group.id}`}>
+                      <CardHeader className="bg-muted/30 border-b py-2.5 px-4">
+                        <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
+                          <Check className="w-4 h-4 text-green-500" />
+                          {group.name}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex items-center justify-center py-8 px-4">
+                        <p className="text-sm text-muted-foreground text-center">All matches completed — waiting for other groups to finish</p>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+
+                if (!currentMatch) {
+                  return (
+                    <Card key={`waiting-${group.id}`} className="border border-dashed border-muted-foreground/30 shadow-none">
+                      <CardHeader className="bg-muted/30 border-b py-2.5 px-4">
+                        <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
+                          {group.name}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex items-center justify-center py-8 px-4">
+                        <p className="text-sm text-muted-foreground text-center">No matches scheduled yet</p>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+
+                const playerA = getPlayer(currentMatch.playerAId);
+                const playerB = getPlayer(currentMatch.playerBId);
+
+                if (isLive) {
+                  const ls = liveScorings.get(currentMatch.id);
+                  return (
+                    <LiveMatchCard
+                      key={currentMatch.id}
+                      match={currentMatch}
+                      ls={ls}
+                      playerA={playerA}
+                      playerB={playerB}
+                      headerLabel={group.name || 'Live'}
+                    />
+                  );
+                }
+
                 return (
-                  <LiveMatchCard key={match.id} match={match} ls={ls} playerA={playerA} playerB={playerB} headerLabel={groupName || 'Live'} />
+                  <KnockoutMatchCard
+                    key={currentMatch.id}
+                    match={currentMatch}
+                    playerA={playerA}
+                    playerB={playerB}
+                    label={group.name || 'Group'}
+                    isCompleted={false}
+                    shareToken={shareToken || ''}
+                  />
                 );
               })}
-              {completedGroups.map(group => (
-                <Card key={`completed-${group.id}`} className="border border-dashed border-muted-foreground/30 shadow-none" data-testid={`completed-group-${group.id}`}>
-                  <CardHeader className="bg-muted/30 border-b py-2.5 px-4">
-                    <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
-                      <Check className="w-4 h-4 text-green-500" />
-                      {group.name}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex items-center justify-center py-8 px-4">
-                    <p className="text-sm text-muted-foreground text-center">All matches completed — waiting for other groups to finish</p>
-                  </CardContent>
-                </Card>
-              ))}
             </div>
           </div>
         )}
