@@ -929,12 +929,15 @@ export default function TournamentDetail() {
                 {isMultiStage ? (
                   <>
                     <TabsTrigger value="group-stage" data-testid="tab-group-stage">Groups</TabsTrigger>
+                    <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
                     <TabsTrigger value="knockout" data-testid="tab-knockout">Knockout</TabsTrigger>
                   </>
                 ) : (
-                  <TabsTrigger value="matches" data-testid="tab-matches">Matches</TabsTrigger>
+                  <>
+                    <TabsTrigger value="matches" data-testid="tab-matches">Matches</TabsTrigger>
+                    <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
+                  </>
                 )}
-                <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
                 <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
               </TabsList>
 
@@ -946,9 +949,6 @@ export default function TournamentDetail() {
                 <>
                   <TabsContent value="group-stage" className="space-y-8" data-testid="content-group-stage">
                     {renderGroupMatches()}
-                  </TabsContent>
-                  <TabsContent value="knockout" className="space-y-6" data-testid="content-knockout">
-                    {renderKnockoutMatches()}
                   </TabsContent>
                 </>
               ) : (
@@ -1011,6 +1011,12 @@ export default function TournamentDetail() {
               </Card>
             ))}
           </TabsContent>
+
+              {isMultiStage && (
+                <TabsContent value="knockout" className="space-y-6" data-testid="content-knockout">
+                  {renderKnockoutMatches()}
+                </TabsContent>
+              )}
           
           <TabsContent value="players">
             {(() => {
