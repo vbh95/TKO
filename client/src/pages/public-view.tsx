@@ -822,7 +822,7 @@ export default function PublicView() {
                           playerA={playerA}
                           playerB={playerB}
                           shareToken={shareToken || ''}
-                          scorerName={match.scorerId ? getPlayer(match.scorerId)?.name : null}
+                          scorerName={match.scorerName || null}
                         />
                       );
                     })}

@@ -232,6 +232,7 @@ export async function generateRoundRobinMatches(
     const scorerIds = assignScorersToMatches(scheduled, groupPlayers);
     for (let i = 0; i < scheduled.length; i++) {
       const sm = scheduled[i];
+      const scorer = scorerIds[i] ? groupPlayers.find(p => p.id === scorerIds[i]) : null;
       await storage.createMatch({
         tournamentId,
         stage: "GROUP",
@@ -246,6 +247,7 @@ export async function generateRoundRobinMatches(
         winnerId: null,
         order: matchOrder++,
         scorerId: scorerIds[i],
+        scorerName: scorer?.name || null,
       });
     }
   }
@@ -459,6 +461,7 @@ export async function generateMultiStageMatches(
     const scorerIds = assignScorersToMatches(scheduled, groupPlayers);
     for (let i = 0; i < scheduled.length; i++) {
       const sm = scheduled[i];
+      const scorer = scorerIds[i] ? groupPlayers.find(p => p.id === scorerIds[i]) : null;
       await storage.createMatch({
         tournamentId,
         stage: "GROUP",
@@ -473,6 +476,7 @@ export async function generateMultiStageMatches(
         winnerId: null,
         order: matchOrder++,
         scorerId: scorerIds[i],
+        scorerName: scorer?.name || null,
       });
     }
   }

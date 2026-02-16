@@ -63,6 +63,63 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Match, Player, GroupMembership, BoardSession } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
+function InlineScorerEdit({ matchId, tournamentId, currentName }: { matchId: number; tournamentId: number; currentName: string | null }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(currentName || '');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setValue(currentName || '');
+  }, [currentName]);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const save = async () => {
+    setEditing(false);
+    const trimmed = value.trim();
+    if (trimmed === (currentName || '')) return;
+    try {
+      await apiRequest('PATCH', `/api/matches/${matchId}/scorer`, { scorerName: trimmed || null });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+    } catch {}
+  };
+
+  return (
+    <div className="mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground" data-testid={`match-scorer-${matchId}`}>
+      {editing ? (
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <ClipboardList className="w-3 h-3 shrink-0" />
+          <span className="shrink-0">Scorer:</span>
+          <input
+            ref={inputRef}
+            className="bg-transparent border-b border-primary/50 outline-none text-xs text-foreground w-full max-w-[120px] px-0.5"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onBlur={save}
+            onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setValue(currentName || ''); setEditing(false); } }}
+            data-testid={`input-scorer-${matchId}`}
+          />
+        </div>
+      ) : (
+        <button
+          className="flex items-center gap-1 hover:text-foreground transition-colors"
+          onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+          data-testid={`button-edit-scorer-${matchId}`}
+        >
+          <ClipboardList className="w-3 h-3" />
+          Scorer: {currentName || "None"}
+          <Pencil className="w-2.5 h-2.5 ml-0.5 opacity-50" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function AdminMatchStats({ matchId, playerAName, playerBName }: { matchId: number; playerAName: string; playerBName: string }) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState<any>(null);
@@ -802,50 +859,11 @@ export default function TournamentDetail() {
                                     </div>
                                   </div>
                                 </div>
-                                <div className="mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground" data-testid={`match-scorer-${match.id}`}>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button className="flex items-center gap-1 hover:text-foreground transition-colors" onClick={(e) => e.stopPropagation()} data-testid={`button-edit-scorer-${match.id}`}>
-                                        <ClipboardList className="w-3 h-3" />
-                                        Scorer: {match.scorerId ? (getPlayer(match.scorerId)?.name || "Unknown") : "None"}
-                                        <Pencil className="w-2.5 h-2.5 ml-0.5 opacity-50" />
-                                      </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                                      {(() => {
-                                        const memberIds = groupMemberships
-                                          .filter((gm: any) => gm.groupId === match.groupId)
-                                          .map((gm: any) => gm.playerId);
-                                        const groupPlayers = players.filter((p: Player) => memberIds.includes(p.id));
-                                        return groupPlayers.map((p: Player) => (
-                                          <DropdownMenuItem
-                                            key={p.id}
-                                            onClick={async () => {
-                                              try {
-                                                await apiRequest('PATCH', `/api/matches/${match.id}/scorer`, { scorerId: p.id });
-                                                queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
-                                              } catch {}
-                                            }}
-                                            data-testid={`scorer-option-${p.id}`}
-                                          >
-                                            {p.name} {p.id === match.scorerId && <Check className="w-3 h-3 ml-auto" />}
-                                          </DropdownMenuItem>
-                                        ));
-                                      })()}
-                                      <DropdownMenuItem
-                                        onClick={async () => {
-                                          try {
-                                            await apiRequest('PATCH', `/api/matches/${match.id}/scorer`, { scorerId: null });
-                                            queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
-                                          } catch {}
-                                        }}
-                                        data-testid={`scorer-option-none-${match.id}`}
-                                      >
-                                        None {!match.scorerId && <Check className="w-3 h-3 ml-auto" />}
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
+                                <InlineScorerEdit
+                                  matchId={match.id}
+                                  tournamentId={tournament.id}
+                                  currentName={match.scorerName || null}
+                                />
                                 {match.status === 'COMPLETED' && (
                                   <AdminMatchStats
                                     matchId={match.id}

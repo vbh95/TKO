@@ -542,21 +542,10 @@ export async function registerRoutes(
       const tournament = await storage.getTournament(match.tournamentId);
       if (!tournament || tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
 
-      const { scorerId } = req.body;
-
-      if (scorerId !== null && scorerId !== undefined) {
-        const scorerIdNum = parseInt(scorerId);
-        if (isNaN(scorerIdNum)) return res.status(400).json({ message: "Invalid scorer ID" });
-
-        const tournamentPlayers = await storage.getPlayersByTournamentId(match.tournamentId);
-        const validPlayer = tournamentPlayers.find(p => p.id === scorerIdNum);
-        if (!validPlayer) return res.status(400).json({ message: "Scorer must be a player in this tournament" });
-
-        const updatedMatch = await storage.updateMatch(id, { scorerId: scorerIdNum });
-        return res.json(updatedMatch);
-      }
-
-      const updatedMatch = await storage.updateMatch(id, { scorerId: null });
+      const { scorerName } = req.body;
+      const updatedMatch = await storage.updateMatch(id, {
+        scorerName: typeof scorerName === 'string' ? scorerName.trim() || null : null,
+      });
       res.json(updatedMatch);
     } catch (err) {
       console.error("Update scorer error:", err);
