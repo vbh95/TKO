@@ -22,7 +22,8 @@ import {
   WifiOff,
   QrCode,
   Trash2,
-  ChevronDown
+  ChevronDown,
+  Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -160,6 +161,8 @@ export default function TournamentDetail() {
   const [bulkInput, setBulkInput] = useState("");
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
   const [isDevicesDialogOpen, setIsDevicesDialogOpen] = useState(false);
+  const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
+  const [editingPlayerName, setEditingPlayerName] = useState("");
 
   useEffect(() => {
     if (tournamentId) joinTournament(tournamentId);
@@ -913,50 +916,198 @@ export default function TournamentDetail() {
           </TabsContent>
           
           <TabsContent value="players">
-            <div className="space-y-4">
-              <div className="flex justify-end">
-                <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="gap-2" onClick={() => setBulkInput(players.map((p: Player) => p.name).join("\n"))}>
-                      <Users className="w-4 h-4" />
-                      Bulk Edit Players
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                      <DialogTitle>Bulk Edit Players</DialogTitle>
-                      <DialogDescription>
-                        Edit player names below. Enter one name per line.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                      <Textarea 
-                        value={bulkInput} 
-                        onChange={(e) => setBulkInput(e.target.value)} 
-                        className="min-h-[300px] font-mono"
-                        placeholder="Enter player names..."
-                      />
+            {(() => {
+              const getPlayerBestRound = (playerId: number) => {
+                const playerMatches = matches.filter(
+                  (m: any) => (m.playerAId === playerId || m.playerBId === playerId) && m.status === 'COMPLETED'
+                );
+                const roundPriority: Record<string, number> = { 'F': 5, 'SF': 4, 'QF': 3, 'R16': 2, 'R32': 1, 'group': 0 };
+                let bestRound = 'group';
+                let bestPriority = 0;
+                let wonFinal = false;
+                for (const m of playerMatches) {
+                  const priority = roundPriority[m.roundKey] || 0;
+                  if (priority > bestPriority) {
+                    bestPriority = priority;
+                    bestRound = m.roundKey;
+                  }
+                  if (m.roundKey === 'F' && m.winnerId === playerId) {
+                    wonFinal = true;
+                  }
+                }
+                return { bestRound, wonFinal };
+              };
+
+              const getPositionLabel = (bestRound: string, wonFinal: boolean) => {
+                if (bestRound === 'F') return wonFinal ? 'Champion' : 'Final';
+                if (bestRound === 'SF') return 'SF';
+                if (bestRound === 'QF') return 'QF';
+                if (bestRound === 'R16') return 'R16';
+                if (bestRound === 'R32') return 'R32';
+                return 'Group';
+              };
+
+              const getPositionBadgeColor = (bestRound: string, wonFinal: boolean) => {
+                if (bestRound === 'F' && wonFinal) return 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
+                if (bestRound === 'F') return 'bg-gray-200/50 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300 border-gray-400/30';
+                if (bestRound === 'SF') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-400/30';
+                if (bestRound === 'QF') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-400/30';
+                if (bestRound === 'R16') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-400/30';
+                if (bestRound === 'R32') return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border-teal-400/30';
+                return 'bg-muted text-muted-foreground border-border';
+              };
+
+              const getPoints = (bestRound: string, wonFinal: boolean) => {
+                if (bestRound === 'F' && wonFinal) return 40;
+                if (bestRound === 'F') return 30;
+                if (bestRound === 'SF') return 20;
+                if (bestRound === 'QF') return 10;
+                if (bestRound === 'R16') return 8;
+                if (bestRound === 'R32') return 6;
+                return 5;
+              };
+
+              const getTotalLegsWon = (playerId: number) => {
+                let total = 0;
+                for (const m of matches) {
+                  if (m.status !== 'COMPLETED') continue;
+                  if (m.playerAId === playerId) total += (m.scoreA || 0);
+                  if (m.playerBId === playerId) total += (m.scoreB || 0);
+                }
+                return total;
+              };
+
+              const playerResults = players.map((p: Player) => {
+                const { bestRound, wonFinal } = getPlayerBestRound(p.id);
+                return {
+                  ...p,
+                  bestRound,
+                  wonFinal,
+                  positionLabel: getPositionLabel(bestRound, wonFinal),
+                  points: getPoints(bestRound, wonFinal),
+                  legsWon: getTotalLegsWon(p.id),
+                };
+              }).sort((a: any, b: any) => b.points - a.points || b.legsWon - a.legsWon);
+
+              const handleSavePlayerName = async (playerId: number) => {
+                if (!editingPlayerName.trim()) return;
+                try {
+                  await apiRequest("PATCH", `/api/tournaments/${tournamentId}/players/${playerId}`, { name: editingPlayerName.trim() });
+                  queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+                  toast({ title: "Player Updated", description: "Player name has been updated." });
+                  setEditingPlayerId(null);
+                } catch {
+                  toast({ title: "Error", description: "Failed to update player name.", variant: "destructive" });
+                }
+              };
+
+              return (
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Tournament Results</CardTitle>
+                    <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-2" onClick={() => setBulkInput(players.map((p: Player) => p.name).join("\n"))}>
+                          <Users className="w-4 h-4" />
+                          Bulk Edit
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader>
+                          <DialogTitle>Bulk Edit Players</DialogTitle>
+                          <DialogDescription>
+                            Edit player names below. Enter one name per line.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                          <Textarea 
+                            value={bulkInput} 
+                            onChange={(e) => setBulkInput(e.target.value)} 
+                            className="min-h-[300px] font-mono"
+                            placeholder="Enter player names..."
+                          />
+                        </div>
+                        <DialogFooter>
+                          <Button variant="ghost" onClick={() => setIsBulkDialogOpen(false)}>Cancel</Button>
+                          <Button onClick={handleBulkUpdate} disabled={isUpdatingPlayers}>
+                            {isUpdatingPlayers && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save Changes
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[50px]">#</TableHead>
+                            <TableHead>Player</TableHead>
+                            <TableHead className="text-center">Position</TableHead>
+                            <TableHead className="text-center">Legs Won</TableHead>
+                            <TableHead className="text-right font-bold">Points</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {playerResults.map((player: any, idx: number) => (
+                            <TableRow key={player.id} data-testid={`player-result-row-${player.id}`}>
+                              <TableCell className="font-medium text-muted-foreground">
+                                <div className="flex items-center gap-1.5">
+                                  {idx + 1}
+                                  {player.wonFinal && <Trophy className="w-4 h-4 text-yellow-500" />}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {editingPlayerId === player.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      value={editingPlayerName}
+                                      onChange={(e) => setEditingPlayerName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSavePlayerName(player.id);
+                                        if (e.key === 'Escape') setEditingPlayerId(null);
+                                      }}
+                                      className="h-8 w-40"
+                                      autoFocus
+                                      data-testid={`input-player-name-${player.id}`}
+                                    />
+                                    <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => handleSavePlayerName(player.id)} data-testid={`button-save-player-${player.id}`}>
+                                      <Check className="w-4 h-4 text-green-600" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingPlayerId(null)}>
+                                      &times;
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold">{player.name}</span>
+                                    <button
+                                      onClick={() => { setEditingPlayerId(player.id); setEditingPlayerName(player.name); }}
+                                      className="text-muted-foreground hover:text-foreground transition-colors"
+                                      data-testid={`button-edit-player-${player.id}`}
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border", getPositionBadgeColor(player.bestRound, player.wonFinal))}>
+                                  {player.positionLabel}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center font-mono">{player.legsWon}</TableCell>
+                              <TableCell className="text-right font-bold text-primary text-lg">{player.points}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                    <DialogFooter>
-                      <Button variant="ghost" onClick={() => setIsBulkDialogOpen(false)}>Cancel</Button>
-                      <Button onClick={handleBulkUpdate} disabled={isUpdatingPlayers}>
-                        {isUpdatingPlayers && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Save Changes
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {players.map((player: Player) => (
-                  <Card key={player.id}>
-                    <CardContent className="flex items-center p-4">
-                      <h4 className="font-bold">{player.name}</h4>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
               </TabsContent>
             </Tabs>
           );

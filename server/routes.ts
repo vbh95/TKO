@@ -198,6 +198,25 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/tournaments/:id/players/:playerId", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const playerId = parseInt(req.params.playerId);
+      const tournament = await storage.getTournament(id);
+      if (!tournament) return res.status(404).json({ message: "Not found" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+      const tournamentPlayers = await storage.getPlayersByTournamentId(id);
+      const playerExists = tournamentPlayers.find(p => p.id === playerId);
+      if (!playerExists) return res.status(404).json({ message: "Player not found in this tournament" });
+      const { name } = req.body;
+      if (!name || typeof name !== "string" || !name.trim()) return res.status(400).json({ message: "Name is required" });
+      const updated = await storage.updatePlayer(playerId, { name: name.trim() });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   app.get(api.tournaments.list.path, isAuthenticated, async (req, res) => {
     const userId = (req.user as any).id;
     const tournaments = await storage.getTournamentsByUserId(userId);
