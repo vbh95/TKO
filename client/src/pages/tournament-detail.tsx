@@ -24,7 +24,8 @@ import {
   Trash2,
   ChevronDown,
   Pencil,
-  Eye
+  Eye,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -417,6 +418,44 @@ export default function TournamentDetail() {
                     </div>
                   ) : (
                     <div className="space-y-4">
+                      <div className="flex flex-col items-center py-2" data-testid="section-share-qr">
+                        <div className="bg-white p-3 rounded-lg" id="share-qr-container">
+                          <QRCodeSVG 
+                            value={`${window.location.origin}/public/t/${tournament.shareToken}`} 
+                            size={200} 
+                            level="H"
+                            includeMargin={false}
+                          />
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="mt-2 text-xs"
+                          data-testid="button-download-qr"
+                          onClick={() => {
+                            const svg = document.querySelector('#share-qr-container svg');
+                            if (!svg) return;
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            const svgData = new XMLSerializer().serializeToString(svg);
+                            const img = new Image();
+                            img.onload = () => {
+                              canvas.width = 600;
+                              canvas.height = 600;
+                              ctx!.fillStyle = '#ffffff';
+                              ctx!.fillRect(0, 0, 600, 600);
+                              ctx!.drawImage(img, 0, 0, 600, 600);
+                              const link = document.createElement('a');
+                              link.download = `${tournament.name.replace(/[^a-zA-Z0-9]/g, '_')}_QR.png`;
+                              link.href = canvas.toDataURL('image/png');
+                              link.click();
+                            };
+                            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+                          }}
+                        >
+                          <Download className="w-3 h-3 mr-1" /> Download QR Code
+                        </Button>
+                      </div>
                       <div className="flex gap-2">
                         <Input 
                           readOnly 
@@ -442,41 +481,6 @@ export default function TournamentDetail() {
                           Disable Sharing
                         </Button>
                       </div>
-
-                      {groups.length > 0 && (
-                        <div className="border-t pt-4 mt-2" data-testid="section-board-links">
-                          <p className="text-sm font-medium mb-3 flex items-center gap-2">
-                            <Target className="w-4 h-4 text-primary" />
-                            Board-Specific Links (for scoring app)
-                          </p>
-                          <div className="space-y-2">
-                            {[...groups].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((group: any, idx: number) => {
-                              const boardUrl = `${window.location.origin}/public/t/${tournament.shareToken}/board/${idx + 1}`;
-                              return (
-                                <div key={group.id} className="flex items-center gap-2" data-testid={`board-link-${idx + 1}`}>
-                                  <span className="text-xs text-muted-foreground w-20 shrink-0">Board {idx + 1}</span>
-                                  <Input readOnly value={boardUrl} className="text-xs h-8" />
-                                  <Button 
-                                    size="icon" 
-                                    variant="ghost" 
-                                    className="h-8 w-8 shrink-0"
-                                    data-testid={`button-copy-board-${idx + 1}`}
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(boardUrl);
-                                      toast({ title: `Board ${idx + 1} link copied!` });
-                                    }}
-                                  >
-                                    <Copy className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Each board link shows only that group's matches and standings.
-                          </p>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
