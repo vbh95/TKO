@@ -289,6 +289,22 @@ export async function registerRoutes(
      res.sendStatus(204);
   });
 
+  // === MATCH NOTES (admin) ===
+  app.get('/api/matches/:matchId/notes', isAuthenticated, async (req, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      const match = await storage.getMatch(matchId);
+      if (!match) return res.status(404).json({ message: "Match not found" });
+      const tournament = await storage.getTournament(match.tournamentId);
+      if (!tournament || tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+      const note = await storage.getMatchNote(matchId);
+      res.json(note || null);
+    } catch (err) {
+      console.error("Match notes error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // === MATCHES ===
   app.put(api.matches.update.path, isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);

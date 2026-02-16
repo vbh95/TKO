@@ -21,7 +21,8 @@ import {
   Wifi,
   WifiOff,
   QrCode,
-  Trash2
+  Trash2,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,91 @@ import { useSocket } from "@/hooks/use-socket";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Match, Player, GroupMembership, BoardSession } from "@shared/schema";
 import { cn } from "@/lib/utils";
+
+function AdminMatchStats({ matchId, playerAName, playerBName }: { matchId: number; playerAName: string; playerBName: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [notes, setNotes] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false);
+
+  const handleToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const willExpand = !expanded;
+    setExpanded(willExpand);
+    if (willExpand && !fetched) {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/matches/${matchId}/notes`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setNotes(data);
+        }
+      } catch {}
+      setLoading(false);
+      setFetched(true);
+    }
+  };
+
+  const threeDartAvgA = notes?.totalVisitsA > 0 ? ((notes.totalScoredA / notes.totalVisitsA) * 3).toFixed(1) : '-';
+  const threeDartAvgB = notes?.totalVisitsB > 0 ? ((notes.totalScoredB / notes.totalVisitsB) * 3).toFixed(1) : '-';
+  const checkoutPctA = notes?.checkoutAttemptsA > 0 ? ((notes.checkoutSuccessA / notes.checkoutAttemptsA) * 100).toFixed(1) + '%' : '-';
+  const checkoutPctB = notes?.checkoutAttemptsB > 0 ? ((notes.checkoutSuccessB / notes.checkoutAttemptsB) * 100).toFixed(1) + '%' : '-';
+  const statRows = notes ? [
+    { label: '3-Dart Avg', valA: threeDartAvgA, valB: threeDartAvgB },
+    { label: 'Checkout %', valA: checkoutPctA, valB: checkoutPctB },
+    { label: 'Highest Finish', valA: notes.highestFinishA || '-', valB: notes.highestFinishB || '-' },
+    { label: 'Highest Visit', valA: notes.highestVisitA || '-', valB: notes.highestVisitB || '-' },
+    { label: '180s', valA: notes.ton80sA ?? '-', valB: notes.ton80sB ?? '-' },
+    { label: '140+', valA: notes.ton40sA ?? '-', valB: notes.ton40sB ?? '-' },
+    { label: '100+', valA: notes.tonsA ?? '-', valB: notes.tonsB ?? '-' },
+    { label: 'Darts Thrown', valA: notes.totalVisitsA != null ? notes.totalVisitsA * 3 : '-', valB: notes.totalVisitsB != null ? notes.totalVisitsB * 3 : '-' },
+  ] : [];
+
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={handleToggle}
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-1 w-full justify-center"
+        data-testid={`button-match-stats-${matchId}`}
+      >
+        Stats
+        <ChevronDown className={cn("w-3 h-3 transition-transform", expanded && "rotate-180")} />
+      </button>
+      {expanded && (
+        <div className="mt-2 border-t pt-2">
+          {loading && (
+            <div className="flex items-center justify-center py-2">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {!loading && notes && statRows.length > 0 && (
+            <div className="grid grid-cols-3 gap-0.5 text-xs">
+              <div className="text-right font-semibold text-muted-foreground truncate">{playerAName}</div>
+              <div className="text-center font-semibold text-muted-foreground">Stat</div>
+              <div className="text-left font-semibold text-muted-foreground truncate">{playerBName}</div>
+              {statRows.map(({ label, valA, valB }) => {
+                const aNum = parseFloat(String(valA));
+                const bNum = parseFloat(String(valB));
+                const aWins = !isNaN(aNum) && !isNaN(bNum) && aNum > bNum;
+                const bWins = !isNaN(aNum) && !isNaN(bNum) && bNum > aNum;
+                return (
+                  <div key={label} className="contents">
+                    <div className={cn("text-right tabular-nums py-0.5", aWins && "text-green-600 dark:text-green-400 font-semibold")}>{valA}</div>
+                    <div className="text-center text-muted-foreground py-0.5">{label}</div>
+                    <div className={cn("text-left tabular-nums py-0.5", bWins && "text-green-600 dark:text-green-400 font-semibold")}>{valB}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!loading && !notes && (
+            <p className="text-xs text-muted-foreground text-center py-1">No stats available</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TournamentDetail() {
   const { id } = useParams();
@@ -615,6 +701,13 @@ export default function TournamentDetail() {
                                     </div>
                                   </div>
                                 </div>
+                                {match.status === 'COMPLETED' && (
+                                  <AdminMatchStats
+                                    matchId={match.id}
+                                    playerAName={playerA?.name || "TBD"}
+                                    playerBName={playerB?.name || "TBD"}
+                                  />
+                                )}
                               </div>
                             );
                           })}
@@ -696,6 +789,15 @@ export default function TournamentDetail() {
                                 {match.scoreB || 0}
                               </div>
                             </div>
+                            {match.status === 'COMPLETED' && (
+                              <div className="px-4 pb-3">
+                                <AdminMatchStats
+                                  matchId={match.id}
+                                  playerAName={labelA}
+                                  playerBName={labelB}
+                                />
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       );
