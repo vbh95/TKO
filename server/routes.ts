@@ -532,6 +532,38 @@ export async function registerRoutes(
     }
   });
 
+  // === MATCH SCORER UPDATE ===
+  app.patch('/api/matches/:id/scorer', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const match = await storage.getMatch(id);
+      if (!match) return res.status(404).json({ message: "Not found" });
+
+      const tournament = await storage.getTournament(match.tournamentId);
+      if (!tournament || tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+
+      const { scorerId } = req.body;
+
+      if (scorerId !== null && scorerId !== undefined) {
+        const scorerIdNum = parseInt(scorerId);
+        if (isNaN(scorerIdNum)) return res.status(400).json({ message: "Invalid scorer ID" });
+
+        const tournamentPlayers = await storage.getPlayersByTournamentId(match.tournamentId);
+        const validPlayer = tournamentPlayers.find(p => p.id === scorerIdNum);
+        if (!validPlayer) return res.status(400).json({ message: "Scorer must be a player in this tournament" });
+
+        const updatedMatch = await storage.updateMatch(id, { scorerId: scorerIdNum });
+        return res.json(updatedMatch);
+      }
+
+      const updatedMatch = await storage.updateMatch(id, { scorerId: null });
+      res.json(updatedMatch);
+    } catch (err) {
+      console.error("Update scorer error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // === MATCHES ===
   app.put(api.matches.update.path, isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);

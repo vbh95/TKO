@@ -37,11 +37,12 @@ interface LiveScoring {
   lastScoreB: number | null;
 }
 
-function CompletedMatchRow({ match, playerA, playerB, shareToken }: {
+function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: {
   match: any;
   playerA: any;
   playerB: any;
   shareToken: string;
+  scorerName?: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState<any>(null);
@@ -125,6 +126,12 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken }: {
           <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform ml-2", expanded && "rotate-180")} />
         )}
       </div>
+
+      {scorerName && (
+        <div className="px-4 pb-1 text-[11px] text-muted-foreground text-center" data-testid={`public-match-scorer-${match.id}`}>
+          Scorer: {scorerName}
+        </div>
+      )}
 
       {expanded && isCompleted && (
         <div className="border-t bg-muted/20 px-4 py-3">
@@ -815,6 +822,7 @@ export default function PublicView() {
                           playerA={playerA}
                           playerB={playerB}
                           shareToken={shareToken || ''}
+                          scorerName={match.scorerId ? getPlayer(match.scorerId)?.name : null}
                         />
                       );
                     })}

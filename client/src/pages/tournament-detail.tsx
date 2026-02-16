@@ -802,12 +802,50 @@ export default function TournamentDetail() {
                                     </div>
                                   </div>
                                 </div>
-                                {match.scorerId && (
-                                  <div className="mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground flex items-center gap-1" data-testid={`match-scorer-${match.id}`}>
-                                    <ClipboardList className="w-3 h-3" />
-                                    Scorer: {getPlayer(match.scorerId)?.name || "Unknown"}
-                                  </div>
-                                )}
+                                <div className="mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground" data-testid={`match-scorer-${match.id}`}>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="flex items-center gap-1 hover:text-foreground transition-colors" onClick={(e) => e.stopPropagation()} data-testid={`button-edit-scorer-${match.id}`}>
+                                        <ClipboardList className="w-3 h-3" />
+                                        Scorer: {match.scorerId ? (getPlayer(match.scorerId)?.name || "Unknown") : "None"}
+                                        <Pencil className="w-2.5 h-2.5 ml-0.5 opacity-50" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                                      {(() => {
+                                        const memberIds = groupMemberships
+                                          .filter((gm: any) => gm.groupId === match.groupId)
+                                          .map((gm: any) => gm.playerId);
+                                        const groupPlayers = players.filter((p: Player) => memberIds.includes(p.id));
+                                        return groupPlayers.map((p: Player) => (
+                                          <DropdownMenuItem
+                                            key={p.id}
+                                            onClick={async () => {
+                                              try {
+                                                await apiRequest('PATCH', `/api/matches/${match.id}/scorer`, { scorerId: p.id });
+                                                queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
+                                              } catch {}
+                                            }}
+                                            data-testid={`scorer-option-${p.id}`}
+                                          >
+                                            {p.name} {p.id === match.scorerId && <Check className="w-3 h-3 ml-auto" />}
+                                          </DropdownMenuItem>
+                                        ));
+                                      })()}
+                                      <DropdownMenuItem
+                                        onClick={async () => {
+                                          try {
+                                            await apiRequest('PATCH', `/api/matches/${match.id}/scorer`, { scorerId: null });
+                                            queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
+                                          } catch {}
+                                        }}
+                                        data-testid={`scorer-option-none-${match.id}`}
+                                      >
+                                        None {!match.scorerId && <Check className="w-3 h-3 ml-auto" />}
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
                                 {match.status === 'COMPLETED' && (
                                   <AdminMatchStats
                                     matchId={match.id}
