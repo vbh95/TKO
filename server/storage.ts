@@ -64,6 +64,9 @@ export interface IStorage {
   getBoardSessionsByTournamentId(tournamentId: number): Promise<BoardSession[]>;
   deleteBoardSession(id: number): Promise<void>;
   
+  // Reset
+  resetTournamentData(tournamentId: number): Promise<void>;
+  
   // Session Store
   sessionStore: session.Store;
 }
@@ -272,6 +275,12 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBoardSession(id: number): Promise<void> {
     await db.delete(boardSessions).where(eq(boardSessions.id, id));
+  }
+
+  async resetTournamentData(tournamentId: number): Promise<void> {
+    await db.delete(boardSessions).where(eq(boardSessions.tournamentId, tournamentId));
+    await db.delete(matches).where(eq(matches.tournamentId, tournamentId));
+    await db.delete(groups).where(eq(groups.tournamentId, tournamentId));
   }
 }
 

@@ -10,7 +10,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { generateMatches } from "./match-generator";
 import type { TournamentSettings } from "@shared/schema";
-import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache } from "./socket";
+import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament } from "./socket";
 
 const scryptAsync = promisify(scrypt);
 
@@ -504,6 +504,47 @@ export async function registerRoutes(
 
      const updated = await storage.updateTournament(id, req.body);
      res.json(updated);
+  });
+
+  app.post('/api/tournaments/:id/reset', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tournament = await storage.getTournament(id);
+      if (!tournament) return res.status(404).json({ message: "Not found" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+
+      const { name, settings } = req.body;
+
+      await storage.updateTournament(id, {
+        ...(name ? { name } : {}),
+        ...(settings ? { settings } : {}),
+      });
+
+      const updatedTournament = await storage.getTournament(id);
+
+      clearLiveScoringForTournament(id);
+
+      await storage.resetTournamentData(id);
+
+      const existingPlayers = await storage.getPlayersByTournamentId(id);
+
+      for (let i = existingPlayers.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [existingPlayers[i], existingPlayers[j]] = [existingPlayers[j], existingPlayers[i]];
+      }
+
+      await generateMatches(id, existingPlayers, updatedTournament!.type, (updatedTournament!.settings || {}) as TournamentSettings);
+
+      await storage.updateTournament(id, { status: "IN_PROGRESS" });
+
+      const finalTournament = await storage.getTournament(id);
+      emitTournamentUpdate(id, finalTournament?.shareToken || null, finalTournament);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Tournament reset error:", err);
+      res.status(500).json({ message: "Failed to reset tournament" });
+    }
   });
 
   app.delete(api.tournaments.delete.path, isAuthenticated, async (req, res) => {

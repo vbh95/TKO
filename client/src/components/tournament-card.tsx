@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { Trophy, Calendar, Users, ArrowRight, Trash2, Settings, Loader2 } from "lucide-react";
+import { Trophy, Calendar, Users, ArrowRight, Trash2, Settings, Loader2, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -157,6 +157,7 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
 function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tournament: Tournament; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [showResetWarning, setShowResetWarning] = useState(false);
 
   const settings = (tournament.settings || {}) as any;
 
@@ -182,45 +183,71 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
       setPointsForWin(s.pointsForWin ?? 2);
       setPointsForLoss(s.pointsForLoss ?? 0);
       setSeeded(s.seeded ?? true);
+      setShowResetWarning(false);
     }
   }, [open, tournament]);
 
   const type = tournament.type;
   const hasGroups = type === "ROUND_ROBIN" || type === "MULTI_STAGE";
   const hasKnockout = type === "KNOCKOUT" || type === "DOUBLE_ELIMINATION" || type === "MULTI_STAGE";
+  const isActive = tournament.status === "IN_PROGRESS" || tournament.status === "COMPLETED";
 
-  const handleSave = async () => {
+  const buildNewSettings = () => {
+    const newSettings = { ...settings };
+    if (hasGroups) {
+      newSettings.groupBestOf = groupBestOf;
+      newSettings.pointsForWin = pointsForWin;
+      newSettings.pointsForLoss = pointsForLoss;
+    }
+    if (hasKnockout) {
+      newSettings.knockoutBestOfByRound = {
+        quarterFinal: qfBestOf,
+        semiFinal: sfBestOf,
+        final: fBestOf,
+      };
+      newSettings.seeded = seeded;
+      if (type === "DOUBLE_ELIMINATION") {
+        newSettings.knockoutBestOf = knockoutBestOf;
+      }
+    }
+    return newSettings;
+  };
+
+  const handleSave = () => {
+    if (isActive) {
+      setShowResetWarning(true);
+      return;
+    }
+    doSave(false);
+  };
+
+  const doSave = async (reset: boolean) => {
     setSaving(true);
+    setShowResetWarning(false);
     try {
-      const newSettings = { ...settings };
+      const newSettings = buildNewSettings();
 
-      if (hasGroups) {
-        newSettings.groupBestOf = groupBestOf;
-        newSettings.pointsForWin = pointsForWin;
-        newSettings.pointsForLoss = pointsForLoss;
+      if (reset) {
+        await apiRequest('POST', `/api/tournaments/${tournament.id}/reset`, {
+          name,
+          settings: newSettings,
+        });
+      } else {
+        await apiRequest('PUT', `/api/tournaments/${tournament.id}`, {
+          name,
+          settings: newSettings,
+        });
       }
-
-      if (hasKnockout) {
-        newSettings.knockoutBestOfByRound = {
-          quarterFinal: qfBestOf,
-          semiFinal: sfBestOf,
-          final: fBestOf,
-        };
-        newSettings.seeded = seeded;
-        if (type === "DOUBLE_ELIMINATION") {
-          newSettings.knockoutBestOf = knockoutBestOf;
-        }
-      }
-
-      await apiRequest('PUT', `/api/tournaments/${tournament.id}`, {
-        name,
-        settings: newSettings,
-      });
 
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
 
-      toast({ title: "Settings saved", description: "Tournament settings have been updated." });
+      toast({
+        title: reset ? "Tournament restarted" : "Settings saved",
+        description: reset
+          ? "All results have been cleared and the tournament has restarted with new settings."
+          : "Tournament settings have been updated.",
+      });
       onOpenChange(false);
     } catch {
       toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
@@ -381,15 +408,53 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-settings">
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving || !name.trim()} data-testid="button-save-settings">
-            {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Save Changes
-          </Button>
-        </DialogFooter>
+        {showResetWarning && (
+          <div className="border-2 border-destructive/50 bg-destructive/10 rounded-xl p-4 space-y-3" data-testid="reset-warning">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-sm text-destructive">Warning: This will restart the tournament</p>
+                <p className="text-xs text-muted-foreground">
+                  Saving these changes will reset all match results, scores, and progress. 
+                  The tournament will start again from scratch with the updated settings. 
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowResetWarning(false)}
+                data-testid="button-cancel-reset"
+              >
+                Go Back
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => doSave(true)}
+                disabled={saving || !name.trim()}
+                data-testid="button-confirm-reset"
+              >
+                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Reset & Restart Tournament
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!showResetWarning && (
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-settings">
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving || !name.trim()} data-testid="button-save-settings">
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

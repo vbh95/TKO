@@ -140,6 +140,16 @@ export function clearLiveScoringCache(matchId: number) {
   liveScoringCache.delete(matchId);
 }
 
+export function clearLiveScoringForTournament(tournamentId: number) {
+  const toDelete: number[] = [];
+  liveScoringCache.forEach((data, matchId) => {
+    if (data.tournamentId === tournamentId) {
+      toDelete.push(matchId);
+    }
+  });
+  toDelete.forEach(id => liveScoringCache.delete(id));
+}
+
 export function getLiveScoringForTournament(tournamentId: number): any[] {
   const results: any[] = [];
   liveScoringCache.forEach((data) => {
