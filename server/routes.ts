@@ -173,7 +173,20 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     }
   }
 
+  const promotedPerGroup = 2;
+  const promotedPlayerIds = new Set<number>();
+  for (let pos = 0; pos < promotedPerGroup && pos < standings.length; pos++) {
+    promotedPlayerIds.add(standings[pos].id);
+  }
+  const completedGroupMemberIds = memberships
+    .filter(gm => gm.groupId === completedGroupId)
+    .map(gm => gm.playerId);
+  const nonPromotedFromGroup = playersList.filter(
+    p => completedGroupMemberIds.includes(p.id) && !promotedPlayerIds.has(p.id)
+  );
+
   const updatedQFIds: number[] = [];
+  let lastAssignedScorerId: number | null = null;
   for (let i = 0; i < firstRoundMatches.length && i < pairings.length; i++) {
     const pairing = pairings[i];
     const updates: any = {};
@@ -190,6 +203,18 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
 
     if (needsUpdate) {
       updates.boardNumber = i + 1;
+
+      if (pairing.aGroupIdx === completedGroupIdx || pairing.bGroupIdx === completedGroupIdx) {
+        let scorerPool = nonPromotedFromGroup.filter(p => p.id !== lastAssignedScorerId);
+        if (scorerPool.length === 0) scorerPool = [...nonPromotedFromGroup];
+        if (scorerPool.length > 0) {
+          const chosen = scorerPool[Math.floor(Math.random() * scorerPool.length)];
+          updates.scorerId = chosen.id;
+          updates.scorerName = chosen.name;
+          lastAssignedScorerId = chosen.id;
+        }
+      }
+
       await storage.updateMatch(firstRoundMatches[i].id, updates);
       updatedQFIds.push(firstRoundMatches[i].id);
     }
