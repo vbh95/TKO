@@ -938,7 +938,7 @@ export default function TournamentDetail() {
                     <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
                   </>
                 )}
-                <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
+                <TabsTrigger value="players" data-testid="tab-players">Players/Tournament Results</TabsTrigger>
               </TabsList>
 
               <TabsContent value="live" className="space-y-6" data-testid="content-live">
