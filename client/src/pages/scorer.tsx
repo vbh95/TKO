@@ -882,13 +882,13 @@ export default function ScorerPage() {
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center px-6">
-          <Target className="w-14 h-14 text-yellow-400 mb-4" />
-          <h2 className="text-white text-2xl font-bold mb-1">Throw for the Bull</h2>
-          <p className="text-gray-400 text-sm mb-8">Select player to start</p>
+          <Target className="w-14 h-14 md:w-20 md:h-20 text-yellow-400 mb-4" />
+          <h2 className="text-white text-2xl md:text-4xl font-bold mb-1">Throw for the Bull</h2>
+          <p className="text-gray-400 text-sm md:text-lg mb-8">Select player to start</p>
 
-          <div className="w-full max-w-sm space-y-3">
+          <div className="w-full max-w-sm md:max-w-md space-y-3 md:space-y-4">
             <button
-              className="w-full h-16 rounded-xl bg-[#3a6635] border border-[#4a8045] text-white text-lg font-bold touch-manipulation active:bg-[#4a7a3a] transition-colors"
+              className="w-full h-16 md:h-20 rounded-xl bg-[#3a6635] border border-[#4a8045] text-white text-lg md:text-2xl font-bold touch-manipulation active:bg-[#4a7a3a] transition-colors"
               onClick={() => handleFirstThrower('A')}
               disabled={startMatchMutation.isPending}
               data-testid="button-first-thrower-a"
@@ -896,10 +896,10 @@ export default function ScorerPage() {
               {playerA?.name || 'Player 1'}
             </button>
 
-            <p className="text-gray-500 text-center text-sm font-medium">vs</p>
+            <p className="text-gray-500 text-center text-sm md:text-lg font-medium">vs</p>
 
             <button
-              className="w-full h-16 rounded-xl bg-[#3a6635] border border-[#4a8045] text-white text-lg font-bold touch-manipulation active:bg-[#4a7a3a] transition-colors"
+              className="w-full h-16 md:h-20 rounded-xl bg-[#3a6635] border border-[#4a8045] text-white text-lg md:text-2xl font-bold touch-manipulation active:bg-[#4a7a3a] transition-colors"
               onClick={() => handleFirstThrower('B')}
               disabled={startMatchMutation.isPending}
               data-testid="button-first-thrower-b"
@@ -953,7 +953,7 @@ export default function ScorerPage() {
 
     return (
       <div className="min-h-[100dvh] bg-[#1a1a1a] flex flex-col overflow-hidden" data-testid="scorer-match-view">
-        <div className="bg-primary text-primary-foreground py-2 px-3 shadow-lg shrink-0">
+        <div className="bg-primary text-primary-foreground py-2 md:py-3 px-3 shadow-lg shrink-0">
           <div className="flex items-center gap-2 max-w-4xl mx-auto">
             <Button
               variant="ghost"
@@ -968,7 +968,7 @@ export default function ScorerPage() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-primary-foreground/80 truncate">
+              <p className="text-xs md:text-sm text-primary-foreground/80 truncate">
                 {tournament.name} — {group.name} — Board {boardNumber}
               </p>
             </div>
@@ -991,7 +991,7 @@ export default function ScorerPage() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col w-full max-w-lg mx-auto px-3 py-1 overflow-hidden">
+        <div className="flex-1 flex flex-col w-full max-w-lg md:max-w-2xl mx-auto px-3 md:px-6 py-1 overflow-hidden">
           {legVisits.length === 0 && legsWonA === 0 && legsWonB === 0 && (
             <div className="flex justify-center mb-1 shrink-0">
               <button
@@ -1004,45 +1004,45 @@ export default function ScorerPage() {
               </button>
             </div>
           )}
-          <div className="text-center py-1 shrink-0">
-            <p className="text-gray-400 text-xs uppercase tracking-wider">
+          <div className="text-center py-1 md:py-2 shrink-0">
+            <p className="text-gray-400 text-xs md:text-sm uppercase tracking-wider">
               Leg {currentLeg} — Best of {matchBestOf}
             </p>
             <div className="tabular-nums mt-0.5">
-              <span className={cn("text-3xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
-              <span className="text-gray-600 mx-2 text-2xl">-</span>
-              <span className={cn("text-3xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
+              <span className={cn("text-3xl md:text-5xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
+              <span className="text-gray-600 mx-2 text-2xl md:text-4xl">-</span>
+              <span className={cn("text-3xl md:text-5xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mb-2 shrink-0">
+          <div className="grid grid-cols-2 gap-2 md:gap-4 mb-2 md:mb-3 shrink-0">
             <div
               className={cn(
-                "rounded-xl p-3 transition-all",
+                "rounded-xl p-3 md:p-5 transition-all",
                 currentThrower === leftThrower
                   ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a]"
                   : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a]"
               )}
               data-testid="panel-player-a"
             >
-              <div className="h-4 mb-1">
+              <div className="h-4 md:h-6 mb-1">
                 {currentThrower === leftThrower && (
                   <div className="flex items-center gap-1">
-                    <Eye className="w-3 h-3 text-white/90" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Throwing</span>
+                    <Eye className="w-3 h-3 md:w-4 md:h-4 text-white/90" />
+                    <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/90">Throwing</span>
                   </div>
                 )}
               </div>
-              <p className="text-sm font-bold text-white/90 truncate" data-testid="text-player-a-name">
+              <p className="text-sm md:text-lg font-bold text-white/90 truncate" data-testid="text-player-a-name">
                 {leftPlayer?.name || "Player 1"}
               </p>
               <div
-                className="text-6xl font-bold text-white tabular-nums leading-none mt-1"
+                className="text-6xl md:text-8xl font-bold text-white tabular-nums leading-none mt-1 md:mt-2"
                 data-testid="text-remaining-a"
               >
                 {leftRemaining}
               </div>
-              <div className="mt-2 space-y-0.5 text-xs">
+              <div className="mt-2 md:mt-3 space-y-0.5 md:space-y-1 text-xs md:text-sm">
                 <div className="flex justify-between text-white/60">
                   <span>3-dart avg.</span>
                   <span className="text-white font-medium tabular-nums">{leftAvg}</span>
@@ -1060,31 +1060,31 @@ export default function ScorerPage() {
 
             <div
               className={cn(
-                "rounded-xl p-3 transition-all",
+                "rounded-xl p-3 md:p-5 transition-all",
                 currentThrower === rightThrower
                   ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a]"
                   : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a]"
               )}
               data-testid="panel-player-b"
             >
-              <div className="h-4 mb-1">
+              <div className="h-4 md:h-6 mb-1">
                 {currentThrower === rightThrower && (
                   <div className="flex items-center gap-1">
-                    <Eye className="w-3 h-3 text-white/90" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Throwing</span>
+                    <Eye className="w-3 h-3 md:w-4 md:h-4 text-white/90" />
+                    <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/90">Throwing</span>
                   </div>
                 )}
               </div>
-              <p className="text-sm font-bold text-white/90 truncate" data-testid="text-player-b-name">
+              <p className="text-sm md:text-lg font-bold text-white/90 truncate" data-testid="text-player-b-name">
                 {rightPlayer?.name || "Player 2"}
               </p>
               <div
-                className="text-6xl font-bold text-white tabular-nums leading-none mt-1"
+                className="text-6xl md:text-8xl font-bold text-white tabular-nums leading-none mt-1 md:mt-2"
                 data-testid="text-remaining-b"
               >
                 {rightRemaining}
               </div>
-              <div className="mt-2 space-y-0.5 text-xs">
+              <div className="mt-2 md:mt-3 space-y-0.5 md:space-y-1 text-xs md:text-sm">
                 <div className="flex justify-between text-white/60">
                   <span>3-dart avg.</span>
                   <span className="text-white font-medium tabular-nums">{rightAvg}</span>
@@ -1102,19 +1102,19 @@ export default function ScorerPage() {
           </div>
 
           {bustMessage && (
-            <div className="bg-red-600 text-white text-center py-2 rounded-lg mb-2 text-sm font-bold animate-pulse shrink-0" data-testid="text-bust">
+            <div className="bg-red-600 text-white text-center py-2 md:py-3 rounded-lg mb-2 text-sm md:text-lg font-bold animate-pulse shrink-0" data-testid="text-bust">
               {bustMessage}
             </div>
           )}
 
           {impossibleWarning && (
-            <div className="bg-[#222] border-2 border-yellow-500 rounded-xl p-4 mb-2 shrink-0" data-testid="impossible-warning">
-              <p className="text-yellow-400 font-bold text-center text-base mb-1">
+            <div className="bg-[#222] border-2 border-yellow-500 rounded-xl p-4 md:p-6 mb-2 shrink-0" data-testid="impossible-warning">
+              <p className="text-yellow-400 font-bold text-center text-base md:text-xl mb-1">
                 {impossibleWarning.startsWith("BUST") ? "BUST!" : "Impossible Score"}
               </p>
-              <p className="text-gray-300 text-center text-sm mb-3">{impossibleWarning}</p>
+              <p className="text-gray-300 text-center text-sm md:text-base mb-3">{impossibleWarning}</p>
               <button
-                className="w-full h-11 rounded-xl bg-yellow-600 text-white font-semibold text-base touch-manipulation active:bg-yellow-700 transition-colors"
+                className="w-full h-11 md:h-14 rounded-xl bg-yellow-600 text-white font-semibold text-base md:text-lg touch-manipulation active:bg-yellow-700 transition-colors"
                 onClick={() => {
                   setImpossibleWarning(null);
                   setInputValue("");
@@ -1127,24 +1127,24 @@ export default function ScorerPage() {
           )}
 
           {pendingCheckout && !pendingDartsAtDouble && (
-            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 mb-2 shrink-0" data-testid="checkout-confirm">
-              <div className="text-center mb-3">
-                <Trophy className="w-8 h-8 text-yellow-400 mx-auto mb-1" />
-                <p className="text-white font-bold text-lg">Checkout!</p>
-                <p className="text-gray-400 text-sm">
+            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 md:p-6 mb-2 shrink-0" data-testid="checkout-confirm">
+              <div className="text-center mb-3 md:mb-4">
+                <Trophy className="w-8 h-8 md:w-12 md:h-12 text-yellow-400 mx-auto mb-1" />
+                <p className="text-white font-bold text-lg md:text-2xl">Checkout!</p>
+                <p className="text-gray-400 text-sm md:text-base">
                   {pendingCheckout.player === 'A' ? (getPlayer(activeMatch.playerAId)?.name || 'Player 1') : (getPlayer(activeMatch.playerBId)?.name || 'Player 2')} checked out
                 </p>
               </div>
               <div className="flex gap-3">
                 <button
-                  className="flex-1 h-12 rounded-xl bg-[#3a3a3a] text-gray-300 font-semibold text-base touch-manipulation active:bg-[#4a4a4a] transition-colors"
+                  className="flex-1 h-12 md:h-16 rounded-xl bg-[#3a3a3a] text-gray-300 font-semibold text-base md:text-lg touch-manipulation active:bg-[#4a4a4a] transition-colors"
                   onClick={cancelCheckout}
                   data-testid="button-cancel-checkout"
                 >
                   Cancel
                 </button>
                 <button
-                  className="flex-1 h-12 rounded-xl bg-[#4a7a3a] text-white font-semibold text-base touch-manipulation active:bg-[#5a8a4a] transition-colors"
+                  className="flex-1 h-12 md:h-16 rounded-xl bg-[#4a7a3a] text-white font-semibold text-base md:text-lg touch-manipulation active:bg-[#5a8a4a] transition-colors"
                   onClick={handleConfirmCheckoutClick}
                   disabled={updateScoreMutation.isPending}
                   data-testid="button-confirm-checkout"
@@ -1156,17 +1156,17 @@ export default function ScorerPage() {
           )}
 
           {pendingCheckout && pendingDartsAtDouble && (
-            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 mb-2 shrink-0" data-testid="darts-at-double">
-              <div className="text-center mb-3">
-                <Target className="w-8 h-8 text-yellow-400 mx-auto mb-1" />
-                <p className="text-white font-bold text-lg">Darts at Double?</p>
-                <p className="text-gray-400 text-sm">How many darts were used on the double</p>
+            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 md:p-6 mb-2 shrink-0" data-testid="darts-at-double">
+              <div className="text-center mb-3 md:mb-4">
+                <Target className="w-8 h-8 md:w-12 md:h-12 text-yellow-400 mx-auto mb-1" />
+                <p className="text-white font-bold text-lg md:text-2xl">Darts at Double?</p>
+                <p className="text-gray-400 text-sm md:text-base">How many darts were used on the double</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-3 md:gap-4">
                 {[1, 2, 3].map(n => (
                   <button
                     key={n}
-                    className="flex-1 h-14 rounded-xl bg-[#4a7a3a] text-white font-bold text-xl touch-manipulation active:bg-[#5a8a4a] transition-colors"
+                    className="flex-1 h-14 md:h-20 rounded-xl bg-[#4a7a3a] text-white font-bold text-xl md:text-3xl touch-manipulation active:bg-[#5a8a4a] transition-colors"
                     onClick={() => confirmCheckout(n)}
                     disabled={updateScoreMutation.isPending}
                     data-testid={`button-darts-at-double-${n}`}
@@ -1179,12 +1179,12 @@ export default function ScorerPage() {
           )}
 
           {showQuickScores && !pendingCheckout && (
-            <div className="grid grid-cols-4 gap-1.5 mb-2 shrink-0">
+            <div className="grid grid-cols-4 gap-1.5 md:gap-2 mb-2 shrink-0">
               {QUICK_SCORES.map(qs => (
                 <button
                   key={qs}
                   className={cn(
-                    "h-11 rounded-lg text-sm font-bold touch-manipulation transition-colors",
+                    "h-11 md:h-14 rounded-lg text-sm md:text-lg font-bold touch-manipulation transition-colors",
                     qs === 180
                       ? "bg-yellow-700/40 text-yellow-300 border border-yellow-600/50"
                       : "bg-[#2a2a2a] text-gray-300 border border-[#3a3a3a]"
@@ -1200,16 +1200,16 @@ export default function ScorerPage() {
           )}
 
           <div className={cn("flex-1 flex flex-col justify-end pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
-            <div className="flex gap-1.5 items-center mb-1.5 shrink-0">
+            <div className="flex gap-1.5 md:gap-2 items-center mb-1.5 md:mb-2 shrink-0">
               <button
-                className="w-11 h-11 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
+                className="w-11 h-11 md:w-14 md:h-14 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
                 onClick={() => setShowQuickScores(!showQuickScores)}
                 data-testid="button-toggle-quick"
               >
-                <Grid2x2 className="w-5 h-5 text-gray-400" />
+                <Grid2x2 className="w-5 h-5 md:w-6 md:h-6 text-gray-400" />
               </button>
               <div
-                className="flex-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl px-4 h-11 text-lg font-medium tabular-nums flex items-center justify-between"
+                className="flex-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl px-4 h-11 md:h-14 text-lg md:text-2xl font-medium tabular-nums flex items-center justify-between"
                 data-testid="text-input-value"
               >
                 <span className={inputValue ? "text-white" : "text-gray-500"}>{inputValue || 'Enter a score'}</span>
@@ -1219,18 +1219,18 @@ export default function ScorerPage() {
                     onClick={() => setInputValue(prev => prev.slice(0, -1))}
                     data-testid="button-backspace"
                   >
-                    <Delete className="w-5 h-5 text-gray-400" />
+                    <Delete className="w-5 h-5 md:w-6 md:h-6 text-gray-400" />
                   </button>
                 )}
               </div>
             </div>
 
             {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
-              <div key={ri} className="grid grid-cols-3 gap-1.5 mb-1.5">
+              <div key={ri} className="grid grid-cols-3 gap-1.5 md:gap-2 mb-1.5 md:mb-2">
                 {row.map(key => (
                   <button
                     key={key}
-                    className="h-[4.2rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                    className="h-[4.2rem] md:h-[5.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
                     onClick={() => handleNumpad(key)}
                     disabled={updateScoreMutation.isPending}
                     data-testid={`button-numpad-${key}`}
@@ -1240,17 +1240,17 @@ export default function ScorerPage() {
                 ))}
               </div>
             ))}
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5 md:gap-2">
               <button
-                className="h-[4.2rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                className="h-[4.2rem] md:h-[5.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] transition-colors"
                 onClick={handleUndo}
                 disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                 data-testid="button-undo"
               >
-                <Undo2 className={cn("w-6 h-6", legVisits.length === 0 ? "text-gray-600" : "text-gray-300")} />
+                <Undo2 className={cn("w-6 h-6 md:w-8 md:h-8", legVisits.length === 0 ? "text-gray-600" : "text-gray-300")} />
               </button>
               <button
-                className="h-[4.2rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                className="h-[4.2rem] md:h-[5.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
                 onClick={() => handleNumpad('0')}
                 disabled={updateScoreMutation.isPending}
                 data-testid="button-numpad-0"
@@ -1258,12 +1258,12 @@ export default function ScorerPage() {
                 0
               </button>
               <button
-                className="h-[4.2rem] rounded-xl flex items-center justify-center touch-manipulation transition-colors bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a]"
+                className="h-[4.2rem] md:h-[5.5rem] rounded-xl flex items-center justify-center touch-manipulation transition-colors bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a]"
                 onClick={() => handleNumpad('OK')}
                 disabled={updateScoreMutation.isPending}
                 data-testid="button-numpad-OK"
               >
-                <Check className="w-7 h-7 text-white" />
+                <Check className="w-7 h-7 md:w-10 md:h-10 text-white" />
               </button>
             </div>
           </div>
