@@ -50,7 +50,7 @@ The project is a single-workspace monorepo with three main directories:
 - **Schema**: Defined in `shared/schema.ts` using Drizzle's `pgTable` definitions with Zod schema generation via `drizzle-zod`
 - **Migration**: Uses `drizzle-kit push` command (`npm run db:push`) to sync schema to database
 - **Connection**: PostgreSQL via `DATABASE_URL` environment variable, using `pg` Pool
-- **Tables**: `users`, `tournaments`, `players`, `groups`, `group_memberships`, `matches`, `match_notes`, `board_sessions`
+- **Tables**: `users`, `tournaments`, `players`, `groups`, `group_memberships`, `matches` (includes `scorerId` for auto-assigned scorers), `match_notes`, `board_sessions`
 - **Key Relationships**: Users own tournaments (cascade delete), tournaments contain players/groups/matches, groups have memberships linking to players
 
 ### Data Model Highlights
