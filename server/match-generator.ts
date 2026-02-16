@@ -32,6 +32,59 @@ function nextPowerOfTwo(n: number): number {
 
 type ScheduledMatch = { playerA: Player; playerB: Player; round: number };
 
+function assignScorersToMatches(
+  scheduled: ScheduledMatch[],
+  groupPlayers: Player[]
+): (number | null)[] {
+  if (groupPlayers.length < 3) {
+    return new Array(scheduled.length).fill(null);
+  }
+
+  const scorerCounts = new Map<number, number>();
+  for (const p of groupPlayers) {
+    scorerCounts.set(p.id, 0);
+  }
+
+  const scorerIds: (number | null)[] = new Array(scheduled.length).fill(null);
+
+  const unscoredPlayers = new Set(groupPlayers.map(p => p.id));
+
+  for (let i = 0; i < scheduled.length; i++) {
+    const current = scheduled[i];
+    const ineligible = new Set<number>();
+    ineligible.add(current.playerA.id);
+    ineligible.add(current.playerB.id);
+
+    const nextMatch = i + 1 < scheduled.length ? scheduled[i + 1] : null;
+    if (nextMatch) {
+      ineligible.add(nextMatch.playerA.id);
+      ineligible.add(nextMatch.playerB.id);
+    }
+
+    let eligible = groupPlayers.filter(p => !ineligible.has(p.id));
+
+    if (eligible.length === 0) {
+      eligible = groupPlayers.filter(
+        p => p.id !== current.playerA.id && p.id !== current.playerB.id
+      );
+    }
+
+    if (eligible.length === 0) continue;
+
+    const unscoredEligible = eligible.filter(p => unscoredPlayers.has(p.id));
+    const pool = unscoredEligible.length > 0 ? unscoredEligible : eligible;
+
+    const minCount = Math.min(...pool.map(p => scorerCounts.get(p.id)!));
+    const candidates = pool.filter(p => scorerCounts.get(p.id)! === minCount);
+    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    scorerIds[i] = chosen.id;
+    scorerCounts.set(chosen.id, scorerCounts.get(chosen.id)! + 1);
+    unscoredPlayers.delete(chosen.id);
+  }
+
+  return scorerIds;
+}
+
 function generateRoundRobinSchedule(players: Player[]): ScheduledMatch[] {
   if (players.length < 2) return [];
 
@@ -176,7 +229,9 @@ export async function generateRoundRobinMatches(
     }
 
     const scheduled = generateRoundRobinSchedule(groupPlayers);
-    for (const sm of scheduled) {
+    const scorerIds = assignScorersToMatches(scheduled, groupPlayers);
+    for (let i = 0; i < scheduled.length; i++) {
+      const sm = scheduled[i];
       await storage.createMatch({
         tournamentId,
         stage: "GROUP",
@@ -190,6 +245,7 @@ export async function generateRoundRobinMatches(
         status: "PENDING",
         winnerId: null,
         order: matchOrder++,
+        scorerId: scorerIds[i],
       });
     }
   }
@@ -400,7 +456,9 @@ export async function generateMultiStageMatches(
     }
 
     const scheduled = generateRoundRobinSchedule(groupPlayers);
-    for (const sm of scheduled) {
+    const scorerIds = assignScorersToMatches(scheduled, groupPlayers);
+    for (let i = 0; i < scheduled.length; i++) {
+      const sm = scheduled[i];
       await storage.createMatch({
         tournamentId,
         stage: "GROUP",
@@ -414,6 +472,7 @@ export async function generateMultiStageMatches(
         status: "PENDING",
         winnerId: null,
         order: matchOrder++,
+        scorerId: scorerIds[i],
       });
     }
   }

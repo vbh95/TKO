@@ -25,7 +25,8 @@ import {
   ChevronDown,
   Pencil,
   Eye,
-  Download
+  Download,
+  ClipboardList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -801,6 +802,12 @@ export default function TournamentDetail() {
                                     </div>
                                   </div>
                                 </div>
+                                {match.scorerId && (
+                                  <div className="mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground flex items-center gap-1" data-testid={`match-scorer-${match.id}`}>
+                                    <ClipboardList className="w-3 h-3" />
+                                    Scorer: {getPlayer(match.scorerId)?.name || "Unknown"}
+                                  </div>
+                                )}
                                 {match.status === 'COMPLETED' && (
                                   <AdminMatchStats
                                     matchId={match.id}
