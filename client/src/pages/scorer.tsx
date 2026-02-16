@@ -1199,7 +1199,7 @@ export default function ScorerPage() {
             </div>
           )}
 
-          <div className={cn("flex-1 flex flex-col justify-end md:justify-normal pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
+          <div className={cn("flex-1 flex flex-col justify-end pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
             <div className="flex gap-1.5 md:gap-2 items-center mb-1.5 md:mb-2 shrink-0">
               <button
                 className="w-11 h-11 md:w-14 md:h-14 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
@@ -1226,11 +1226,11 @@ export default function ScorerPage() {
             </div>
 
             {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
-              <div key={ri} className="grid grid-cols-3 gap-1.5 md:gap-2 mb-1.5 md:mb-2 md:flex-1">
+              <div key={ri} className="grid grid-cols-3 gap-1.5 md:gap-2 mb-1.5 md:mb-2">
                 {row.map(key => (
                   <button
                     key={key}
-                    className="h-[4.2rem] md:h-full rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                    className="h-[4.2rem] md:h-[6.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
                     onClick={() => handleNumpad(key)}
                     disabled={updateScoreMutation.isPending}
                     data-testid={`button-numpad-${key}`}
@@ -1240,9 +1240,9 @@ export default function ScorerPage() {
                 ))}
               </div>
             ))}
-            <div className="grid grid-cols-3 gap-1.5 md:gap-2 md:flex-1">
+            <div className="grid grid-cols-3 gap-1.5 md:gap-2">
               <button
-                className="h-[4.2rem] md:h-full rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                className="h-[4.2rem] md:h-[6.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] transition-colors"
                 onClick={handleUndo}
                 disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                 data-testid="button-undo"
@@ -1250,7 +1250,7 @@ export default function ScorerPage() {
                 <Undo2 className={cn("w-6 h-6 md:w-8 md:h-8", legVisits.length === 0 ? "text-gray-600" : "text-gray-300")} />
               </button>
               <button
-                className="h-[4.2rem] md:h-full rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                className="h-[4.2rem] md:h-[6.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
                 onClick={() => handleNumpad('0')}
                 disabled={updateScoreMutation.isPending}
                 data-testid="button-numpad-0"
@@ -1258,7 +1258,7 @@ export default function ScorerPage() {
                 0
               </button>
               <button
-                className="h-[4.2rem] md:h-full rounded-xl flex items-center justify-center touch-manipulation transition-colors bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a]"
+                className="h-[4.2rem] md:h-[6.5rem] rounded-xl flex items-center justify-center touch-manipulation transition-colors bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a]"
                 onClick={() => handleNumpad('OK')}
                 disabled={updateScoreMutation.isPending}
                 data-testid="button-numpad-OK"
