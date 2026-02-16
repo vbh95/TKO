@@ -5,6 +5,7 @@ import { storage } from "./storage";
 let io: SocketIOServer | null = null;
 
 const boardSocketCounts = new Map<string, number>();
+const liveScoringCache = new Map<number, any>();
 
 export function getIO(): SocketIOServer {
   if (!io) throw new Error("Socket.IO not initialized");
@@ -25,6 +26,10 @@ export function setupSocketIO(httpServer: Server): SocketIOServer {
     socket.on("join:tournament", async (data: { tournamentId: number; userId?: number }) => {
       const tournamentId = typeof data === 'number' ? data : data.tournamentId;
       socket.join(`tournament:${tournamentId}`);
+      const cached = getLiveScoringForTournament(tournamentId);
+      for (const scoring of cached) {
+        socket.emit("leg:scoring", scoring);
+      }
     });
 
     socket.on("join:board", async (data: { tournamentId: number; boardNumber: number; shareToken?: string }) => {
@@ -42,6 +47,10 @@ export function setupSocketIO(httpServer: Server): SocketIOServer {
       const tournament = await storage.getTournamentByShareToken(shareToken);
       if (tournament) {
         socket.join(`public:${shareToken}`);
+        const cached = getLiveScoringForTournament(tournament.id);
+        for (const scoring of cached) {
+          socket.emit("leg:scoring", scoring);
+        }
       }
     });
 
@@ -117,9 +126,26 @@ export function emitBoardMatchUpdate(tournamentId: number, boardNumber: number, 
 
 export function emitLegScoring(tournamentId: number, boardNumber: number, shareToken: string | null, scoringData: any) {
   if (!io) return;
+  if (scoringData.matchId) {
+    liveScoringCache.set(scoringData.matchId, { ...scoringData, tournamentId });
+  }
   io.to(`board:${tournamentId}:${boardNumber}`).emit("leg:scoring", scoringData);
   io.to(`tournament:${tournamentId}`).emit("leg:scoring", scoringData);
   if (shareToken) {
     io.to(`public:${shareToken}`).emit("leg:scoring", scoringData);
   }
+}
+
+export function clearLiveScoringCache(matchId: number) {
+  liveScoringCache.delete(matchId);
+}
+
+export function getLiveScoringForTournament(tournamentId: number): any[] {
+  const results: any[] = [];
+  liveScoringCache.forEach((data) => {
+    if (data.tournamentId === tournamentId) {
+      results.push(data);
+    }
+  });
+  return results;
 }

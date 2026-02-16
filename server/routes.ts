@@ -10,7 +10,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { generateMatches } from "./match-generator";
 import type { TournamentSettings } from "@shared/schema";
-import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring } from "./socket";
+import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache } from "./socket";
 
 const scryptAsync = promisify(scrypt);
 
@@ -353,6 +353,7 @@ export async function registerRoutes(
         winnerId,
         status: isReset ? "PENDING" : "COMPLETED"
     });
+    clearLiveScoringCache(id);
     
     if (input.notes) {
         const noteValues = Object.fromEntries(
@@ -939,6 +940,9 @@ export async function registerRoutes(
         winnerId,
         status,
       });
+      if (status === "COMPLETED") {
+        clearLiveScoringCache(matchId);
+      }
 
       if (req.body.notes) {
         const noteValues = Object.fromEntries(
