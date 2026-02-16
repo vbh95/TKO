@@ -14,6 +14,214 @@ import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegSco
 
 const scryptAsync = promisify(scrypt);
 
+interface PromoteGroupParams {
+  tournamentId: number;
+  completedGroupId: number;
+  currentMatchId: number;
+  currentMatchWinnerId: number | null;
+  ptsWin: number;
+  ptsLoss: number;
+  shareToken: string | null;
+}
+
+async function promoteGroupToKnockout(params: PromoteGroupParams) {
+  const { tournamentId, completedGroupId, currentMatchId, currentMatchWinnerId, ptsWin, ptsLoss, shareToken } = params;
+
+  const allMatches = await storage.getMatchesByTournamentId(tournamentId);
+  const groupMatches = allMatches.filter(m => m.stage === 'GROUP');
+  const knockoutMatches = allMatches.filter(m => m.stage === 'KNOCKOUT');
+  if (knockoutMatches.length === 0) return;
+
+  const groupsList = await storage.getGroupsByTournamentId(tournamentId);
+  const playersList = await storage.getPlayersByTournamentId(tournamentId);
+  const memberships = await storage.getGroupMembershipsByTournamentId(tournamentId);
+  if (groupsList.length === 0) return;
+
+  const sorted = [...knockoutMatches].sort((a: any, b: any) => a.order - b.order);
+  const roundKeys: string[] = [];
+  for (const m of sorted) {
+    if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
+  }
+  const firstRoundKey = roundKeys[0];
+  const firstRoundMatches = sorted.filter(m => m.roundKey === firstRoundKey);
+
+  const calcGroupStandings = (groupId: number) => {
+    const memberPlayerIds = memberships.filter(gm => gm.groupId === groupId).map(gm => gm.playerId);
+    const groupPlayers = playersList.filter(p => memberPlayerIds.includes(p.id));
+    const gMatches = groupMatches.filter(m => m.groupId === groupId);
+    const completedGMatches = gMatches.filter(m => m.status === 'COMPLETED' || m.id === currentMatchId);
+
+    const stats = groupPlayers.map(player => {
+      const playerMs = completedGMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
+      let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
+      playerMs.forEach(m => {
+        played++;
+        const isA = m.playerAId === player.id;
+        const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
+        const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
+        legsFor += myScore;
+        legsAgainst += oppScore;
+        const mWinnerId = m.id === currentMatchId ? currentMatchWinnerId : m.winnerId;
+        if (mWinnerId === player.id) won++;
+        else lost++;
+      });
+      return { id: player.id, played, pts: (won * ptsWin) + (lost * ptsLoss), legsFor, legsAgainst, diff: legsFor - legsAgainst };
+    });
+
+    stats.sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.diff !== a.diff) return b.diff - a.diff;
+      if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+      return a.id - b.id;
+    });
+
+    let i = 0;
+    while (i < stats.length) {
+      let j = i + 1;
+      while (j < stats.length && stats[j].pts === stats[i].pts && stats[j].diff === stats[i].diff && stats[j].legsFor === stats[i].legsFor) {
+        j++;
+      }
+      if (j - i > 1) {
+        const tiedGroup = stats.slice(i, j);
+        const tiedIds = new Set(tiedGroup.map(p => p.id));
+        const h2hMatches = completedGMatches.filter(m =>
+          m.playerAId !== null && m.playerBId !== null &&
+          tiedIds.has(m.playerAId) && tiedIds.has(m.playerBId)
+        );
+        const expectedPairings = tiedGroup.length * (tiedGroup.length - 1) / 2;
+        const pairingSet = new Set<string>();
+        h2hMatches.forEach(m => {
+          const pair = [m.playerAId!, m.playerBId!].sort((a, b) => a - b).join('-');
+          pairingSet.add(pair);
+        });
+
+        let resolved = false;
+        if (pairingSet.size >= expectedPairings) {
+          const matchCounts = new Map<number, number>();
+          tiedGroup.forEach(p => matchCounts.set(p.id, 0));
+          h2hMatches.forEach(m => {
+            matchCounts.set(m.playerAId!, (matchCounts.get(m.playerAId!) || 0) + 1);
+            matchCounts.set(m.playerBId!, (matchCounts.get(m.playerBId!) || 0) + 1);
+          });
+          const counts: number[] = [];
+          matchCounts.forEach(v => counts.push(v));
+          if (counts.every(c => c === counts[0])) {
+            const h2hStats = tiedGroup.map(player => {
+              const playerH2H = h2hMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
+              let hWon = 0, hFor = 0, hAgainst = 0;
+              playerH2H.forEach(m => {
+                const isA = m.playerAId === player.id;
+                const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
+                const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
+                hFor += myScore;
+                hAgainst += oppScore;
+                const mWinnerId = m.id === currentMatchId ? currentMatchWinnerId : m.winnerId;
+                if (mWinnerId === player.id) hWon++;
+              });
+              return { id: player.id, pts: hWon * ptsWin, diff: hFor - hAgainst, legsFor: hFor, played: player.played };
+            });
+            h2hStats.sort((a, b) => {
+              if (b.pts !== a.pts) return b.pts - a.pts;
+              if (b.diff !== a.diff) return b.diff - a.diff;
+              if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+              if (a.played !== b.played) return a.played - b.played;
+              return a.id - b.id;
+            });
+            const reordered = h2hStats.map(h => tiedGroup.find(p => p.id === h.id)!);
+            for (let k = 0; k < reordered.length; k++) {
+              stats[i + k] = reordered[k];
+            }
+            resolved = true;
+          }
+        }
+        if (!resolved) {
+          const fallback = tiedGroup.sort((a, b) => {
+            if (a.played !== b.played) return a.played - b.played;
+            return a.id - b.id;
+          });
+          for (let k = 0; k < fallback.length; k++) {
+            stats[i + k] = fallback[k];
+          }
+        }
+      }
+      i = j;
+    }
+
+    return stats;
+  };
+
+  const completedGroupIdx = groupsList.findIndex(g => g.id === completedGroupId);
+  if (completedGroupIdx < 0) return;
+
+  const standings = calcGroupStandings(completedGroupId);
+  if (standings.length < 2) return;
+
+  const groupCount = groupsList.length;
+  type Pairing = { aGroupIdx: number; aPos: number; bGroupIdx: number; bPos: number };
+  const pairings: Pairing[] = [];
+  for (let i = 0; i < groupCount; i += 2) {
+    const oppIdx = i + 1;
+    if (oppIdx < groupCount) {
+      pairings.push(
+        { aGroupIdx: i, aPos: 0, bGroupIdx: oppIdx, bPos: 1 },
+        { aGroupIdx: i, aPos: 1, bGroupIdx: oppIdx, bPos: 0 },
+      );
+    } else {
+      pairings.push(
+        { aGroupIdx: i, aPos: 0, bGroupIdx: i, bPos: 1 },
+      );
+    }
+  }
+
+  const updatedQFIds: number[] = [];
+  for (let i = 0; i < firstRoundMatches.length && i < pairings.length; i++) {
+    const pairing = pairings[i];
+    const updates: any = {};
+    let needsUpdate = false;
+
+    if (pairing.aGroupIdx === completedGroupIdx) {
+      const playerId = standings[pairing.aPos]?.id;
+      if (playerId) { updates.playerAId = playerId; needsUpdate = true; }
+    }
+    if (pairing.bGroupIdx === completedGroupIdx) {
+      const playerId = standings[pairing.bPos]?.id;
+      if (playerId) { updates.playerBId = playerId; needsUpdate = true; }
+    }
+
+    if (needsUpdate) {
+      updates.boardNumber = i + 1;
+      await storage.updateMatch(firstRoundMatches[i].id, updates);
+      updatedQFIds.push(firstRoundMatches[i].id);
+    }
+  }
+
+  const sfBoardMap: Record<number, number> = { 0: 2, 1: 3 };
+  const fBoardMap: Record<number, number> = { 0: 3 };
+  for (const km of sorted) {
+    if (km.roundKey === firstRoundKey) continue;
+    const roundMatches = sorted.filter(m => m.roundKey === km.roundKey);
+    const idx = roundMatches.findIndex(m => m.id === km.id);
+    let assignedBoard: number | undefined;
+    if (km.roundKey === 'SF') assignedBoard = sfBoardMap[idx];
+    else if (km.roundKey === 'F') assignedBoard = fBoardMap[idx];
+    else if (km.roundKey === 'GF') assignedBoard = fBoardMap[idx];
+    if (assignedBoard != null && !km.boardNumber) {
+      await storage.updateMatch(km.id, { boardNumber: assignedBoard } as any);
+    }
+  }
+
+  try {
+    const updatedKnockouts = await storage.getMatchesByTournamentId(tournamentId);
+    const koMatches = updatedKnockouts.filter(m => m.stage === 'KNOCKOUT');
+    for (const km of koMatches) {
+      emitMatchUpdate(tournamentId, shareToken, km);
+      if ((km as any).boardNumber) {
+        emitBoardMatchUpdate(tournamentId, (km as any).boardNumber, km);
+      }
+    }
+  } catch {}
+}
+
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
@@ -372,219 +580,21 @@ export async function registerRoutes(
       const ptsWin = settings.pointsForWin ?? 2;
       const ptsLoss = settings.pointsForLoss ?? 0;
 
-      if (match.stage === 'GROUP') {
-        // Check if ALL group stage matches are now completed
+      if (match.stage === 'GROUP' && match.groupId) {
         const groupMatches = allMatches.filter(m => m.stage === 'GROUP');
-        const allGroupsDone = groupMatches.every(m => m.status === 'COMPLETED' || m.id === id);
+        const thisGroupMatches = groupMatches.filter(m => m.groupId === match.groupId);
+        const thisGroupDone = thisGroupMatches.every(m => m.status === 'COMPLETED' || m.id === id);
 
-        if (allGroupsDone) {
-          const groupsList = await storage.getGroupsByTournamentId(match.tournamentId);
-          const playersList = await storage.getPlayersByTournamentId(match.tournamentId);
-          const memberships = await storage.getGroupMembershipsByTournamentId(match.tournamentId);
-          const knockoutMatches = allMatches.filter(m => m.stage === 'KNOCKOUT');
-
-          if (knockoutMatches.length > 0 && groupsList.length > 0) {
-            const sorted = [...knockoutMatches].sort((a: any, b: any) => a.order - b.order);
-            const roundKeys: string[] = [];
-            for (const m of sorted) {
-              if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
-            }
-            const firstRoundKey = roundKeys[0];
-            const firstRoundMatches = sorted.filter(m => m.roundKey === firstRoundKey);
-
-            // Calculate standings for each group
-            const calcGroupStandings = (groupId: number) => {
-              const memberPlayerIds = memberships.filter(gm => gm.groupId === groupId).map(gm => gm.playerId);
-              const groupPlayers = playersList.filter(p => memberPlayerIds.includes(p.id));
-              const gMatches = groupMatches.filter(m => m.groupId === groupId);
-              const completedGMatches = gMatches.filter(m => m.status === 'COMPLETED' || m.id === id);
-
-              const stats = groupPlayers.map(player => {
-                const playerMs = completedGMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
-                let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
-                playerMs.forEach(m => {
-                  played++;
-                  const isA = m.playerAId === player.id;
-                  const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
-                  const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
-                  legsFor += myScore;
-                  legsAgainst += oppScore;
-                  const mWinnerId = m.id === id ? winnerId : m.winnerId;
-                  if (mWinnerId === player.id) won++;
-                  else lost++;
-                });
-                return {
-                  id: player.id,
-                  played,
-                  pts: (won * ptsWin) + (lost * ptsLoss),
-                  legsFor,
-                  legsAgainst,
-                  diff: legsFor - legsAgainst,
-                };
-              });
-
-              // Sort by: Points desc, Leg Diff desc, Legs For desc, then fallback
-              stats.sort((a, b) => {
-                if (b.pts !== a.pts) return b.pts - a.pts;
-                if (b.diff !== a.diff) return b.diff - a.diff;
-                if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-                return a.id - b.id;
-              });
-
-              // Apply head-to-head for players tied on points + leg diff + legs for
-              let i = 0;
-              while (i < stats.length) {
-                let j = i + 1;
-                while (j < stats.length && stats[j].pts === stats[i].pts && stats[j].diff === stats[i].diff && stats[j].legsFor === stats[i].legsFor) {
-                  j++;
-                }
-                if (j - i > 1) {
-                  const tiedGroup = stats.slice(i, j);
-                  const tiedIds = new Set(tiedGroup.map(p => p.id));
-                  const h2hMatches = completedGMatches.filter(m =>
-                    m.playerAId !== null && m.playerBId !== null &&
-                    tiedIds.has(m.playerAId) && tiedIds.has(m.playerBId)
-                  );
-                  const expectedPairings = tiedGroup.length * (tiedGroup.length - 1) / 2;
-                  const pairingSet = new Set<string>();
-                  h2hMatches.forEach(m => {
-                    const pair = [m.playerAId!, m.playerBId!].sort((a, b) => a - b).join('-');
-                    pairingSet.add(pair);
-                  });
-
-                  let resolved = false;
-                  if (pairingSet.size >= expectedPairings) {
-                    const matchCounts = new Map<number, number>();
-                    tiedGroup.forEach(p => matchCounts.set(p.id, 0));
-                    h2hMatches.forEach(m => {
-                      matchCounts.set(m.playerAId!, (matchCounts.get(m.playerAId!) || 0) + 1);
-                      matchCounts.set(m.playerBId!, (matchCounts.get(m.playerBId!) || 0) + 1);
-                    });
-                    const counts = Array.from(matchCounts.values());
-                    if (counts.every(c => c === counts[0])) {
-                      const h2hStats = tiedGroup.map(player => {
-                        const playerH2H = h2hMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
-                        let hWon = 0, hLost = 0, hFor = 0, hAgainst = 0;
-                        playerH2H.forEach(m => {
-                          const isA = m.playerAId === player.id;
-                          const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
-                          const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
-                          hFor += myScore;
-                          hAgainst += oppScore;
-                          const mWinnerId = m.id === id ? winnerId : m.winnerId;
-                          if (mWinnerId === player.id) hWon++;
-                          else hLost++;
-                        });
-                        return {
-                          id: player.id,
-                          pts: hWon * ptsWin + hLost * ptsLoss,
-                          diff: hFor - hAgainst,
-                          legsFor: hFor,
-                          played: player.played,
-                        };
-                      });
-                      h2hStats.sort((a, b) => {
-                        if (b.pts !== a.pts) return b.pts - a.pts;
-                        if (b.diff !== a.diff) return b.diff - a.diff;
-                        if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-                        if (a.played !== b.played) return a.played - b.played;
-                        return a.id - b.id;
-                      });
-                      const reordered = h2hStats.map(h => tiedGroup.find(p => p.id === h.id)!);
-                      for (let k = 0; k < reordered.length; k++) {
-                        stats[i + k] = reordered[k];
-                      }
-                      resolved = true;
-                    }
-                  }
-                  if (!resolved) {
-                    const fallback = tiedGroup.sort((a, b) => {
-                      if (a.played !== b.played) return a.played - b.played;
-                      return a.id - b.id;
-                    });
-                    for (let k = 0; k < fallback.length; k++) {
-                      stats[i + k] = fallback[k];
-                    }
-                  }
-                }
-                i = j;
-              }
-
-              return stats;
-            };
-
-            // Build pairings (same logic as frontend knockoutSlotLabels)
-            const groupCount = groupsList.length;
-            type Pairing = { aGroupIdx: number; aPos: number; bGroupIdx: number; bPos: number };
-            const pairings: Pairing[] = [];
-
-            for (let i = 0; i < groupCount; i += 2) {
-              const oppIdx = i + 1;
-              if (oppIdx < groupCount) {
-                pairings.push(
-                  { aGroupIdx: i, aPos: 0, bGroupIdx: oppIdx, bPos: 1 },
-                  { aGroupIdx: i, aPos: 1, bGroupIdx: oppIdx, bPos: 0 },
-                );
-              } else {
-                pairings.push(
-                  { aGroupIdx: i, aPos: 0, bGroupIdx: i, bPos: 1 },
-                );
-              }
-            }
-
-            // Calculate standings per group and assign players
-            const standingsPerGroup: Record<number, { id: number; pts: number; legsFor: number }[]> = {};
-            for (const group of groupsList) {
-              standingsPerGroup[group.id] = calcGroupStandings(group.id);
-            }
-
-            for (let i = 0; i < firstRoundMatches.length && i < pairings.length; i++) {
-              const pairing = pairings[i];
-              const groupA = groupsList[pairing.aGroupIdx];
-              const groupB = groupsList[pairing.bGroupIdx];
-              if (!groupA || !groupB) continue;
-
-              const standingsA = standingsPerGroup[groupA.id];
-              const standingsB = standingsPerGroup[groupB.id];
-              const playerAId = standingsA?.[pairing.aPos]?.id || null;
-              const playerBId = standingsB?.[pairing.bPos]?.id || null;
-
-              await storage.updateMatch(firstRoundMatches[i].id, {
-                ...(playerAId ? { playerAId } : {}),
-                ...(playerBId ? { playerBId } : {}),
-                boardNumber: i + 1,
-              } as any);
-            }
-
-            // Assign board numbers to subsequent knockout rounds
-            // SF1→Board 2, SF2→Board 3, Final→Board 3
-            const sfBoardMap: Record<number, number> = { 0: 2, 1: 3 };
-            const fBoardMap: Record<number, number> = { 0: 3 };
-            for (const km of sorted) {
-              if (km.roundKey === firstRoundKey) continue;
-              const roundMatches = sorted.filter(m => m.roundKey === km.roundKey);
-              const idx = roundMatches.findIndex(m => m.id === km.id);
-              let assignedBoard: number | undefined;
-              if (km.roundKey === 'SF') assignedBoard = sfBoardMap[idx];
-              else if (km.roundKey === 'F') assignedBoard = fBoardMap[idx];
-              else if (km.roundKey === 'GF') assignedBoard = fBoardMap[idx];
-              if (assignedBoard != null) {
-                await storage.updateMatch(km.id, { boardNumber: assignedBoard } as any);
-              }
-            }
-
-            // Emit updates for all knockout matches so boards see their new matches
-            try {
-              const updatedKnockouts = await storage.getMatchesByTournamentId(match.tournamentId);
-              const koMatches = updatedKnockouts.filter(m => m.stage === 'KNOCKOUT');
-              for (const km of koMatches) {
-                emitMatchUpdate(match.tournamentId, tournamentData?.shareToken || null, km);
-                if ((km as any).boardNumber) {
-                  emitBoardMatchUpdate(match.tournamentId, (km as any).boardNumber, km);
-                }
-              }
-            } catch {}
-          }
+        if (thisGroupDone) {
+          await promoteGroupToKnockout({
+            tournamentId: match.tournamentId,
+            completedGroupId: match.groupId,
+            currentMatchId: id,
+            currentMatchWinnerId: winnerId,
+            ptsWin,
+            ptsLoss,
+            shareToken: tournamentData?.shareToken || null,
+          });
         }
       } else if (match.stage === 'KNOCKOUT' && winnerId) {
         // Progress winner to next knockout round
@@ -956,6 +966,66 @@ export async function registerRoutes(
       const tournament = await storage.getTournament(tournamentId);
       emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
       emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
+
+      if (status === "COMPLETED" && match.stage === 'GROUP' && match.groupId) {
+        try {
+          const allMatches = await storage.getMatchesByTournamentId(tournamentId);
+          const thisGroupMatches = allMatches.filter(m => m.stage === 'GROUP' && m.groupId === match.groupId);
+          const thisGroupDone = thisGroupMatches.every(m => m.status === 'COMPLETED' || m.id === matchId);
+
+          if (thisGroupDone) {
+            const settings = (tournament?.settings || {}) as any;
+            const ptsWin = settings.pointsForWin ?? 2;
+            const ptsLoss = settings.pointsForLoss ?? 0;
+            await promoteGroupToKnockout({
+              tournamentId,
+              completedGroupId: match.groupId,
+              currentMatchId: matchId,
+              currentMatchWinnerId: winnerId,
+              ptsWin,
+              ptsLoss,
+              shareToken: tournament?.shareToken || null,
+            });
+          }
+        } catch (progressionError) {
+          console.error("Scorer auto-progression error (non-fatal):", progressionError);
+        }
+      }
+
+      if (status === "COMPLETED" && match.stage === 'KNOCKOUT' && winnerId) {
+        try {
+          const allMatches = await storage.getMatchesByTournamentId(tournamentId);
+          const knockoutMatches = allMatches.filter(m => m.stage === 'KNOCKOUT');
+          const sorted = [...knockoutMatches].sort((a: any, b: any) => a.order - b.order);
+          const roundKeys: string[] = [];
+          for (const m of sorted) {
+            if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
+          }
+          const currentRoundIdx = roundKeys.indexOf(match.roundKey);
+          if (currentRoundIdx >= 0 && currentRoundIdx < roundKeys.length - 1) {
+            const nextRoundKey = roundKeys[currentRoundIdx + 1];
+            const currentRoundMatches = sorted.filter(m => m.roundKey === match.roundKey);
+            const nextRoundMatches = sorted.filter(m => m.roundKey === nextRoundKey);
+            const matchIndexInRound = currentRoundMatches.findIndex(m => m.id === matchId);
+            const nextMatchIndex = Math.floor(matchIndexInRound / 2);
+            const isTopSlot = matchIndexInRound % 2 === 0;
+
+            if (nextMatchIndex < nextRoundMatches.length) {
+              const nextMatch = nextRoundMatches[nextMatchIndex];
+              const updatedNextMatch = await storage.updateMatch(nextMatch.id, isTopSlot
+                ? { playerAId: winnerId } as any
+                : { playerBId: winnerId } as any
+              );
+              emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedNextMatch);
+              if ((updatedNextMatch as any).boardNumber) {
+                emitBoardMatchUpdate(tournamentId, (updatedNextMatch as any).boardNumber, updatedNextMatch);
+              }
+            }
+          }
+        } catch (progressionError) {
+          console.error("Scorer knockout progression error (non-fatal):", progressionError);
+        }
+      }
 
       res.json(updatedMatch);
     } catch (err) {
