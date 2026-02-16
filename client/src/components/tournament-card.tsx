@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { Trophy, Calendar, Users, ArrowRight, Trash2 } from "lucide-react";
+import { Trophy, Calendar, Users, ArrowRight, Trash2, Settings, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,12 +20,21 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useDeleteTournament } from "@/hooks/use-tournaments";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Tournament } from "@shared/schema";
 
 export function TournamentCard({ tournament }: { tournament: Tournament }) {
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const deleteMutation = useDeleteTournament();
   const { toast } = useToast();
 
@@ -35,6 +48,7 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
     ROUND_ROBIN: "Round Robin",
     KNOCKOUT: "Knockout",
     DOUBLE_ELIMINATION: "Double Elimination",
+    MULTI_STAGE: "Multi-Stage",
   };
 
   const handleDelete = () => {
@@ -62,10 +76,19 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
               {tournament.createdAt ? format(new Date(tournament.createdAt), 'MMM d, yyyy') : 'Date unknown'}
             </div>
           </div>
-          <div className="flex items-center gap-2 ml-2 shrink-0">
+          <div className="flex items-center gap-1 ml-2 shrink-0">
             <Badge variant="outline" className={statusColors[tournament.status as keyof typeof statusColors]}>
               {tournament.status.replace('_', ' ')}
             </Badge>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+              data-testid={`button-settings-tournament-${tournament.id}`}
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSettingsOpen(true); }}
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
             <AlertDialog open={open} onOpenChange={setOpen}>
               <AlertDialogTrigger asChild>
                 <Button
@@ -121,6 +144,260 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
           </Link>
         </div>
       </div>
+
+      <TournamentSettingsDialog
+        tournament={tournament}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+      />
     </Card>
   );
 }
+
+function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tournament: Tournament; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+
+  const settings = (tournament.settings || {}) as any;
+
+  const [name, setName] = useState(tournament.name);
+  const [groupBestOf, setGroupBestOf] = useState(settings.groupBestOf || 3);
+  const [knockoutBestOf, setKnockoutBestOf] = useState(settings.knockoutBestOf || 5);
+  const [qfBestOf, setQfBestOf] = useState(settings.knockoutBestOfByRound?.quarterFinal || 5);
+  const [sfBestOf, setSfBestOf] = useState(settings.knockoutBestOfByRound?.semiFinal || 7);
+  const [fBestOf, setFBestOf] = useState(settings.knockoutBestOfByRound?.final || 9);
+  const [pointsForWin, setPointsForWin] = useState(settings.pointsForWin ?? 2);
+  const [pointsForLoss, setPointsForLoss] = useState(settings.pointsForLoss ?? 0);
+  const [seeded, setSeeded] = useState(settings.seeded ?? true);
+
+  useEffect(() => {
+    if (open) {
+      const s = (tournament.settings || {}) as any;
+      setName(tournament.name);
+      setGroupBestOf(s.groupBestOf || 3);
+      setKnockoutBestOf(s.knockoutBestOf || 5);
+      setQfBestOf(s.knockoutBestOfByRound?.quarterFinal || 5);
+      setSfBestOf(s.knockoutBestOfByRound?.semiFinal || 7);
+      setFBestOf(s.knockoutBestOfByRound?.final || 9);
+      setPointsForWin(s.pointsForWin ?? 2);
+      setPointsForLoss(s.pointsForLoss ?? 0);
+      setSeeded(s.seeded ?? true);
+    }
+  }, [open, tournament]);
+
+  const type = tournament.type;
+  const hasGroups = type === "ROUND_ROBIN" || type === "MULTI_STAGE";
+  const hasKnockout = type === "KNOCKOUT" || type === "DOUBLE_ELIMINATION" || type === "MULTI_STAGE";
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const newSettings = { ...settings };
+
+      if (hasGroups) {
+        newSettings.groupBestOf = groupBestOf;
+        newSettings.pointsForWin = pointsForWin;
+        newSettings.pointsForLoss = pointsForLoss;
+      }
+
+      if (hasKnockout) {
+        newSettings.knockoutBestOfByRound = {
+          quarterFinal: qfBestOf,
+          semiFinal: sfBestOf,
+          final: fBestOf,
+        };
+        newSettings.seeded = seeded;
+        if (type === "DOUBLE_ELIMINATION") {
+          newSettings.knockoutBestOf = knockoutBestOf;
+        }
+      }
+
+      await apiRequest('PUT', `/api/tournaments/${tournament.id}`, {
+        name,
+        settings: newSettings,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
+
+      toast({ title: "Settings saved", description: "Tournament settings have been updated." });
+      onOpenChange(false);
+    } catch {
+      toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5" />
+            Tournament Settings
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="settings-name">Tournament Name</Label>
+            <Input
+              id="settings-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-11"
+              data-testid="input-settings-name"
+            />
+          </div>
+
+          <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-primary" />
+            Format: {typeLabels[type] || type}
+          </div>
+
+          {hasGroups && (
+            <div className="space-y-4 border rounded-xl p-4 bg-muted/20">
+              <Label className="text-sm font-bold">Group Stage</Label>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="settings-groupBestOf" className="text-xs">Match Format</Label>
+                  <Select value={groupBestOf.toString()} onValueChange={(v) => setGroupBestOf(parseInt(v))}>
+                    <SelectTrigger id="settings-groupBestOf" className="h-10" data-testid="select-group-best-of">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 3, 5, 7, 9, 11].map(n => (
+                        <SelectItem key={n} value={n.toString()}>Best of {n} legs</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="settings-ptsWin" className="text-xs">Points for Win</Label>
+                    <Input
+                      id="settings-ptsWin"
+                      type="number"
+                      min={0}
+                      max={10}
+                      value={pointsForWin}
+                      onChange={(e) => setPointsForWin(parseInt(e.target.value) || 0)}
+                      className="h-10"
+                      data-testid="input-settings-pts-win"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="settings-ptsLoss" className="text-xs">Points for Loss</Label>
+                    <Input
+                      id="settings-ptsLoss"
+                      type="number"
+                      min={0}
+                      max={10}
+                      value={pointsForLoss}
+                      onChange={(e) => setPointsForLoss(parseInt(e.target.value) || 0)}
+                      className="h-10"
+                      data-testid="input-settings-pts-loss"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {hasKnockout && (
+            <div className="space-y-4 border rounded-xl p-4 bg-muted/20">
+              <Label className="text-sm font-bold">Knockout Stage</Label>
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Quarter Finals</Label>
+                    <Select value={qfBestOf.toString()} onValueChange={(v) => setQfBestOf(parseInt(v))}>
+                      <SelectTrigger className="h-10" data-testid="select-qf-best-of">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                          <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Semi Finals</Label>
+                    <Select value={sfBestOf.toString()} onValueChange={(v) => setSfBestOf(parseInt(v))}>
+                      <SelectTrigger className="h-10" data-testid="select-sf-best-of">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                          <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Grand Final</Label>
+                    <Select value={fBestOf.toString()} onValueChange={(v) => setFBestOf(parseInt(v))}>
+                      <SelectTrigger className="h-10" data-testid="select-final-best-of">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                          <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {type === "DOUBLE_ELIMINATION" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Other Bracket Matches</Label>
+                    <Select value={knockoutBestOf.toString()} onValueChange={(v) => setKnockoutBestOf(parseInt(v))}>
+                      <SelectTrigger className="h-10" data-testid="select-knockout-best-of">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                          <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {(type === "KNOCKOUT" || type === "MULTI_STAGE") && (
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm">Seeded Bracket</Label>
+                      <p className="text-xs text-muted-foreground">Highest seeds play lowest seeds</p>
+                    </div>
+                    <Switch checked={seeded} onCheckedChange={setSeeded} data-testid="switch-seeded" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-settings">
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving || !name.trim()} data-testid="button-save-settings">
+            {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Save Changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const typeLabels: Record<string, string> = {
+  ROUND_ROBIN: "Round Robin",
+  KNOCKOUT: "Knockout",
+  DOUBLE_ELIMINATION: "Double Elimination",
+  MULTI_STAGE: "Multi-Stage",
+};

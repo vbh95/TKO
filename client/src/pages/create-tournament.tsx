@@ -29,14 +29,14 @@ export default function CreateTournament() {
     const [players, setPlayers] = useState<string[]>(["", ""]);
     const [bulkInput, setBulkInput] = useState("");
     const [isBulkMode, setIsBulkMode] = useState(false);
-    const [randomize, setRandomize] = useState(false);
+    const [randomize, setRandomize] = useState(true);
     const [groupCount, setGroupCount] = useState(1);
     const [groupBestOf, setGroupBestOf] = useState(3);
     const [knockoutBestOf, setKnockoutBestOf] = useState(5);
     const [qfBestOf, setQfBestOf] = useState(5);
     const [sfBestOf, setSfBestOf] = useState(7);
     const [fBestOf, setFBestOf] = useState(9);
-    const [seeded, setSeeded] = useState(false);
+    const [seeded, setSeeded] = useState(true);
     const [pointsForWin, setPointsForWin] = useState(2);
     const [pointsForLoss, setPointsForLoss] = useState(0);
 
