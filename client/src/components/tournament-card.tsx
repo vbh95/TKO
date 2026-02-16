@@ -162,6 +162,7 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
   const settings = (tournament.settings || {}) as any;
 
   const [name, setName] = useState(tournament.name);
+  const [groupCount, setGroupCount] = useState(settings.groupCount || 1);
   const [groupBestOf, setGroupBestOf] = useState(settings.groupBestOf || 3);
   const [knockoutBestOf, setKnockoutBestOf] = useState(settings.knockoutBestOf || 5);
   const [qfBestOf, setQfBestOf] = useState(settings.knockoutBestOfByRound?.quarterFinal || 5);
@@ -175,6 +176,7 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
     if (open) {
       const s = (tournament.settings || {}) as any;
       setName(tournament.name);
+      setGroupCount(s.groupCount || 1);
       setGroupBestOf(s.groupBestOf || 3);
       setKnockoutBestOf(s.knockoutBestOf || 5);
       setQfBestOf(s.knockoutBestOfByRound?.quarterFinal || 5);
@@ -195,6 +197,7 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
   const buildNewSettings = () => {
     const newSettings = { ...settings };
     if (hasGroups) {
+      newSettings.groupCount = groupCount;
       newSettings.groupBestOf = groupBestOf;
       newSettings.pointsForWin = pointsForWin;
       newSettings.pointsForLoss = pointsForLoss;
@@ -287,6 +290,19 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
             <div className="space-y-4 border rounded-xl p-4 bg-muted/20">
               <Label className="text-sm font-bold">Group Stage</Label>
               <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="settings-groupCount" className="text-xs">Number of Groups</Label>
+                  <Select value={groupCount.toString()} onValueChange={(v) => setGroupCount(parseInt(v))}>
+                    <SelectTrigger id="settings-groupCount" className="h-10" data-testid="select-group-count">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 4, 8].map(n => (
+                        <SelectItem key={n} value={n.toString()}>{n} Group{n > 1 ? 's' : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="settings-groupBestOf" className="text-xs">Match Format</Label>
                   <Select value={groupBestOf.toString()} onValueChange={(v) => setGroupBestOf(parseInt(v))}>
