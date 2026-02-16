@@ -1021,20 +1021,23 @@ export default function TournamentDetail() {
           <TabsContent value="players">
             {(() => {
               const getPlayerBestRound = (playerId: number) => {
-                const playerMatches = matches.filter(
-                  (m: any) => (m.playerAId === playerId || m.playerBId === playerId) && m.status === 'COMPLETED'
-                );
                 const roundPriority: Record<string, number> = { 'F': 5, 'SF': 4, 'QF': 3, 'R16': 2, 'R32': 1, 'group': 0 };
                 let bestRound = 'group';
                 let bestPriority = 0;
                 let wonFinal = false;
-                for (const m of playerMatches) {
-                  const priority = roundPriority[m.roundKey] || 0;
-                  if (priority > bestPriority) {
-                    bestPriority = priority;
-                    bestRound = m.roundKey;
+
+                const allPlayerMatches = matches.filter(
+                  (m: any) => m.playerAId === playerId || m.playerBId === playerId
+                );
+                for (const m of allPlayerMatches) {
+                  if (m.stage === 'KNOCKOUT') {
+                    const priority = roundPriority[m.roundKey] || 0;
+                    if (priority > bestPriority) {
+                      bestPriority = priority;
+                      bestRound = m.roundKey;
+                    }
                   }
-                  if (m.roundKey === 'F' && m.winnerId === playerId) {
+                  if (m.roundKey === 'F' && m.status === 'COMPLETED' && m.winnerId === playerId) {
                     wonFinal = true;
                   }
                 }
