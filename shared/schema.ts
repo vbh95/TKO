@@ -86,6 +86,7 @@ export const matches = pgTable("matches", {
   
   order: integer("order").notNull(), // Display order within round/group
   boardNumber: integer("board_number"), // Board assignment for knockout matches
+  scorerId: integer("scorer_id").references(() => players.id, { onDelete: "set null" }), // Assigned scorer for group matches
 });
 
 export const insertMatchSchema = createInsertSchema(matches).omit({ id: true });
