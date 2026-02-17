@@ -462,17 +462,17 @@ export default function TournamentDetail() {
                 {tournament.type}
               </Badge>
             </div>
-            <p className="text-muted-foreground mt-1 text-sm">
+            {tournament.leagueId && (() => {
+              const league = leaguesList.find((l: any) => l.id === tournament.leagueId);
+              return league ? (
+                <p className="flex items-center gap-1.5 mt-1 text-base font-medium text-muted-foreground" data-testid="text-tournament-league">
+                  <Medal className="w-4 h-4 text-primary" />
+                  {league.name}
+                </p>
+              ) : null;
+            })()}
+            <p className="text-muted-foreground mt-0.5 text-sm">
               Created on {new Date(tournament.createdAt!).toLocaleDateString()}
-              {tournament.leagueId && (() => {
-                const league = leaguesList.find((l: any) => l.id === tournament.leagueId);
-                return league ? (
-                  <span className="ml-2 inline-flex items-center gap-1">
-                    <Medal className="w-3 h-3 text-primary inline" />
-                    <span data-testid="text-tournament-league">{league.name}</span>
-                  </span>
-                ) : null;
-              })()}
             </p>
           </div>
           

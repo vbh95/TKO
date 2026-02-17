@@ -80,16 +80,16 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
             <h3 className="font-display font-bold text-xl text-foreground group-hover:text-primary transition-colors truncate">
               {tournament.name}
             </h3>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="w-3.5 h-3.5" />
-              {tournament.createdAt ? format(new Date(tournament.createdAt), 'MMM d, yyyy') : 'Date unknown'}
-            </div>
             {leagueName && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                <Medal className="w-3 h-3 text-primary" />
+              <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                <Medal className="w-3.5 h-3.5 text-primary" />
                 <span data-testid={`text-league-name-${tournament.id}`}>{leagueName}</span>
               </div>
             )}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Calendar className="w-3 h-3" />
+              {tournament.createdAt ? format(new Date(tournament.createdAt), 'MMM d, yyyy') : 'Date unknown'}
+            </div>
           </div>
           <div className="flex items-center gap-1 ml-2 shrink-0">
             <Badge variant="outline" className={statusColors[tournament.status as keyof typeof statusColors]}>

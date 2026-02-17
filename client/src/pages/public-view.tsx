@@ -531,13 +531,23 @@ export default function PublicView() {
     if (!aIsGroup && !bIsGroup) {
       const aOrder = knockoutRoundOrder[a] ?? 0;
       const bOrder = knockoutRoundOrder[b] ?? 0;
-      return aOrder - bOrder;
+      return bOrder - aOrder;
     }
     if (aIsGroup && aAllCompleted) return 1;
     if (bIsGroup && bAllCompleted) return -1;
     if (aIsGroup) return -1;
     return 1;
   });
+
+  for (const [, roundMatches] of sortedRoundEntries) {
+    roundMatches.sort((a, b) => {
+      const aCompleted = a.status === 'COMPLETED' ? 1 : 0;
+      const bCompleted = b.status === 'COMPLETED' ? 1 : 0;
+      if (aCompleted !== bCompleted) return aCompleted - bCompleted;
+      if (aCompleted && bCompleted) return (b.order || 0) - (a.order || 0);
+      return (a.order || 0) - (b.order || 0);
+    });
+  }
 
   const getPlayer = (id: number | null) => players.find(p => p.id === id) || null;
 
