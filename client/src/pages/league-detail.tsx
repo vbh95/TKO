@@ -167,13 +167,11 @@ export default function LeagueDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-14 text-center">#</TableHead>
+                      <TableHead className="w-14 text-center">Pos</TableHead>
                       <TableHead>Player</TableHead>
-                      <TableHead className="text-center">Pts</TableHead>
-                      <TableHead className="text-center hidden sm:table-cell">W</TableHead>
-                      <TableHead className="text-center hidden sm:table-cell">L</TableHead>
-                      <TableHead className="text-center hidden md:table-cell">+/-</TableHead>
-                      <TableHead className="text-center hidden md:table-cell">Played</TableHead>
+                      <TableHead className="text-center">Points</TableHead>
+                      <TableHead className="text-center">Legs Won</TableHead>
+                      <TableHead className="text-center">Leg Diff</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -197,9 +195,8 @@ export default function LeagueDetail() {
                           </TableCell>
                           <TableCell className="font-medium">{row.name}</TableCell>
                           <TableCell className="text-center tabular-nums font-bold text-primary text-lg">{row.points}</TableCell>
-                          <TableCell className="text-center tabular-nums hidden sm:table-cell">{row.legsWon}</TableCell>
-                          <TableCell className="text-center tabular-nums hidden sm:table-cell">{row.legsLost}</TableCell>
-                          <TableCell className="text-center tabular-nums hidden md:table-cell">
+                          <TableCell className="text-center tabular-nums">{row.legsWon}</TableCell>
+                          <TableCell className="text-center tabular-nums">
                             <span className={cn(
                               row.legDifference > 0 && "text-green-600 dark:text-green-400",
                               row.legDifference < 0 && "text-red-600 dark:text-red-400",
@@ -207,7 +204,6 @@ export default function LeagueDetail() {
                               {row.legDifference > 0 ? '+' : ''}{row.legDifference}
                             </span>
                           </TableCell>
-                          <TableCell className="text-center tabular-nums hidden md:table-cell">{row.tournaments}</TableCell>
                         </TableRow>
                       );
                     })}
