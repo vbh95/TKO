@@ -36,6 +36,7 @@ export default function CreateTournament() {
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [isLegacy, setIsLegacy] = useState(false);
     const [eventDate, setEventDate] = useState("");
+    const [legacyPlayerCount, setLegacyPlayerCount] = useState(8);
     const [randomize, setRandomize] = useState(true);
     const [groupCount, setGroupCount] = useState(1);
     const [groupBestOf, setGroupBestOf] = useState(3);
@@ -65,20 +66,33 @@ export default function CreateTournament() {
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      
-      let playerList = players;
-      if (isBulkMode) {
-        playerList = bulkInput.split("\n").map(p => p.trim()).filter(p => p !== "");
-      }
 
-      const validPlayers = playerList.filter(p => p.trim() !== "");
-      if (validPlayers.length < 2) {
-        toast({
-          title: "Not enough players",
-          description: "You need at least 2 players to start a tournament.",
-          variant: "destructive"
-        });
-        return;
+      let validPlayers: string[];
+
+      if (isLegacy) {
+        if (legacyPlayerCount < 2) {
+          toast({
+            title: "Not enough players",
+            description: "You need at least 2 players.",
+            variant: "destructive"
+          });
+          return;
+        }
+        validPlayers = Array.from({ length: legacyPlayerCount }, (_, i) => `Player ${i + 1}`);
+      } else {
+        let playerList = players;
+        if (isBulkMode) {
+          playerList = bulkInput.split("\n").map(p => p.trim()).filter(p => p !== "");
+        }
+        validPlayers = playerList.filter(p => p.trim() !== "");
+        if (validPlayers.length < 2) {
+          toast({
+            title: "Not enough players",
+            description: "You need at least 2 players to start a tournament.",
+            variant: "destructive"
+          });
+          return;
+        }
       }
 
       create({
@@ -378,30 +392,51 @@ export default function CreateTournament() {
                   </div>
                   <h2 className="text-xl font-bold">Players</h2>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="bulk-toggle" className="text-xs cursor-pointer">Bulk Mode</Label>
-                    <Switch 
-                      id="bulk-toggle"
-                      checked={isBulkMode} 
-                      onCheckedChange={(checked) => {
-                        setIsBulkMode(checked);
-                        if (checked) {
-                          setBulkInput(players.filter(p => p.trim() !== "").join("\n"));
-                        } else {
-                          const newPlayers = bulkInput.split("\n").map(p => p.trim()).filter(p => p !== "");
-                          setPlayers(newPlayers.length > 0 ? newPlayers : ["", ""]);
-                        }
-                      }} 
-                    />
+                {!isLegacy && (
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="bulk-toggle" className="text-xs cursor-pointer">Bulk Mode</Label>
+                      <Switch 
+                        id="bulk-toggle"
+                        checked={isBulkMode} 
+                        onCheckedChange={(checked) => {
+                          setIsBulkMode(checked);
+                          if (checked) {
+                            setBulkInput(players.filter(p => p.trim() !== "").join("\n"));
+                          } else {
+                            const newPlayers = bulkInput.split("\n").map(p => p.trim()).filter(p => p !== "");
+                            setPlayers(newPlayers.length > 0 ? newPlayers : ["", ""]);
+                          }
+                        }} 
+                      />
+                    </div>
+                    <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                      {isBulkMode ? bulkInput.split("\n").filter(p => p.trim() !== "").length : players.length} Players
+                    </span>
                   </div>
-                  <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-md">
-                    {isBulkMode ? bulkInput.split("\n").filter(p => p.trim() !== "").length : players.length} Players
-                  </span>
-                </div>
+                )}
               </div>
 
-              {isBulkMode ? (
+              {isLegacy ? (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="legacyPlayerCount">Number of Players</Label>
+                    <Input
+                      id="legacyPlayerCount"
+                      type="number"
+                      min={2}
+                      max={48}
+                      value={legacyPlayerCount}
+                      onChange={(e) => setLegacyPlayerCount(Math.max(2, Math.min(48, parseInt(e.target.value) || 2)))}
+                      className="h-12 text-lg"
+                      data-testid="input-legacy-player-count"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Players will be named Player 1, Player 2, etc. You can rename them after creating the tournament.
+                  </p>
+                </div>
+              ) : isBulkMode ? (
                 <div className="space-y-2">
                   <Label htmlFor="bulk-players">Player Names (one per line)</Label>
                   <Textarea
@@ -425,7 +460,7 @@ export default function CreateTournament() {
                           placeholder={`Player Name`}
                           value={player}
                           onChange={(e) => handlePlayerChange(idx, e.target.value)}
-                          required={idx < 2} // First two are required
+                          required={idx < 2}
                           className="flex-1"
                         />
                         {players.length > 2 && (
