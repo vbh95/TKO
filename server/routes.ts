@@ -1508,7 +1508,8 @@ export async function registerRoutes(
       if (b.legsWon !== a.legsWon) return b.legsWon - a.legsWon;
       const diffA = a.legsWon - a.legsLost;
       const diffB = b.legsWon - b.legsLost;
-      return diffB - diffA;
+      if (diffB !== diffA) return diffB - diffA;
+      return b.tournaments - a.tournaments;
     });
 
     res.json({
