@@ -14,10 +14,21 @@ export const users = pgTable("users", {
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 
+// === LEAGUES ===
+export const leagues = pgTable("leagues", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLeagueSchema = createInsertSchema(leagues).omit({ id: true, createdAt: true });
+
 // === TOURNAMENTS ===
 export const tournaments = pgTable("tournaments", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  leagueId: integer("league_id").references(() => leagues.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   type: text("type").notNull(), // 'ROUND_ROBIN' | 'KNOCKOUT' | 'DOUBLE_ELIMINATION' | 'MULTI_STAGE'
   status: text("status").notNull().default("NOT_STARTED"), // 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED'
@@ -138,10 +149,17 @@ export const insertBoardSessionSchema = createInsertSchema(boardSessions).omit({
 // === RELATIONS ===
 export const usersRelations = relations(users, ({ many }) => ({
   tournaments: many(tournaments),
+  leagues: many(leagues),
+}));
+
+export const leaguesRelations = relations(leagues, ({ one, many }) => ({
+  user: one(users, { fields: [leagues.userId], references: [users.id] }),
+  tournaments: many(tournaments),
 }));
 
 export const tournamentsRelations = relations(tournaments, ({ one, many }) => ({
   user: one(users, { fields: [tournaments.userId], references: [users.id] }),
+  league: one(leagues, { fields: [tournaments.leagueId], references: [leagues.id] }),
   players: many(players),
   groups: many(groups),
   matches: many(matches),
@@ -185,6 +203,9 @@ export const boardSessionsRelations = relations(boardSessions, ({ one }) => ({
 }));
 
 // === TYPES ===
+export type League = typeof leagues.$inferSelect;
+export type InsertLeague = z.infer<typeof insertLeagueSchema>;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 

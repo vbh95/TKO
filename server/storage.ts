@@ -1,4 +1,4 @@
-import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions } from "@shared/schema";
+import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -7,7 +7,8 @@ import type {
   GroupMembership, InsertGroupMembership,
   Match, InsertMatch,
   MatchNote, InsertMatchNote,
-  BoardSession, InsertBoardSession
+  BoardSession, InsertBoardSession,
+  League, InsertLeague
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -65,6 +66,14 @@ export interface IStorage {
   getBoardSessionsByTournamentId(tournamentId: number): Promise<BoardSession[]>;
   deleteBoardSession(id: number): Promise<void>;
   
+  // Leagues
+  getLeaguesByUserId(userId: number): Promise<League[]>;
+  getLeague(id: number): Promise<League | undefined>;
+  createLeague(league: InsertLeague): Promise<League>;
+  updateLeague(id: number, data: Partial<InsertLeague>): Promise<League>;
+  deleteLeague(id: number): Promise<void>;
+  getTournamentsByLeagueId(leagueId: number): Promise<Tournament[]>;
+
   // Reset
   resetTournamentData(tournamentId: number): Promise<void>;
   
@@ -280,6 +289,35 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBoardSession(id: number): Promise<void> {
     await db.delete(boardSessions).where(eq(boardSessions.id, id));
+  }
+
+  // Leagues
+  async getLeaguesByUserId(userId: number): Promise<League[]> {
+    return await db.select().from(leagues).where(eq(leagues.userId, userId)).orderBy(desc(leagues.createdAt));
+  }
+
+  async getLeague(id: number): Promise<League | undefined> {
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, id));
+    return league;
+  }
+
+  async createLeague(league: InsertLeague): Promise<League> {
+    const [newLeague] = await db.insert(leagues).values(league).returning();
+    return newLeague;
+  }
+
+  async updateLeague(id: number, data: Partial<InsertLeague>): Promise<League> {
+    const [updated] = await db.update(leagues).set(data).where(eq(leagues.id, id)).returning();
+    return updated;
+  }
+
+  async deleteLeague(id: number): Promise<void> {
+    await db.update(tournaments).set({ leagueId: null }).where(eq(tournaments.leagueId, id));
+    await db.delete(leagues).where(eq(leagues.id, id));
+  }
+
+  async getTournamentsByLeagueId(leagueId: number): Promise<Tournament[]> {
+    return await db.select().from(tournaments).where(eq(tournaments.leagueId, leagueId)).orderBy(desc(tournaments.createdAt));
   }
 
   async resetTournamentData(tournamentId: number): Promise<void> {

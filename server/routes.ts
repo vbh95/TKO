@@ -543,12 +543,20 @@ export async function registerRoutes(
       const input = api.tournaments.create.input.parse(req.body);
       const userId = (req.user as any).id;
       
+      if (input.leagueId) {
+        const league = await storage.getLeague(input.leagueId);
+        if (!league || league.userId !== userId) {
+          return res.status(400).json({ message: "League not found" });
+        }
+      }
+
       const tournament = await storage.createTournament({
         name: input.name,
         type: input.type,
         userId,
         settings: input.settings,
-        status: "NOT_STARTED"
+        status: "NOT_STARTED",
+        leagueId: input.leagueId || null,
       });
       
       // Create players
@@ -1272,6 +1280,153 @@ export async function registerRoutes(
       players: boardPlayers,
       matches: boardMatches,
     });
+  });
+
+  // === LEAGUE ROUTES ===
+
+  app.get("/api/leagues", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const userId = (req.user as any).id;
+    const leaguesList = await storage.getLeaguesByUserId(userId);
+    res.json(leaguesList);
+  });
+
+  app.post("/api/leagues", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const userId = (req.user as any).id;
+    const { name } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ message: "League name is required" });
+    }
+    const league = await storage.createLeague({ userId, name: name.trim() });
+    res.json(league);
+  });
+
+  app.put("/api/leagues/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const userId = (req.user as any).id;
+    const leagueId = parseInt(req.params.id);
+    const league = await storage.getLeague(leagueId);
+    if (!league || league.userId !== userId) return res.status(404).json({ message: "League not found" });
+    const { name } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ message: "League name is required" });
+    }
+    const updated = await storage.updateLeague(leagueId, { name: name.trim() });
+    res.json(updated);
+  });
+
+  app.delete("/api/leagues/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const userId = (req.user as any).id;
+    const leagueId = parseInt(req.params.id);
+    const league = await storage.getLeague(leagueId);
+    if (!league || league.userId !== userId) return res.status(404).json({ message: "League not found" });
+    await storage.deleteLeague(leagueId);
+    res.json({ success: true });
+  });
+
+  app.get("/api/leagues/:id/standings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const userId = (req.user as any).id;
+    const leagueId = parseInt(req.params.id);
+    const league = await storage.getLeague(leagueId);
+    if (!league || league.userId !== userId) return res.status(404).json({ message: "League not found" });
+
+    const leagueTournaments = await storage.getTournamentsByLeagueId(leagueId);
+
+    const STAGE_POINTS: Record<string, number> = {
+      'GROUP': 5,
+      'QF': 10,
+      'SF': 20,
+      'RUNNER_UP': 30,
+      'WINNER': 40,
+    };
+
+    const playerAgg: Record<string, { name: string; points: number; legsWon: number; legsLost: number; tournaments: number }> = {};
+
+    for (const t of leagueTournaments) {
+      const allMatches = await storage.getMatchesByTournamentId(t.id);
+      const playersList = await storage.getPlayersByTournamentId(t.id);
+      const completedMatches = allMatches.filter(m => m.status === 'COMPLETED');
+
+      const eliminationMatches = completedMatches.filter(m =>
+        m.stage === 'KNOCKOUT' || m.stage === 'WINNERS_BRACKET' || m.stage === 'LOSERS_BRACKET' || m.stage === 'GRAND_FINAL'
+      );
+      const finalMatch = eliminationMatches.find(m => m.roundKey === 'F' || m.stage === 'GRAND_FINAL');
+      const sfMatches = eliminationMatches.filter(m => m.roundKey === 'SF');
+      const qfMatches = eliminationMatches.filter(m => m.roundKey === 'QF');
+
+      for (const player of playersList) {
+        const key = player.name.toLowerCase().trim();
+        if (!playerAgg[key]) {
+          playerAgg[key] = { name: player.name, points: 0, legsWon: 0, legsLost: 0, tournaments: 0 };
+        }
+
+        const playerMatches = completedMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
+
+        if (playerMatches.length === 0) continue;
+
+        playerMatches.forEach(m => {
+          const isA = m.playerAId === player.id;
+          playerAgg[key].legsWon += isA ? (m.scoreA || 0) : (m.scoreB || 0);
+          playerAgg[key].legsLost += isA ? (m.scoreB || 0) : (m.scoreA || 0);
+        });
+
+        let stage = 'GROUP';
+        if (finalMatch && finalMatch.winnerId === player.id) {
+          stage = 'WINNER';
+        } else if (finalMatch && (finalMatch.playerAId === player.id || finalMatch.playerBId === player.id)) {
+          stage = 'RUNNER_UP';
+        } else if (sfMatches.some(m => m.playerAId === player.id || m.playerBId === player.id)) {
+          stage = 'SF';
+        } else if (qfMatches.some(m => m.playerAId === player.id || m.playerBId === player.id)) {
+          stage = 'QF';
+        }
+
+        playerAgg[key].points += STAGE_POINTS[stage] || 0;
+        playerAgg[key].tournaments += 1;
+      }
+    }
+
+    const standings = Object.values(playerAgg).sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.legsWon !== a.legsWon) return b.legsWon - a.legsWon;
+      const diffA = a.legsWon - a.legsLost;
+      const diffB = b.legsWon - b.legsLost;
+      return diffB - diffA;
+    });
+
+    res.json({
+      league,
+      tournaments: leagueTournaments.map(t => ({ id: t.id, name: t.name, status: t.status })),
+      standings: standings.map((s, i) => ({
+        position: i + 1,
+        name: s.name,
+        points: s.points,
+        legsWon: s.legsWon,
+        legsLost: s.legsLost,
+        legDifference: s.legsWon - s.legsLost,
+        tournaments: s.tournaments,
+      })),
+    });
+  });
+
+  app.put("/api/tournaments/:id/league", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const userId = (req.user as any).id;
+    const tournamentId = parseInt(req.params.id);
+    const tournament = await storage.getTournament(tournamentId);
+    if (!tournament || tournament.userId !== userId) return res.status(404).json({ message: "Tournament not found" });
+
+    const { leagueId } = req.body;
+    if (leagueId !== null && leagueId !== undefined) {
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.userId !== userId) return res.status(400).json({ message: "League not found" });
+    }
+
+    const updated = await storage.updateTournament(tournamentId, { leagueId: leagueId || null });
+    res.json(updated);
   });
 
   backfillKnockoutScorers();

@@ -111,6 +111,7 @@ export const api = {
         playerNames: z.array(z.string()),
         randomize: z.boolean(),
         settings: z.any(),
+        leagueId: z.number().nullable().optional(),
       }),
       responses: {
         201: z.custom<typeof tournaments.$inferSelect>(),

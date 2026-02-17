@@ -23,7 +23,7 @@ The project is a single-workspace monorepo with three main directories:
 - **UI Components**: shadcn/ui component library (new-york style) built on Radix UI primitives
 - **Styling**: Tailwind CSS with CSS variables for theming, custom fonts (Outfit for display, Plus Jakarta Sans for body)
 - **Path Aliases**: `@/` maps to `client/src/`, `@shared/` maps to `shared/`
-- **Key Pages**: Dashboard (tournament list), Create Tournament, Tournament Detail, Account Settings, Auth (login/signup), Public Spectator View, Board View (spectator per-board), Scorer Tablet (paired scorer device)
+- **Key Pages**: Dashboard (tournament list), Create Tournament, Tournament Detail, Account Settings, Auth (login/signup), Public Spectator View, Board View (spectator per-board), Scorer Tablet (paired scorer device), Leagues (league standings across tournaments)
 - **Protected Routes**: Implemented via a `ProtectedRoute` wrapper that checks auth state and redirects to login
 
 ### Backend Architecture
@@ -50,8 +50,8 @@ The project is a single-workspace monorepo with three main directories:
 - **Schema**: Defined in `shared/schema.ts` using Drizzle's `pgTable` definitions with Zod schema generation via `drizzle-zod`
 - **Migration**: Uses `drizzle-kit push` command (`npm run db:push`) to sync schema to database
 - **Connection**: PostgreSQL via `DATABASE_URL` environment variable, using `pg` Pool
-- **Tables**: `users`, `tournaments`, `players`, `groups`, `group_memberships`, `matches` (includes `scorerId` for auto-assigned scorers), `match_notes`, `board_sessions`
-- **Key Relationships**: Users own tournaments (cascade delete), tournaments contain players/groups/matches, groups have memberships linking to players
+- **Tables**: `users`, `tournaments`, `players`, `groups`, `group_memberships`, `matches` (includes `scorerId` for auto-assigned scorers), `match_notes`, `board_sessions`, `leagues`
+- **Key Relationships**: Users own tournaments (cascade delete), tournaments contain players/groups/matches, groups have memberships linking to players, leagues own tournaments (1-to-many, set null on delete)
 
 ### Data Model Highlights
 - Tournaments store structural settings as JSONB (group count, match format, points system)

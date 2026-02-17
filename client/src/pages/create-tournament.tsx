@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { LayoutShell } from "@/components/layout-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,11 @@ export default function CreateTournament() {
   const { mutate: create, isPending } = useCreateTournament();
   const { toast } = useToast();
 
+    const { data: leaguesList = [] } = useQuery<Array<{ id: number; name: string }>>({
+      queryKey: ['/api/leagues'],
+    });
     const [name, setName] = useState("");
+    const [leagueId, setLeagueId] = useState<number | null>(null);
     const [type, setType] = useState("ROUND_ROBIN");
     const [players, setPlayers] = useState<string[]>(["", ""]);
     const [bulkInput, setBulkInput] = useState("");
@@ -77,6 +82,7 @@ export default function CreateTournament() {
       create({
         name,
         type,
+        leagueId,
         playerNames: validPlayers,
         randomize,
         settings: {
@@ -134,6 +140,23 @@ export default function CreateTournament() {
                     className="h-12 text-lg"
                   />
                 </div>
+
+                {leaguesList.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>League (optional)</Label>
+                    <Select value={leagueId?.toString() ?? "none"} onValueChange={(val) => setLeagueId(val === "none" ? null : parseInt(val))}>
+                      <SelectTrigger className="h-12" data-testid="select-league">
+                        <SelectValue placeholder="No league" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No league</SelectItem>
+                        {leaguesList.map(l => (
+                          <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="type">Tournament Format</Label>

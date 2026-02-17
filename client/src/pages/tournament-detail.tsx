@@ -6,6 +6,7 @@ import { calcStandings } from "@/lib/standings";
 import { LayoutShell } from "@/components/layout-shell";
 import { MatchScoreInput } from "@/components/match-score-input";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Medal } from "lucide-react";
 import { 
   Loader2, 
   Share2, 
@@ -57,6 +58,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useSocket } from "@/hooks/use-socket";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -212,6 +220,9 @@ export default function TournamentDetail() {
   const { enableShare, disableShare } = useTournamentShare(tournamentId);
   const { mutate: bulkUpdate, isPending: isUpdatingPlayers } = useBulkUpdatePlayers(tournamentId);
   const { toast } = useToast();
+  const { data: leaguesList = [] } = useQuery<Array<{ id: number; name: string }>>({
+    queryKey: ['/api/leagues'],
+  });
 
   const { joinTournament, on, socket } = useSocket();
   const [boardStatuses, setBoardStatuses] = useState<Record<number, boolean>>({});
@@ -223,6 +234,8 @@ export default function TournamentDetail() {
   const [isDevicesDialogOpen, setIsDevicesDialogOpen] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [renameName, setRenameName] = useState("");
+  const [isLeagueDialogOpen, setIsLeagueDialogOpen] = useState(false);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>("none");
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
   const [editingPlayerName, setEditingPlayerName] = useState("");
   const [liveScorings, setLiveScorings] = useState<Map<number, {
@@ -562,6 +575,10 @@ export default function TournamentDetail() {
                   <TabletSmartphone className="w-4 h-4" />
                   Connected Devices
                 </DropdownMenuItem>
+                <DropdownMenuItem data-testid="menu-item-league" className="gap-2 cursor-pointer" onSelect={() => { setSelectedLeagueId(tournament.leagueId?.toString() ?? "none"); setIsLeagueDialogOpen(true); }}>
+                  <Medal className="w-4 h-4" />
+                  {tournament.leagueId ? "Change League" : "Add to League"}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -612,6 +629,50 @@ export default function TournamentDetail() {
                           setIsRenameDialogOpen(false);
                         })
                         .catch(() => toast({ title: "Error", description: "Failed to rename.", variant: "destructive" }));
+                    }}
+                  >
+                    Save
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isLeagueDialogOpen} onOpenChange={setIsLeagueDialogOpen}>
+              <DialogContent className="max-w-sm" onClick={(e) => e.stopPropagation()}>
+                <DialogHeader>
+                  <DialogTitle>{tournament.leagueId ? "Change League" : "Add to League"}</DialogTitle>
+                </DialogHeader>
+                {leaguesList.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No leagues created yet. Go to the Leagues page to create one first.</p>
+                ) : (
+                  <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
+                    <SelectTrigger data-testid="select-tournament-league">
+                      <SelectValue placeholder="Select league" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No league</SelectItem>
+                      {leaguesList.map((l: any) => (
+                        <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsLeagueDialogOpen(false)}>Cancel</Button>
+                  <Button
+                    data-testid="button-save-league"
+                    disabled={leaguesList.length === 0}
+                    onClick={() => {
+                      const lid = selectedLeagueId === "none" ? null : parseInt(selectedLeagueId);
+                      apiRequest('PUT', `/api/tournaments/${tournament.id}/league`, { leagueId: lid })
+                        .then(() => {
+                          queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+                          queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournament.id] });
+                          queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
+                          toast({ title: lid ? "Tournament added to league" : "Tournament removed from league" });
+                          setIsLeagueDialogOpen(false);
+                        })
+                        .catch(() => toast({ title: "Error", description: "Failed to update league.", variant: "destructive" }));
                     }}
                   >
                     Save
