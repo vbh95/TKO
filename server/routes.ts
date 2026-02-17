@@ -1418,11 +1418,15 @@ export async function registerRoutes(
     const leagueId = parseInt(req.params.id);
     const league = await storage.getLeague(leagueId);
     if (!league || league.userId !== userId) return res.status(404).json({ message: "League not found" });
-    const { name } = req.body;
+    const { name, endDate, promotionCount, relegationCount } = req.body;
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ message: "League name is required" });
     }
-    const updated = await storage.updateLeague(leagueId, { name: name.trim() });
+    const updateData: any = { name: name.trim() };
+    if (endDate !== undefined) updateData.endDate = endDate || null;
+    if (promotionCount !== undefined) updateData.promotionCount = Math.max(0, parseInt(promotionCount) || 0);
+    if (relegationCount !== undefined) updateData.relegationCount = Math.max(0, parseInt(relegationCount) || 0);
+    const updated = await storage.updateLeague(leagueId, updateData);
     res.json(updated);
   });
 
