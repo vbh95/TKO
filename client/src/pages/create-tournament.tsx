@@ -88,7 +88,7 @@ export default function CreateTournament() {
         playerNames: validPlayers,
         randomize,
         isLegacy,
-        eventDate: isLegacy && eventDate ? eventDate : null,
+        eventDate: eventDate || null,
         settings: {
           groupCount: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupCount : undefined,
           groupBestOf: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupBestOf : undefined,
@@ -156,20 +156,17 @@ export default function CreateTournament() {
                   <Switch checked={isLegacy} onCheckedChange={setIsLegacy} />
                 </div>
 
-                {isLegacy && (
-                  <div className="space-y-2 col-span-2" data-testid="input-event-date-wrapper">
-                    <Label htmlFor="eventDate">Tournament Date</Label>
-                    <Input
-                      id="eventDate"
-                      type="date"
-                      value={eventDate}
-                      onChange={(e) => setEventDate(e.target.value)}
-                      className="h-12 text-lg"
-                      data-testid="input-event-date"
-                    />
-                    <p className="text-xs text-muted-foreground">When did this tournament take place?</p>
-                  </div>
-                )}
+                <div className="space-y-2" data-testid="input-event-date-wrapper">
+                  <Label htmlFor="eventDate">Tournament Date</Label>
+                  <Input
+                    id="eventDate"
+                    type="date"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    className="h-12 text-lg"
+                    data-testid="input-event-date"
+                  />
+                </div>
 
                 {leaguesList.length > 0 && (
                   <div className="space-y-2">

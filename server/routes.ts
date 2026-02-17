@@ -685,11 +685,12 @@ export async function registerRoutes(
       if (!tournament) return res.status(404).json({ message: "Not found" });
       if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
 
-      const { name, settings } = req.body;
+      const { name, settings, eventDate } = req.body;
 
       await storage.updateTournament(id, {
         ...(name ? { name } : {}),
         ...(settings ? { settings } : {}),
+        ...(eventDate !== undefined ? { eventDate: eventDate || null } : {}),
       });
 
       const updatedTournament = await storage.getTournament(id);

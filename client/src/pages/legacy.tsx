@@ -14,7 +14,7 @@ export default function LegacyPage() {
   const [search, setSearch] = useState("");
 
   const legacyTournaments = tournaments
-    ?.filter(t => t.isLegacy)
+    ?.filter(t => t.isLegacy || t.status === 'COMPLETED')
     .filter(t => t.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       if (a.eventDate && b.eventDate) return b.eventDate.localeCompare(a.eventDate);
@@ -29,7 +29,7 @@ export default function LegacyPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-display font-bold tracking-tight" data-testid="text-legacy-title">Legacy Tournaments</h1>
-            <p className="text-muted-foreground mt-1">Past tournament results entered manually.</p>
+            <p className="text-muted-foreground mt-1">Completed and Past Tournaments</p>
           </div>
           <Link href="/create">
             <Button size="lg" className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all" data-testid="button-create-legacy">
@@ -61,8 +61,8 @@ export default function LegacyPage() {
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <History className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-bold font-display" data-testid="text-no-legacy">No legacy tournaments</h3>
-            <p className="text-muted-foreground mt-2 mb-6">Add past tournament results by creating a legacy tournament.</p>
+            <h3 className="text-xl font-bold font-display" data-testid="text-no-legacy">No tournaments here yet</h3>
+            <p className="text-muted-foreground mt-2 mb-6">Completed tournaments and legacy entries will appear here.</p>
             <Link href="/create">
               <Button data-testid="button-create-first-legacy">Add Legacy Tournament</Button>
             </Link>

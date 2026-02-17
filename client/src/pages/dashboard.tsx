@@ -13,7 +13,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
 
   const filteredTournaments = tournaments
-    ?.filter(t => !t.isLegacy)
+    ?.filter(t => !t.isLegacy && t.status !== 'COMPLETED')
     .filter(t => t.name.toLowerCase().includes(search.toLowerCase()));
 
   return (

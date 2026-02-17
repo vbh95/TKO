@@ -88,7 +88,7 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
             )}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Calendar className="w-3 h-3" />
-              {tournament.isLegacy && tournament.eventDate
+              {tournament.eventDate
                 ? format(new Date(tournament.eventDate + 'T00:00:00'), 'MMM d, yyyy')
                 : tournament.createdAt ? format(new Date(tournament.createdAt), 'MMM d, yyyy') : 'Date unknown'}
             </div>
@@ -192,6 +192,7 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
   const settings = (tournament.settings || {}) as any;
 
   const [name, setName] = useState(tournament.name);
+  const [eventDate, setEventDate] = useState(tournament.eventDate || "");
   const [groupCount, setGroupCount] = useState(settings.groupCount || 1);
   const [groupBestOf, setGroupBestOf] = useState(settings.groupBestOf || 3);
   const [knockoutBestOf, setKnockoutBestOf] = useState(settings.knockoutBestOf || 5);
@@ -206,6 +207,7 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
     if (open) {
       const s = (tournament.settings || {}) as any;
       setName(tournament.name);
+      setEventDate(tournament.eventDate || "");
       setGroupCount(s.groupCount || 1);
       setGroupBestOf(s.groupBestOf || 3);
       setKnockoutBestOf(s.knockoutBestOf || 5);
@@ -283,11 +285,13 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
         await apiRequest('POST', `/api/tournaments/${tournament.id}/reset`, {
           name,
           settings: newSettings,
+          eventDate: eventDate || null,
         });
       } else {
         await apiRequest('PUT', `/api/tournaments/${tournament.id}`, {
           name,
           settings: newSettings,
+          eventDate: eventDate || null,
         });
       }
 
@@ -327,6 +331,18 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
               onChange={(e) => setName(e.target.value)}
               className="h-11"
               data-testid="input-settings-name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="settings-event-date">Tournament Date</Label>
+            <Input
+              id="settings-event-date"
+              type="date"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+              className="h-11"
+              data-testid="input-settings-event-date"
             />
           </div>
 
