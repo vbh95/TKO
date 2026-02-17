@@ -54,6 +54,7 @@ export const tournaments = pgTable("tournaments", {
   type: text("type").notNull(), // 'ROUND_ROBIN' | 'KNOCKOUT' | 'DOUBLE_ELIMINATION' | 'MULTI_STAGE'
   status: text("status").notNull().default("NOT_STARTED"), // 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED'
   settings: jsonb("settings").notNull(), // Stores structural settings, points system, etc.
+  isLegacy: boolean("is_legacy").default(false),
   shareEnabled: boolean("share_enabled").default(false),
   shareToken: text("share_token"),
   shareTokenCreatedAt: timestamp("share_token_created_at"),

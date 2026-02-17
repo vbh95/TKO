@@ -71,7 +71,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Match, Player, GroupMembership, BoardSession } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
-function InlineScorerEdit({ matchId, tournamentId, currentName }: { matchId: number; tournamentId: number; currentName: string | null }) {
+function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { matchId: number; tournamentId: number; currentName: string | null; isLegacy?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(currentName || '');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -96,6 +96,17 @@ function InlineScorerEdit({ matchId, tournamentId, currentName }: { matchId: num
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
     } catch {}
   };
+
+  if (isLegacy) {
+    return (
+      <div className="mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground" data-testid={`match-scorer-${matchId}`}>
+        <div className="flex items-center gap-1">
+          <ClipboardList className="w-3 h-3" />
+          Scorer: Not available
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground" data-testid={`match-scorer-${matchId}`}>
@@ -461,6 +472,11 @@ export default function TournamentDetail() {
               <Badge variant="secondary" className="text-sm font-medium">
                 {tournament.type}
               </Badge>
+              {tournament.isLegacy && (
+                <Badge variant="outline" className="text-sm font-medium bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
+                  Legacy
+                </Badge>
+              )}
             </div>
             {tournament.leagueId && (() => {
               const league = leaguesList.find((l: any) => l.id === tournament.leagueId);
@@ -477,7 +493,7 @@ export default function TournamentDetail() {
           </div>
           
           <div className="flex gap-2">
-            <Dialog>
+            {!tournament.isLegacy && <Dialog>
               <DialogTrigger asChild>
                 <Button variant="outline" className="gap-2">
                   <Share2 className="w-4 h-4" />
@@ -569,7 +585,7 @@ export default function TournamentDetail() {
                   )}
                 </div>
               </DialogContent>
-            </Dialog>
+            </Dialog>}
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -582,10 +598,10 @@ export default function TournamentDetail() {
                   <Pencil className="w-4 h-4" />
                   Rename Tournament
                 </DropdownMenuItem>
-                <DropdownMenuItem data-testid="menu-item-devices" className="gap-2 cursor-pointer" onSelect={() => setIsDevicesDialogOpen(true)}>
+                {!tournament.isLegacy && <DropdownMenuItem data-testid="menu-item-devices" className="gap-2 cursor-pointer" onSelect={() => setIsDevicesDialogOpen(true)}>
                   <TabletSmartphone className="w-4 h-4" />
                   Connected Devices
-                </DropdownMenuItem>
+                </DropdownMenuItem>}
                 <DropdownMenuItem data-testid="menu-item-league" className="gap-2 cursor-pointer" onSelect={() => { setSelectedLeagueId(tournament.leagueId?.toString() ?? "none"); setIsLeagueDialogOpen(true); }}>
                   <Medal className="w-4 h-4" />
                   {tournament.leagueId ? "Change League" : "Add to League"}
@@ -986,6 +1002,7 @@ export default function TournamentDetail() {
                                   matchId={match.id}
                                   tournamentId={tournament.id}
                                   currentName={match.scorerName || null}
+                                  isLegacy={tournament.isLegacy || false}
                                 />
                                 {match.status === 'COMPLETED' && (
                                   <AdminMatchStats

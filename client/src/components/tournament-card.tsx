@@ -47,7 +47,7 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
     ? leaguesList.find(l => l.id === tournament.leagueId)?.name
     : null;
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     NOT_STARTED: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800",
     IN_PROGRESS: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
     COMPLETED: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
@@ -92,9 +92,15 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
             </div>
           </div>
           <div className="flex items-center gap-1 ml-2 shrink-0">
-            <Badge variant="outline" className={statusColors[tournament.status as keyof typeof statusColors]}>
-              {tournament.status.replace('_', ' ')}
-            </Badge>
+            {tournament.isLegacy ? (
+              <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
+                LEGACY
+              </Badge>
+            ) : (
+              <Badge variant="outline" className={statusColors[tournament.status] || statusColors.IN_PROGRESS}>
+                {tournament.status.replace('_', ' ')}
+              </Badge>
+            )}
             <Button
               variant="ghost"
               size="icon"

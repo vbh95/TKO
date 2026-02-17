@@ -627,6 +627,7 @@ export async function registerRoutes(
         settings: input.settings,
         status: "NOT_STARTED",
         leagueId: input.leagueId || null,
+        isLegacy: input.isLegacy || false,
       });
       
       // Create players

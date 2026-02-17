@@ -16,7 +16,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useCreateTournament } from "@/hooks/use-tournaments";
-import { Loader2, Plus, Trash2, Trophy, Users } from "lucide-react";
+import { Loader2, Plus, Trash2, Trophy, Users, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 
@@ -34,6 +34,7 @@ export default function CreateTournament() {
     const [players, setPlayers] = useState<string[]>(["", ""]);
     const [bulkInput, setBulkInput] = useState("");
     const [isBulkMode, setIsBulkMode] = useState(false);
+    const [isLegacy, setIsLegacy] = useState(false);
     const [randomize, setRandomize] = useState(true);
     const [groupCount, setGroupCount] = useState(1);
     const [groupBestOf, setGroupBestOf] = useState(3);
@@ -85,6 +86,7 @@ export default function CreateTournament() {
         leagueId,
         playerNames: validPlayers,
         randomize,
+        isLegacy,
         settings: {
           groupCount: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupCount : undefined,
           groupBestOf: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupBestOf : undefined,
@@ -139,6 +141,17 @@ export default function CreateTournament() {
                     required
                     className="h-12 text-lg"
                   />
+                </div>
+
+                <div className="space-y-2 flex items-center justify-between border rounded-xl p-4 col-span-2" data-testid="toggle-legacy">
+                  <div className="space-y-0.5">
+                    <Label className="text-base flex items-center gap-2">
+                      <History className="w-4 h-4" />
+                      Legacy Tournament
+                    </Label>
+                    <p className="text-xs text-muted-foreground">For entering past tournament results manually. No live features.</p>
+                  </div>
+                  <Switch checked={isLegacy} onCheckedChange={setIsLegacy} />
                 </div>
 
                 {leaguesList.length > 0 && (
