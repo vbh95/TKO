@@ -9,10 +9,10 @@ export function useUser() {
       const res = await fetch(api.auth.me.path);
       if (res.status === 401) return null;
       if (!res.ok) throw new Error("Failed to fetch user");
-      return api.auth.me.responses[200].parse(await res.json());
+      return res.json();
     },
     retry: false,
-    staleTime: Infinity, // User data rarely changes
+    staleTime: Infinity,
   });
 }
 
@@ -31,7 +31,7 @@ export function useLogin() {
         throw new Error("Login failed");
       }
       
-      return api.auth.login.responses[200].parse(await res.json());
+      return res.json();
     },
     onSuccess: (user) => {
       queryClient.setQueryData([api.auth.me.path], user);
@@ -57,7 +57,7 @@ export function useSignup() {
         throw new Error("Signup failed");
       }
       
-      return api.auth.signup.responses[201].parse(await res.json());
+      return res.json();
     },
     onSuccess: (user) => {
       queryClient.setQueryData([api.auth.me.path], user);
@@ -76,7 +76,7 @@ export function useLogout() {
     },
     onSuccess: () => {
       queryClient.setQueryData([api.auth.me.path], null);
-      queryClient.invalidateQueries(); // Clear all data
+      queryClient.invalidateQueries();
     },
   });
 }
@@ -84,18 +84,80 @@ export function useLogout() {
 export function useUpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { name: string }) => {
+    mutationFn: async (data: { name?: string; dateOfBirth?: string | null; phone?: string | null; billingAddress?: string | null }) => {
       const res = await fetch(api.account.updateProfile.path, {
         method: api.account.updateProfile.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
       
-      if (!res.ok) throw new Error("Update failed");
-      return api.account.updateProfile.responses[200].parse(await res.json());
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Update failed");
+      }
+      return res.json();
     },
     onSuccess: (user) => {
       queryClient.setQueryData([api.auth.me.path], user);
+    },
+  });
+}
+
+export function useUpdateEmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { email: string; currentPassword: string }) => {
+      const res = await fetch(api.account.updateEmail.path, {
+        method: api.account.updateEmail.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Update failed");
+      }
+      return res.json();
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData([api.auth.me.path], user);
+    },
+  });
+}
+
+export function useUpdatePassword() {
+  return useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const res = await fetch(api.account.updatePassword.path, {
+        method: api.account.updatePassword.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Update failed");
+      }
+      return res.json();
+    },
+  });
+}
+
+export function useSetMemorableWord() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { memorableWord: string; currentPassword: string }) => {
+      const res = await fetch(api.account.setMemorableWord.path, {
+        method: api.account.setMemorableWord.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Update failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
     },
   });
 }

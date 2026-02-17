@@ -20,6 +20,7 @@ export default function AuthPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [resetMemorableWord, setResetMemorableWord] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isResetting, setIsResetting] = useState(false);
@@ -59,15 +60,21 @@ export default function AuthPage() {
       toast({ title: "Password must be at least 6 characters", variant: "destructive" });
       return;
     }
+    if (!resetMemorableWord.trim()) {
+      toast({ title: "Please enter your memorable word", variant: "destructive" });
+      return;
+    }
     setIsResetting(true);
     try {
       const res = await apiRequest("POST", "/api/auth/reset-password", {
         email: resetEmail,
+        memorableWord: resetMemorableWord,
         newPassword,
       });
       toast({ title: "Password reset successfully", description: "You can now log in with your new password." });
       setShowReset(false);
       setResetEmail("");
+      setResetMemorableWord("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: any) {
@@ -107,7 +114,7 @@ export default function AuthPage() {
                 </button>
                 <div>
                   <h2 className="text-lg font-bold">Reset Password</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Enter your email and choose a new password.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Verify your identity with your memorable word to reset your password.</p>
                 </div>
                 <form onSubmit={handleResetPassword} className="space-y-4">
                   <div className="space-y-2">
@@ -120,6 +127,18 @@ export default function AuthPage() {
                       onChange={(e) => setResetEmail(e.target.value)}
                       required
                       data-testid="input-reset-email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-memorable">Memorable Word</Label>
+                    <Input
+                      id="reset-memorable"
+                      type="text"
+                      placeholder="Your memorable word"
+                      value={resetMemorableWord}
+                      onChange={(e) => setResetMemorableWord(e.target.value)}
+                      required
+                      data-testid="input-reset-memorable-word"
                     />
                   </div>
                   <div className="space-y-2">

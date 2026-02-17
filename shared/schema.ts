@@ -9,10 +9,14 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
+  dateOfBirth: text("date_of_birth"),
+  phone: text("phone"),
+  billingAddress: text("billing_address"),
+  memorableWord: text("memorable_word"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memorableWord: true });
 
 // === LEAGUES ===
 export const leagues = pgTable("leagues", {

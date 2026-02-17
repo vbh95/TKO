@@ -413,9 +413,9 @@ export async function registerRoutes(
 
   app.post("/api/auth/reset-password", async (req, res) => {
     try {
-      const { email, newPassword } = req.body;
-      if (!email || !newPassword) {
-        return res.status(400).json({ message: "Email and new password are required" });
+      const { email, memorableWord, newPassword } = req.body;
+      if (!email || !memorableWord || !newPassword) {
+        return res.status(400).json({ message: "Email, memorable word, and new password are required" });
       }
       if (newPassword.length < 6) {
         return res.status(400).json({ message: "Password must be at least 6 characters" });
@@ -424,7 +424,7 @@ export async function registerRoutes(
       const now = Date.now();
       const attempt = resetAttempts.get(email);
       if (attempt && attempt.count >= 5 && now - attempt.lastAttempt < 15 * 60 * 1000) {
-        return res.status(429).json({ message: "Too many attempts. Please try again later." });
+        return res.status(429).json({ message: "Too many attempts. Please try again in 15 minutes." });
       }
       resetAttempts.set(email, {
         count: (attempt && now - attempt.lastAttempt < 15 * 60 * 1000) ? attempt.count + 1 : 1,
@@ -432,12 +432,16 @@ export async function registerRoutes(
       });
 
       const user = await storage.getUserByUsername(email);
-      if (!user) {
-        return res.json({ message: "If an account exists with that email, the password has been reset." });
+      if (!user || !user.memorableWord) {
+        return res.status(400).json({ message: "The details you entered don't match our records. Please try again." });
+      }
+      const wordValid = await comparePassword(memorableWord.toLowerCase().trim(), user.memorableWord);
+      if (!wordValid) {
+        return res.status(400).json({ message: "The details you entered don't match our records. Please try again." });
       }
       const hashedPassword = await hashPassword(newPassword);
       await storage.updateUserPassword(email, hashedPassword);
-      res.json({ message: "If an account exists with that email, the password has been reset." });
+      res.json({ message: "Password has been reset successfully." });
     } catch (err) {
       res.status(500).json({ message: "Internal server error" });
     }
@@ -460,7 +464,73 @@ export async function registerRoutes(
   });
 
   app.get(api.auth.me.path, isAuthenticated, (req, res) => {
-    res.json(req.user);
+    const user = req.user as any;
+    const { password, memorableWord, ...safeUser } = user;
+    res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
+  });
+
+  // === ACCOUNT ROUTES ===
+  app.put(api.account.updateProfile.path, isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const input = api.account.updateProfile.input.parse(req.body);
+      const updateData: any = {};
+      if (input.name !== undefined) updateData.name = input.name;
+      if (input.dateOfBirth !== undefined) updateData.dateOfBirth = input.dateOfBirth;
+      if (input.phone !== undefined) updateData.phone = input.phone;
+      if (input.billingAddress !== undefined) updateData.billingAddress = input.billingAddress;
+      const updated = await storage.updateUser(user.id, updateData);
+      const { password, memorableWord, ...safeUser } = updated;
+      res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
+    } catch {
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  app.put(api.account.updateEmail.path, isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const input = api.account.updateEmail.input.parse(req.body);
+      const isValid = await comparePassword(input.currentPassword, user.password);
+      if (!isValid) return res.status(400).json({ message: "Current password is incorrect" });
+      const existing = await storage.getUserByUsername(input.email);
+      if (existing && existing.id !== user.id) return res.status(400).json({ message: "Email already in use" });
+      const updated = await storage.updateUser(user.id, { email: input.email });
+      const { password, memorableWord, ...safeUser } = updated;
+      res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
+    } catch {
+      res.status(500).json({ message: "Failed to update email" });
+    }
+  });
+
+  app.put(api.account.updatePassword.path, isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const input = api.account.updatePassword.input.parse(req.body);
+      const isValid = await comparePassword(input.currentPassword, user.password);
+      if (!isValid) return res.status(400).json({ message: "Current password is incorrect" });
+      if (input.newPassword.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
+      const hashed = await hashPassword(input.newPassword);
+      await storage.updateUserPassword(user.email, hashed);
+      res.json({ message: "Password updated" });
+    } catch {
+      res.status(500).json({ message: "Failed to update password" });
+    }
+  });
+
+  app.put(api.account.setMemorableWord.path, isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const input = api.account.setMemorableWord.input.parse(req.body);
+      const isValid = await comparePassword(input.currentPassword, user.password);
+      if (!isValid) return res.status(400).json({ message: "Current password is incorrect" });
+      if (input.memorableWord.length < 3) return res.status(400).json({ message: "Memorable word must be at least 3 characters" });
+      const hashed = await hashPassword(input.memorableWord.toLowerCase().trim());
+      await storage.updateUser(user.id, { memorableWord: hashed });
+      res.json({ message: "Memorable word set" });
+    } catch {
+      res.status(500).json({ message: "Failed to set memorable word" });
+    }
   });
 
   // === TOURNAMENT ROUTES ===

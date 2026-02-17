@@ -230,7 +230,12 @@ export const api = {
     updateProfile: {
       method: 'PUT' as const,
       path: '/api/account/profile' as const,
-      input: z.object({ name: z.string() }),
+      input: z.object({
+        name: z.string().optional(),
+        dateOfBirth: z.string().nullable().optional(),
+        phone: z.string().nullable().optional(),
+        billingAddress: z.string().nullable().optional(),
+      }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
         401: errorSchemas.unauthorized,
@@ -250,6 +255,16 @@ export const api = {
       method: 'PUT' as const,
       path: '/api/account/password' as const,
       input: z.object({ currentPassword: z.string(), newPassword: z.string() }),
+      responses: {
+        200: z.void(),
+        401: errorSchemas.unauthorized,
+        400: errorSchemas.validation,
+      },
+    },
+    setMemorableWord: {
+      method: 'PUT' as const,
+      path: '/api/account/memorable-word' as const,
+      input: z.object({ memorableWord: z.string(), currentPassword: z.string() }),
       responses: {
         200: z.void(),
         401: errorSchemas.unauthorized,

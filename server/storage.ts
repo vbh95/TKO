@@ -20,8 +20,9 @@ const MemoryStore = createMemoryStore(session);
 export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>; // username maps to email
+  getUserByUsername(username: string): Promise<User | undefined>;
   updateUserPassword(email: string, hashedPassword: string): Promise<boolean>;
+  updateUser(id: number, data: Partial<{ name: string; email: string; dateOfBirth: string | null; phone: string | null; billingAddress: string | null; memorableWord: string | null }>): Promise<User>;
   createUser(user: InsertUser): Promise<User>;
   
   // Tournaments
@@ -104,6 +105,11 @@ export class DatabaseStorage implements IStorage {
   async updateUserPassword(email: string, hashedPassword: string): Promise<boolean> {
     const result = await db.update(users).set({ password: hashedPassword }).where(eq(users.email, email)).returning();
     return result.length > 0;
+  }
+
+  async updateUser(id: number, data: Partial<{ name: string; email: string; dateOfBirth: string | null; phone: string | null; billingAddress: string | null; memorableWord: string | null }>): Promise<User> {
+    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return updated;
   }
 
   async createUser(user: InsertUser): Promise<User> {
