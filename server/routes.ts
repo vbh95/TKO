@@ -798,6 +798,26 @@ export async function registerRoutes(
       console.error("Auto-progression error (non-fatal):", progressionError);
     }
 
+    // Auto-complete tournament when final match has a winner
+    try {
+      if (winnerId && !isReset) {
+        const allMatchesForComplete = await storage.getMatchesByTournamentId(match.tournamentId);
+        const isFinalMatch = (
+          (match.stage === 'KNOCKOUT' && (match.roundKey === 'F' || match.roundKey === 'GF')) ||
+          match.stage === 'GRAND_FINAL'
+        );
+
+        const allRoundRobin = allMatchesForComplete.every(m => m.stage === 'GROUP');
+        const allCompleted = allMatchesForComplete.every(m => m.status === 'COMPLETED' || m.id === id);
+
+        if (isFinalMatch || (allRoundRobin && allCompleted)) {
+          await storage.updateTournament(match.tournamentId, { status: "COMPLETED" });
+        }
+      }
+    } catch (completeError) {
+      console.error("Auto-complete error (non-fatal):", completeError);
+    }
+
     // Emit real-time updates
     try {
       const tournamentForEmit = await storage.getTournament(match.tournamentId);
@@ -1186,6 +1206,26 @@ export async function registerRoutes(
           }
         } catch (progressionError) {
           console.error("Scorer knockout progression error (non-fatal):", progressionError);
+        }
+      }
+
+      // Auto-complete tournament when final match has a winner
+      if (status === "COMPLETED" && winnerId) {
+        try {
+          const isFinalMatch = (
+            (match.stage === 'KNOCKOUT' && (match.roundKey === 'F' || match.roundKey === 'GF')) ||
+            match.stage === 'GRAND_FINAL'
+          );
+
+          const allMatchesCheck = await storage.getMatchesByTournamentId(tournamentId);
+          const allRoundRobin = allMatchesCheck.every(m => m.stage === 'GROUP');
+          const allDone = allMatchesCheck.every(m => m.status === 'COMPLETED' || m.id === matchId);
+
+          if (isFinalMatch || (allRoundRobin && allDone)) {
+            await storage.updateTournament(tournamentId, { status: "COMPLETED" });
+          }
+        } catch (completeError) {
+          console.error("Scorer auto-complete error (non-fatal):", completeError);
         }
       }
 

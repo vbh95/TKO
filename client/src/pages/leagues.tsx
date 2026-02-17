@@ -300,11 +300,8 @@ function LeagueCard({ league, expanded, onToggle, onRename, onDelete }: {
                       <TableRow>
                         <TableHead className="w-12 text-center">#</TableHead>
                         <TableHead>Player</TableHead>
-                        <TableHead className="text-center">Pts</TableHead>
-                        <TableHead className="text-center hidden sm:table-cell">Played</TableHead>
-                        <TableHead className="text-center hidden sm:table-cell">LW</TableHead>
-                        <TableHead className="text-center hidden sm:table-cell">LL</TableHead>
-                        <TableHead className="text-center">LD</TableHead>
+                        <TableHead className="text-center">Points</TableHead>
+                        <TableHead className="text-center">Legs Won</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -312,13 +309,8 @@ function LeagueCard({ league, expanded, onToggle, onRename, onDelete }: {
                         <TableRow key={row.position} data-testid={`row-standing-${row.position}`}>
                           <TableCell className="text-center font-bold tabular-nums">{row.position}</TableCell>
                           <TableCell className="font-medium">{row.name}</TableCell>
-                          <TableCell className="text-center font-bold tabular-nums">{row.points}</TableCell>
-                          <TableCell className="text-center tabular-nums hidden sm:table-cell">{row.tournaments}</TableCell>
-                          <TableCell className="text-center tabular-nums hidden sm:table-cell">{row.legsWon}</TableCell>
-                          <TableCell className="text-center tabular-nums hidden sm:table-cell">{row.legsLost}</TableCell>
-                          <TableCell className={cn("text-center tabular-nums font-medium", row.legDifference > 0 ? "text-green-600 dark:text-green-400" : row.legDifference < 0 ? "text-red-600 dark:text-red-400" : "")}>
-                            {row.legDifference > 0 ? '+' : ''}{row.legDifference}
-                          </TableCell>
+                          <TableCell className="text-center tabular-nums font-bold text-primary text-lg">{row.points}</TableCell>
+                          <TableCell className="text-center tabular-nums">{row.legsWon}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

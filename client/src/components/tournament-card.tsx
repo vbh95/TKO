@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Trophy, Calendar, Users, ArrowRight, Trash2, Settings, Loader2, AlertTriangle } from "lucide-react";
+import { Trophy, Calendar, Users, ArrowRight, Trash2, Settings, Loader2, AlertTriangle, Medal } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -158,6 +160,13 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [showResetWarning, setShowResetWarning] = useState(false);
+  const [leagueSaving, setLeagueSaving] = useState(false);
+
+  const { data: leaguesList = [] } = useQuery<Array<{ id: number; name: string }>>({
+    queryKey: ['/api/leagues'],
+    enabled: open,
+  });
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>("none");
 
   const settings = (tournament.settings || {}) as any;
 
@@ -186,6 +195,7 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
       setPointsForLoss(s.pointsForLoss ?? 0);
       setSeeded(s.seeded ?? true);
       setShowResetWarning(false);
+      setSelectedLeagueId(tournament.leagueId?.toString() ?? "none");
     }
   }, [open, tournament]);
 
@@ -280,6 +290,56 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
               data-testid="input-settings-name"
             />
           </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5">
+              <Medal className="w-4 h-4" />
+              League
+            </Label>
+            <div className="flex items-center gap-2">
+              <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
+                <SelectTrigger className="h-10 flex-1" data-testid="select-settings-league">
+                  <SelectValue placeholder="No league" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No league</SelectItem>
+                  {leaguesList.map(l => (
+                    <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedLeagueId !== (tournament.leagueId?.toString() ?? "none") && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={leagueSaving}
+                  data-testid="button-save-league-setting"
+                  onClick={async () => {
+                    setLeagueSaving(true);
+                    try {
+                      const lid = selectedLeagueId === "none" ? null : parseInt(selectedLeagueId);
+                      await apiRequest('PUT', `/api/tournaments/${tournament.id}/league`, { leagueId: lid });
+                      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+                      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournament.id] });
+                      queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
+                      toast({ title: lid ? "Added to league" : "Removed from league" });
+                    } catch {
+                      toast({ title: "Error", description: "Failed to update league.", variant: "destructive" });
+                    } finally {
+                      setLeagueSaving(false);
+                    }
+                  }}
+                >
+                  {leagueSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                </Button>
+              )}
+            </div>
+            {leaguesList.length === 0 && (
+              <p className="text-xs text-muted-foreground">Create leagues from the Leagues page first.</p>
+            )}
+          </div>
+
+          <Separator />
 
           <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg flex items-center gap-2">
             <Trophy className="w-4 h-4 text-primary" />
