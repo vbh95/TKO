@@ -88,7 +88,9 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
             )}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Calendar className="w-3 h-3" />
-              {tournament.createdAt ? format(new Date(tournament.createdAt), 'MMM d, yyyy') : 'Date unknown'}
+              {tournament.isLegacy && tournament.eventDate
+                ? format(new Date(tournament.eventDate + 'T00:00:00'), 'MMM d, yyyy')
+                : tournament.createdAt ? format(new Date(tournament.createdAt), 'MMM d, yyyy') : 'Date unknown'}
             </div>
           </div>
           <div className="flex items-center gap-1 ml-2 shrink-0">

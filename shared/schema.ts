@@ -55,6 +55,7 @@ export const tournaments = pgTable("tournaments", {
   status: text("status").notNull().default("NOT_STARTED"), // 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED'
   settings: jsonb("settings").notNull(), // Stores structural settings, points system, etc.
   isLegacy: boolean("is_legacy").default(false),
+  eventDate: text("event_date"),
   shareEnabled: boolean("share_enabled").default(false),
   shareToken: text("share_token"),
   shareTokenCreatedAt: timestamp("share_token_created_at"),
@@ -278,6 +279,9 @@ export type CreateTournamentRequest = {
   playerNames: string[];
   randomize: boolean;
   settings: TournamentSettings;
+  isLegacy?: boolean;
+  leagueId?: number | null;
+  eventDate?: string | null;
 };
 
 export type UpdateMatchScoreRequest = {

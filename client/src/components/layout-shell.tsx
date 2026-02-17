@@ -11,7 +11,8 @@ import {
   Sun,
   Moon,
   Trophy,
-  Medal
+  Medal,
+  History
 } from "lucide-react";
 import tkoLogoDark from "@assets/Untitled-1-02_1771177331378.png";
 import tkoLogoWhite from "@assets/TKO_White-02_1771177730966.png";
@@ -35,6 +36,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
     { name: 'My Tournaments', href: '/tournaments', icon: Trophy },
     { name: 'Create New', href: '/create', icon: Plus },
     { name: 'Leagues', href: '/leagues', icon: Medal },
+    { name: 'Legacy', href: '/legacy', icon: History },
     { name: 'Profile', href: '/account', icon: User },
   ];
 

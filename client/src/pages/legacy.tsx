@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Plus, Search, Trophy } from "lucide-react";
+import { Plus, Search, History, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LayoutShell } from "@/components/layout-shell";
@@ -7,64 +7,69 @@ import { TournamentCard } from "@/components/tournament-card";
 import { useTournaments } from "@/hooks/use-tournaments";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { format } from "date-fns";
 
-export default function Dashboard() {
+export default function LegacyPage() {
   const { data: tournaments, isLoading } = useTournaments();
   const [search, setSearch] = useState("");
 
-  const filteredTournaments = tournaments
-    ?.filter(t => !t.isLegacy)
-    .filter(t => t.name.toLowerCase().includes(search.toLowerCase()));
+  const legacyTournaments = tournaments
+    ?.filter(t => t.isLegacy)
+    .filter(t => t.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      if (a.eventDate && b.eventDate) return b.eventDate.localeCompare(a.eventDate);
+      if (a.eventDate) return -1;
+      if (b.eventDate) return 1;
+      return 0;
+    });
 
   return (
     <LayoutShell>
       <div className="space-y-8">
-        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-display font-bold tracking-tight">My Tournaments</h1>
-            <p className="text-muted-foreground mt-1">Manage and track all your dart events.</p>
+            <h1 className="text-3xl font-display font-bold tracking-tight" data-testid="text-legacy-title">Legacy Tournaments</h1>
+            <p className="text-muted-foreground mt-1">Past tournament results entered manually.</p>
           </div>
           <Link href="/create">
-            <Button size="lg" className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
+            <Button size="lg" className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all" data-testid="button-create-legacy">
               <Plus className="w-5 h-5 mr-2" />
-              Create Tournament
+              Add Legacy Tournament
             </Button>
           </Link>
         </div>
 
-        {/* Filters */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input 
-            placeholder="Search tournaments..." 
+          <Input
+            placeholder="Search legacy tournaments..."
             className="pl-10 h-12 text-lg bg-card border-border/50 shadow-sm rounded-xl"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            data-testid="input-search-legacy"
           />
         </div>
 
-        {/* Content */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-64 rounded-2xl" />
             ))}
           </div>
-        ) : filteredTournaments?.length === 0 ? (
+        ) : legacyTournaments?.length === 0 ? (
           <div className="text-center py-20 bg-card rounded-2xl border border-dashed">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <Trophy className="w-8 h-8 text-muted-foreground" />
+              <History className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-bold font-display">No tournaments found</h3>
-            <p className="text-muted-foreground mt-2 mb-6">Get started by creating your first tournament.</p>
+            <h3 className="text-xl font-bold font-display" data-testid="text-no-legacy">No legacy tournaments</h3>
+            <p className="text-muted-foreground mt-2 mb-6">Add past tournament results by creating a legacy tournament.</p>
             <Link href="/create">
-              <Button>Create Tournament</Button>
+              <Button data-testid="button-create-first-legacy">Add Legacy Tournament</Button>
             </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredTournaments?.map((tournament) => (
+            {legacyTournaments?.map((tournament) => (
               <TournamentCard key={tournament.id} tournament={tournament} />
             ))}
           </div>
