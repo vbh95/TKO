@@ -226,8 +226,26 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
     return newSettings;
   };
 
+  const hasStructuralChanges = () => {
+    const s = (tournament.settings || {}) as any;
+    if (hasGroups) {
+      if (groupCount !== (s.groupCount || 1)) return true;
+      if (groupBestOf !== (s.groupBestOf || 3)) return true;
+      if (pointsForWin !== (s.pointsForWin ?? 2)) return true;
+      if (pointsForLoss !== (s.pointsForLoss ?? 0)) return true;
+    }
+    if (hasKnockout) {
+      if (qfBestOf !== (s.knockoutBestOfByRound?.quarterFinal || 5)) return true;
+      if (sfBestOf !== (s.knockoutBestOfByRound?.semiFinal || 7)) return true;
+      if (fBestOf !== (s.knockoutBestOfByRound?.final || 9)) return true;
+      if (seeded !== (s.seeded ?? true)) return true;
+      if (type === "DOUBLE_ELIMINATION" && knockoutBestOf !== (s.knockoutBestOf || 5)) return true;
+    }
+    return false;
+  };
+
   const handleSave = () => {
-    if (isActive) {
+    if (isActive && hasStructuralChanges()) {
       setShowResetWarning(true);
       return;
     }
