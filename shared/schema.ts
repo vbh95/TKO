@@ -31,6 +31,20 @@ export const leagues = pgTable("leagues", {
 
 export const insertLeagueSchema = createInsertSchema(leagues).omit({ id: true, createdAt: true });
 
+// === LEAGUE MANUAL RESULTS ===
+export const leagueManualResults = pgTable("league_manual_results", {
+  id: serial("id").primaryKey(),
+  leagueId: integer("league_id").notNull().references(() => leagues.id, { onDelete: "cascade" }),
+  playerName: text("player_name").notNull(),
+  tournamentLabel: text("tournament_label").notNull(),
+  points: integer("points").notNull().default(0),
+  legsWon: integer("legs_won").notNull().default(0),
+  legsLost: integer("legs_lost").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLeagueManualResultSchema = createInsertSchema(leagueManualResults).omit({ id: true, createdAt: true });
+
 // === TOURNAMENTS ===
 export const tournaments = pgTable("tournaments", {
   id: serial("id").primaryKey(),
@@ -212,6 +226,9 @@ export const boardSessionsRelations = relations(boardSessions, ({ one }) => ({
 // === TYPES ===
 export type League = typeof leagues.$inferSelect;
 export type InsertLeague = z.infer<typeof insertLeagueSchema>;
+
+export type LeagueManualResult = typeof leagueManualResults.$inferSelect;
+export type InsertLeagueManualResult = z.infer<typeof insertLeagueManualResultSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

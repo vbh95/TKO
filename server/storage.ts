@@ -1,4 +1,4 @@
-import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues } from "@shared/schema";
+import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues, leagueManualResults } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -8,7 +8,8 @@ import type {
   Match, InsertMatch,
   MatchNote, InsertMatchNote,
   BoardSession, InsertBoardSession,
-  League, InsertLeague
+  League, InsertLeague,
+  LeagueManualResult, InsertLeagueManualResult
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -74,6 +75,11 @@ export interface IStorage {
   updateLeague(id: number, data: Partial<InsertLeague>): Promise<League>;
   deleteLeague(id: number): Promise<void>;
   getTournamentsByLeagueId(leagueId: number): Promise<Tournament[]>;
+
+  // League Manual Results
+  getLeagueManualResults(leagueId: number): Promise<LeagueManualResult[]>;
+  createLeagueManualResult(result: InsertLeagueManualResult): Promise<LeagueManualResult>;
+  deleteLeagueManualResult(id: number): Promise<void>;
 
   // Reset
   resetTournamentData(tournamentId: number): Promise<void>;
@@ -324,6 +330,19 @@ export class DatabaseStorage implements IStorage {
 
   async getTournamentsByLeagueId(leagueId: number): Promise<Tournament[]> {
     return await db.select().from(tournaments).where(eq(tournaments.leagueId, leagueId)).orderBy(desc(tournaments.createdAt));
+  }
+
+  async getLeagueManualResults(leagueId: number): Promise<LeagueManualResult[]> {
+    return await db.select().from(leagueManualResults).where(eq(leagueManualResults.leagueId, leagueId)).orderBy(desc(leagueManualResults.createdAt));
+  }
+
+  async createLeagueManualResult(result: InsertLeagueManualResult): Promise<LeagueManualResult> {
+    const [newResult] = await db.insert(leagueManualResults).values(result).returning();
+    return newResult;
+  }
+
+  async deleteLeagueManualResult(id: number): Promise<void> {
+    await db.delete(leagueManualResults).where(eq(leagueManualResults.id, id));
   }
 
   async resetTournamentData(tournamentId: number): Promise<void> {

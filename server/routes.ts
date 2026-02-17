@@ -1503,6 +1503,23 @@ export async function registerRoutes(
       }
     }
 
+    const manualResults = await storage.getLeagueManualResults(leagueId);
+    const manualTournamentsByPlayer: Record<string, Set<string>> = {};
+    for (const mr of manualResults) {
+      const key = mr.playerName.toLowerCase().trim();
+      if (!playerAgg[key]) {
+        playerAgg[key] = { name: mr.playerName, points: 0, legsWon: 0, legsLost: 0, tournaments: 0 };
+      }
+      playerAgg[key].points += mr.points;
+      playerAgg[key].legsWon += mr.legsWon;
+      playerAgg[key].legsLost += mr.legsLost;
+      if (!manualTournamentsByPlayer[key]) manualTournamentsByPlayer[key] = new Set();
+      manualTournamentsByPlayer[key].add(mr.tournamentLabel.toLowerCase().trim());
+    }
+    for (const [key, labels] of Object.entries(manualTournamentsByPlayer)) {
+      if (playerAgg[key]) playerAgg[key].tournaments += labels.size;
+    }
+
     const standings = Object.values(playerAgg).sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
       if (b.legsWon !== a.legsWon) return b.legsWon - a.legsWon;
@@ -1525,6 +1542,51 @@ export async function registerRoutes(
         tournaments: s.tournaments,
       })),
     });
+  });
+
+  app.get("/api/leagues/:id/manual-results", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const userId = (req.user as any).id;
+    const leagueId = parseInt(req.params.id);
+    const league = await storage.getLeague(leagueId);
+    if (!league || league.userId !== userId) return res.status(404).json({ message: "League not found" });
+    const results = await storage.getLeagueManualResults(leagueId);
+    res.json(results);
+  });
+
+  app.post("/api/leagues/:id/manual-results", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const userId = (req.user as any).id;
+    const leagueId = parseInt(req.params.id);
+    const league = await storage.getLeague(leagueId);
+    if (!league || league.userId !== userId) return res.status(404).json({ message: "League not found" });
+
+    const { playerName, tournamentLabel, points, legsWon, legsLost } = req.body;
+    if (!playerName || !tournamentLabel) return res.status(400).json({ message: "Player name and tournament label are required" });
+
+    const result = await storage.createLeagueManualResult({
+      leagueId,
+      playerName: String(playerName).trim(),
+      tournamentLabel: String(tournamentLabel).trim(),
+      points: Math.max(0, parseInt(points) || 0),
+      legsWon: Math.max(0, parseInt(legsWon) || 0),
+      legsLost: Math.max(0, parseInt(legsLost) || 0),
+    });
+    res.json(result);
+  });
+
+  app.delete("/api/leagues/:id/manual-results/:resultId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const userId = (req.user as any).id;
+    const leagueId = parseInt(req.params.id);
+    const league = await storage.getLeague(leagueId);
+    if (!league || league.userId !== userId) return res.status(404).json({ message: "League not found" });
+    const allResults = await storage.getLeagueManualResults(leagueId);
+    const resultId = parseInt(req.params.resultId);
+    const result = allResults.find(r => r.id === resultId);
+    if (!result) return res.status(404).json({ message: "Result not found" });
+    await storage.deleteLeagueManualResult(resultId);
+    res.json({ success: true });
   });
 
   app.put("/api/tournaments/:id/league", async (req, res) => {
