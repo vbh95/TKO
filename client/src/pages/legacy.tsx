@@ -1,6 +1,4 @@
-import { Link } from "wouter";
-import { Plus, Search, History, Calendar } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Search, History } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LayoutShell } from "@/components/layout-shell";
 import { TournamentCard } from "@/components/tournament-card";
@@ -31,12 +29,6 @@ export default function LegacyPage() {
             <h1 className="text-3xl font-display font-bold tracking-tight" data-testid="text-legacy-title">Legacy Tournaments</h1>
             <p className="text-muted-foreground mt-1">Completed and Past Tournaments</p>
           </div>
-          <Link href="/create">
-            <Button size="lg" className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all" data-testid="button-create-legacy">
-              <Plus className="w-5 h-5 mr-2" />
-              Add Legacy Tournament
-            </Button>
-          </Link>
         </div>
 
         <div className="relative">
@@ -62,10 +54,7 @@ export default function LegacyPage() {
               <History className="w-8 h-8 text-muted-foreground" />
             </div>
             <h3 className="text-xl font-bold font-display" data-testid="text-no-legacy">No tournaments here yet</h3>
-            <p className="text-muted-foreground mt-2 mb-6">Completed tournaments and legacy entries will appear here.</p>
-            <Link href="/create">
-              <Button data-testid="button-create-first-legacy">Add Legacy Tournament</Button>
-            </Link>
+            <p className="text-muted-foreground mt-2">Completed tournaments and legacy entries will appear here.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
