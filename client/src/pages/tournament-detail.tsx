@@ -462,7 +462,18 @@ export default function TournamentDetail() {
                 {tournament.type}
               </Badge>
             </div>
-            <p className="text-muted-foreground mt-1 text-sm">Created on {new Date(tournament.createdAt!).toLocaleDateString()}</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Created on {new Date(tournament.createdAt!).toLocaleDateString()}
+              {tournament.leagueId && (() => {
+                const league = leaguesList.find((l: any) => l.id === tournament.leagueId);
+                return league ? (
+                  <span className="ml-2 inline-flex items-center gap-1">
+                    <Medal className="w-3 h-3 text-primary inline" />
+                    <span data-testid="text-tournament-league">{league.name}</span>
+                  </span>
+                ) : null;
+              })()}
+            </p>
           </div>
           
           <div className="flex gap-2">
@@ -1220,9 +1231,9 @@ export default function TournamentDetail() {
               };
 
               const getPositionLabel = (bestRound: string, wonFinal: boolean) => {
-                if (bestRound === 'F') return wonFinal ? 'Champion' : 'Final';
-                if (bestRound === 'SF') return 'SF';
-                if (bestRound === 'QF') return 'QF';
+                if (bestRound === 'F') return wonFinal ? 'Champion' : 'Runner-Up';
+                if (bestRound === 'SF') return 'Semi-Finalist';
+                if (bestRound === 'QF') return 'Quarter-Finalist';
                 if (bestRound === 'R16') return 'R16';
                 if (bestRound === 'R32') return 'R32';
                 return 'Group';

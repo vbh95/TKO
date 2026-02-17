@@ -496,17 +496,22 @@ export default function PublicView() {
     'QF': 1,
     'Quarter Final': 1,
     'Quarter Finals': 1,
+    'Quarter-Final': 1,
     'SF': 2,
     'Semi Final': 2,
     'Semi Finals': 2,
+    'Semi-Final': 2,
     'F': 3,
     'Final': 3,
     'GF': 4,
     'Grand Final': 4,
   };
 
+  const roundDisplayNames: Record<string, string> = { QF: 'Quarter-Final', SF: 'Semi-Final', F: 'Final', GF: 'Grand Final' };
+
   const matchesByRound = matches.reduce((acc, match) => {
-    const key = match.groupId ? (groups.find(g => g.id === match.groupId)?.name || 'Group') : (match.roundKey || 'Other');
+    const rawKey = match.groupId ? (groups.find(g => g.id === match.groupId)?.name || 'Group') : (match.roundKey || 'Other');
+    const key = roundDisplayNames[rawKey] || rawKey;
     if (!acc[key]) acc[key] = [];
     acc[key].push(match);
     return acc;

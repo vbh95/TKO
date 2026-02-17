@@ -40,6 +40,13 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
   const deleteMutation = useDeleteTournament();
   const { toast } = useToast();
 
+  const { data: leaguesList = [] } = useQuery<Array<{ id: number; name: string }>>({
+    queryKey: ['/api/leagues'],
+  });
+  const leagueName = tournament.leagueId
+    ? leaguesList.find(l => l.id === tournament.leagueId)?.name
+    : null;
+
   const statusColors = {
     NOT_STARTED: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800",
     IN_PROGRESS: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
@@ -77,6 +84,12 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
               <Calendar className="w-3.5 h-3.5" />
               {tournament.createdAt ? format(new Date(tournament.createdAt), 'MMM d, yyyy') : 'Date unknown'}
             </div>
+            {leagueName && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                <Medal className="w-3 h-3 text-primary" />
+                <span data-testid={`text-league-name-${tournament.id}`}>{leagueName}</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-1 ml-2 shrink-0">
             <Badge variant="outline" className={statusColors[tournament.status as keyof typeof statusColors]}>
