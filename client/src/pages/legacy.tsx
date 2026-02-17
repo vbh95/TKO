@@ -1,11 +1,16 @@
-import { Search, History, ArrowUpDown } from "lucide-react";
+import { Search, History, ArrowUpDown, Calendar, Trophy, Users, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LayoutShell } from "@/components/layout-shell";
 import { TournamentCard } from "@/components/tournament-card";
 import { useTournaments } from "@/hooks/use-tournaments";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
+import { format } from "date-fns";
+import { Link } from "wouter";
+import type { Tournament } from "@shared/schema";
 
 type SortOption = "eventDate" | "createdAt" | "updatedAt";
 
@@ -13,6 +18,13 @@ const sortLabels: Record<SortOption, string> = {
   eventDate: "Date of Tournament",
   createdAt: "Date Created",
   updatedAt: "Last Modified",
+};
+
+const typeLabels: Record<string, string> = {
+  ROUND_ROBIN: "Round Robin",
+  KNOCKOUT: "Knockout",
+  DOUBLE_ELIMINATION: "Double Elim",
+  MULTI_STAGE: "Multi-Stage",
 };
 
 function sortTournaments(list: any[], sortBy: SortOption) {
@@ -39,6 +51,46 @@ function sortTournaments(list: any[], sortBy: SortOption) {
   });
 }
 
+function TournamentListRow({ tournament }: { tournament: Tournament }) {
+  const dateStr = tournament.eventDate
+    ? format(new Date(tournament.eventDate + 'T00:00:00'), 'MMM d, yyyy')
+    : tournament.createdAt
+      ? format(new Date(tournament.createdAt), 'MMM d, yyyy')
+      : '';
+
+  return (
+    <Link href={`/tournaments/${tournament.id}`}>
+      <Card className="flex items-center gap-4 px-4 py-3 cursor-pointer hover-elevate transition-all" data-testid={`list-row-tournament-${tournament.id}`}>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm truncate" data-testid={`text-list-name-${tournament.id}`}>{tournament.name}</p>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {dateStr}
+            </span>
+            <span className="flex items-center gap-1">
+              <Trophy className="w-3 h-3" />
+              {typeLabels[tournament.type] || tournament.type}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {tournament.isLegacy ? (
+            <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 text-xs">
+              LEGACY
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 text-xs">
+              COMPLETED
+            </Badge>
+          )}
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </div>
+      </Card>
+    </Link>
+  );
+}
+
 export default function LegacyPage() {
   const { data: tournaments, isLoading } = useTournaments();
   const [search, setSearch] = useState("");
@@ -49,6 +101,9 @@ export default function LegacyPage() {
     .filter(t => t.name.toLowerCase().includes(search.toLowerCase()));
 
   const legacyTournaments = filtered ? sortTournaments(filtered, sortBy) : [];
+
+  const topThree = legacyTournaments.slice(0, 3);
+  const rest = legacyTournaments.slice(3);
 
   return (
     <LayoutShell>
@@ -99,10 +154,23 @@ export default function LegacyPage() {
             <p className="text-muted-foreground mt-2">Completed tournaments and legacy entries will appear here.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {legacyTournaments.map((tournament: any) => (
-              <TournamentCard key={tournament.id} tournament={tournament} />
-            ))}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {topThree.map((tournament: any) => (
+                <TournamentCard key={tournament.id} tournament={tournament} />
+              ))}
+            </div>
+
+            {rest.length > 0 && (
+              <div className="space-y-2">
+                <h2 className="text-sm font-medium text-muted-foreground px-1" data-testid="text-older-heading">Older Tournaments</h2>
+                <div className="space-y-2">
+                  {rest.map((tournament: any) => (
+                    <TournamentListRow key={tournament.id} tournament={tournament} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
