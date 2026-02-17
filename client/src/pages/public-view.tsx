@@ -531,7 +531,10 @@ export default function PublicView() {
     if (!aIsGroup && !bIsGroup) {
       const aOrder = knockoutRoundOrder[a] ?? 0;
       const bOrder = knockoutRoundOrder[b] ?? 0;
-      return bOrder - aOrder;
+      if (aAllCompleted && bAllCompleted) return bOrder - aOrder;
+      if (aAllCompleted && !bAllCompleted) return 1;
+      if (!aAllCompleted && bAllCompleted) return -1;
+      return aOrder - bOrder;
     }
     if (aIsGroup && aAllCompleted) return 1;
     if (bIsGroup && bAllCompleted) return -1;
