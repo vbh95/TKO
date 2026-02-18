@@ -258,6 +258,7 @@ export default function TournamentDetail() {
   const [newMatchGroupId, setNewMatchGroupId] = useState<string>("");
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [editingKnockoutMatchId, setEditingKnockoutMatchId] = useState<number | null>(null);
   const [liveScorings, setLiveScorings] = useState<Map<number, {
     matchId: number;
     remainingA: number;
@@ -1194,6 +1195,17 @@ export default function TournamentDetail() {
             </div>
           );
 
+          const handleUpdateMatchPlayer = async (matchId: number, slot: 'A' | 'B', playerId: number) => {
+            try {
+              const body = slot === 'A' ? { playerAId: playerId } : { playerBId: playerId };
+              await apiRequest("PATCH", `/api/tournaments/${tournamentId}/matches/${matchId}/players`, body);
+              queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+              toast({ title: "Player Updated", description: "Match player has been changed." });
+            } catch {
+              toast({ title: "Error", description: "Failed to update match player.", variant: "destructive" });
+            }
+          };
+
           const renderKnockoutMatches = () => (
             <div className="space-y-8">
               {groupMatchData.nonGroupRounds.map(({ roundKey, matches: roundMatches }, roundIdx) => (
@@ -1211,34 +1223,68 @@ export default function TournamentDetail() {
                       const slotLabel = knockoutSlotLabels[match.id];
                       const labelA = playerA?.name || slotLabel?.a || 'TBD';
                       const labelB = playerB?.name || slotLabel?.b || 'TBD';
+                      const isEditingThis = editingKnockoutMatchId === match.id && tournament.isLegacy;
 
                       return (
                         <Card
                           key={match.id}
-                          onClick={() => setSelectedMatch(match)}
+                          onClick={() => { if (!isEditingThis) setSelectedMatch(match); }}
                           className={cn(
                             "overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
                             match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
                           )}
                           data-testid={`match-card-${match.id}`}
                         >
-                          <div className="bg-primary px-4 py-2 flex items-center justify-between">
+                          <div className="bg-primary px-4 py-2 flex items-center justify-between gap-2">
                             <span className="text-primary-foreground font-bold text-sm">
                               {roundKey === 'F' ? 'Final' : `${getRoundDisplayName(roundKey)} ${matchIdx + 1}`}
                             </span>
-                            {match.status === 'COMPLETED' && (
-                              <Badge variant="secondary" className="text-xs">Completed</Badge>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {tournament.isLegacy && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingKnockoutMatchId(isEditingThis ? null : match.id);
+                                  }}
+                                  data-testid={`button-edit-knockout-${match.id}`}
+                                >
+                                  <Pencil className="w-3 h-3 mr-1" />
+                                  {isEditingThis ? "Done" : "Edit"}
+                                </Button>
+                              )}
+                              {match.status === 'COMPLETED' && (
+                                <Badge variant="secondary" className="text-xs">Completed</Badge>
+                              )}
+                            </div>
                           </div>
                           <CardContent className="p-0">
-                            <div className="flex items-center justify-between px-4 py-3 border-b">
+                            <div className="flex items-center justify-between px-4 py-3 border-b gap-2">
                               <div className="flex-1">
-                                <span className={cn(
-                                  "text-sm font-medium",
-                                  match.status === 'COMPLETED' && match.winnerId === match.playerAId && match.playerAId && "text-primary font-bold"
-                                )}>
-                                  {labelA}
-                                </span>
+                                {isEditingThis ? (
+                                  <Select
+                                    value={match.playerAId?.toString() || ""}
+                                    onValueChange={(val) => handleUpdateMatchPlayer(match.id, 'A', parseInt(val))}
+                                  >
+                                    <SelectTrigger className="h-8" onClick={(e) => e.stopPropagation()} data-testid={`select-knockout-player-a-${match.id}`}>
+                                      <SelectValue placeholder="Select player" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {players.map((p: Player) => (
+                                        <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <span className={cn(
+                                    "text-sm font-medium",
+                                    match.status === 'COMPLETED' && match.winnerId === match.playerAId && match.playerAId && "text-primary font-bold"
+                                  )}>
+                                    {labelA}
+                                  </span>
+                                )}
                               </div>
                               <div className={cn(
                                 "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
@@ -1247,14 +1293,30 @@ export default function TournamentDetail() {
                                 {match.scoreA || 0}
                               </div>
                             </div>
-                            <div className="flex items-center justify-between px-4 py-3">
+                            <div className="flex items-center justify-between px-4 py-3 gap-2">
                               <div className="flex-1">
-                                <span className={cn(
-                                  "text-sm font-medium",
-                                  match.status === 'COMPLETED' && match.winnerId === match.playerBId && match.playerBId && "text-primary font-bold"
-                                )}>
-                                  {labelB}
-                                </span>
+                                {isEditingThis ? (
+                                  <Select
+                                    value={match.playerBId?.toString() || ""}
+                                    onValueChange={(val) => handleUpdateMatchPlayer(match.id, 'B', parseInt(val))}
+                                  >
+                                    <SelectTrigger className="h-8" onClick={(e) => e.stopPropagation()} data-testid={`select-knockout-player-b-${match.id}`}>
+                                      <SelectValue placeholder="Select player" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {players.map((p: Player) => (
+                                        <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <span className={cn(
+                                    "text-sm font-medium",
+                                    match.status === 'COMPLETED' && match.winnerId === match.playerBId && match.playerBId && "text-primary font-bold"
+                                  )}>
+                                    {labelB}
+                                  </span>
+                                )}
                               </div>
                               <div className={cn(
                                 "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",

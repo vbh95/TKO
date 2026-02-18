@@ -675,6 +675,40 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/tournaments/:id/matches/:matchId/players", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const matchId = parseInt(req.params.matchId);
+      const tournament = await storage.getTournament(id);
+      if (!tournament) return res.status(404).json({ message: "Not found" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+      if (!tournament.isLegacy) return res.status(400).json({ message: "Only available for legacy tournaments" });
+      const existingMatches = await storage.getMatchesByTournamentId(id);
+      const match = existingMatches.find(m => m.id === matchId);
+      if (!match) return res.status(404).json({ message: "Match not found in this tournament" });
+      const { playerAId, playerBId } = req.body;
+      if (playerAId !== undefined && playerAId !== null) {
+        const tournamentPlayers = await storage.getPlayersByTournamentId(id);
+        if (!tournamentPlayers.find(p => p.id === playerAId)) {
+          return res.status(400).json({ message: "Player A not found in tournament" });
+        }
+      }
+      if (playerBId !== undefined && playerBId !== null) {
+        const tournamentPlayers = await storage.getPlayersByTournamentId(id);
+        if (!tournamentPlayers.find(p => p.id === playerBId)) {
+          return res.status(400).json({ message: "Player B not found in tournament" });
+        }
+      }
+      const updateData: any = {};
+      if (playerAId !== undefined) updateData.playerAId = playerAId;
+      if (playerBId !== undefined) updateData.playerBId = playerBId;
+      const updated = await storage.updateMatch(matchId, updateData);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   app.post("/api/tournaments/:id/matches/recalculate", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
