@@ -64,8 +64,38 @@ export default function CreateTournament() {
       setPlayers(newPlayers);
     };
 
+    const handleDateInput = (value: string) => {
+      const digits = value.replace(/\D/g, '');
+      let formatted = '';
+      for (let i = 0; i < digits.length && i < 8; i++) {
+        if (i === 2 || i === 4) formatted += '/';
+        formatted += digits[i];
+      }
+      setEventDate(formatted);
+    };
+
+    const parseEventDate = (ddmmyyyy: string): string | null => {
+      const parts = ddmmyyyy.split('/');
+      if (parts.length !== 3) return null;
+      const [dd, mm, yyyy] = parts;
+      if (dd.length !== 2 || mm.length !== 2 || yyyy.length !== 4) return null;
+      const day = parseInt(dd), month = parseInt(mm), year = parseInt(yyyy);
+      if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+      if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return null;
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
+
+      if (!eventDate || !parseEventDate(eventDate)) {
+        toast({
+          title: "Date required",
+          description: "Please enter a valid tournament date in DD/MM/YYYY format.",
+          variant: "destructive"
+        });
+        return;
+      }
 
       let validPlayers: string[];
 
@@ -102,7 +132,7 @@ export default function CreateTournament() {
         playerNames: validPlayers,
         randomize,
         isLegacy,
-        eventDate: eventDate || null,
+        eventDate: parseEventDate(eventDate),
         settings: {
           groupCount: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupCount : undefined,
           groupBestOf: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupBestOf : undefined,
@@ -171,14 +201,18 @@ export default function CreateTournament() {
                 </div>
 
                 <div className="space-y-2" data-testid="input-event-date-wrapper">
-                  <Label htmlFor="eventDate">Tournament Date</Label>
+                  <Label htmlFor="eventDate">Tournament Date <span className="text-destructive">*</span></Label>
                   <Input
                     id="eventDate"
-                    type="date"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="DD/MM/YYYY"
                     value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
+                    onChange={(e) => handleDateInput(e.target.value)}
+                    maxLength={10}
                     className="h-12 text-lg"
                     data-testid="input-event-date"
+                    required
                   />
                 </div>
 
