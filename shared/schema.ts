@@ -23,6 +23,7 @@ export const leagues = pgTable("leagues", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
+  startDate: text("start_date"),
   endDate: text("end_date"),
   promotionCount: integer("promotion_count").default(0),
   relegationCount: integer("relegation_count").default(0),

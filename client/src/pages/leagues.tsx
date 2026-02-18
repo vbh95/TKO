@@ -36,6 +36,7 @@ interface League {
   id: number;
   name: string;
   userId: number;
+  startDate: string | null;
   endDate: string | null;
   promotionCount: number;
   relegationCount: number;
@@ -46,6 +47,8 @@ export default function LeaguesPage() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newLeagueName, setNewLeagueName] = useState("");
+  const [newStartDate, setNewStartDate] = useState("");
+  const [newEndDate, setNewEndDate] = useState("");
   const [search, setSearch] = useState("");
 
   const { data: leagues = [], isLoading } = useQuery<League[]>({
@@ -53,14 +56,16 @@ export default function LeaguesPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const res = await apiRequest('POST', '/api/leagues', { name });
+    mutationFn: async (data: { name: string; startDate?: string | null; endDate?: string | null }) => {
+      const res = await apiRequest('POST', '/api/leagues', data);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
       setIsCreateOpen(false);
       setNewLeagueName("");
+      setNewStartDate("");
+      setNewEndDate("");
       toast({ title: "League created" });
     },
     onError: () => toast({ title: "Error", description: "Failed to create league", variant: "destructive" }),
@@ -132,23 +137,59 @@ export default function LeaguesPage() {
             <DialogHeader>
               <DialogTitle>Create League</DialogTitle>
             </DialogHeader>
-            <Input
-              data-testid="input-league-name"
-              value={newLeagueName}
-              onChange={(e) => setNewLeagueName(e.target.value)}
-              placeholder="League name"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newLeagueName.trim()) {
-                  createMutation.mutate(newLeagueName.trim());
-                }
-              }}
-            />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-league-name">League Name</Label>
+                <Input
+                  id="create-league-name"
+                  data-testid="input-league-name"
+                  value={newLeagueName}
+                  onChange={(e) => setNewLeagueName(e.target.value)}
+                  placeholder="League name"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newLeagueName.trim()) {
+                      createMutation.mutate({
+                        name: newLeagueName.trim(),
+                        startDate: newStartDate || null,
+                        endDate: newEndDate || null,
+                      });
+                    }
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="create-league-start">Start Date</Label>
+                  <Input
+                    id="create-league-start"
+                    type="date"
+                    value={newStartDate}
+                    onChange={(e) => setNewStartDate(e.target.value)}
+                    data-testid="input-league-start-date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-league-end">End Date</Label>
+                  <Input
+                    id="create-league-end"
+                    type="date"
+                    value={newEndDate}
+                    onChange={(e) => setNewEndDate(e.target.value)}
+                    data-testid="input-league-end-date-create"
+                  />
+                </div>
+              </div>
+            </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
               <Button
                 data-testid="button-confirm-create-league"
                 disabled={!newLeagueName.trim() || createMutation.isPending}
-                onClick={() => createMutation.mutate(newLeagueName.trim())}
+                onClick={() => createMutation.mutate({
+                  name: newLeagueName.trim(),
+                  startDate: newStartDate || null,
+                  endDate: newEndDate || null,
+                })}
               >
                 {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Create
@@ -186,14 +227,20 @@ function LeagueCard({ league }: { league: League }) {
             <h3 className="font-display font-bold text-xl text-foreground group-hover:text-primary transition-colors truncate">
               {league.name}
             </h3>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Calendar className="w-3 h-3" />
-              {league.createdAt ? format(new Date(league.createdAt), 'MMM d, yyyy') : 'Date unknown'}
-            </div>
-            {league.endDate && (
+            {(league.startDate || league.endDate) ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Calendar className="w-3 h-3" />
-                Ends: {format(new Date(league.endDate), 'MMM d, yyyy')}
+                {league.startDate && league.endDate
+                  ? `${format(new Date(league.startDate), 'MMM d, yyyy')} — ${format(new Date(league.endDate), 'MMM d, yyyy')}`
+                  : league.startDate
+                    ? `From ${format(new Date(league.startDate), 'MMM d, yyyy')}`
+                    : `Ends ${format(new Date(league.endDate!), 'MMM d, yyyy')}`
+                }
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Calendar className="w-3 h-3" />
+                {league.createdAt ? format(new Date(league.createdAt), 'MMM d, yyyy') : 'Date unknown'}
               </div>
             )}
           </div>
@@ -279,6 +326,7 @@ function LeagueSettingsDialog({ league, open, onOpenChange }: { league: League; 
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState(league.name);
+  const [startDate, setStartDate] = useState(league.startDate || "");
   const [endDate, setEndDate] = useState(league.endDate || "");
   const [promotionEnabled, setPromotionEnabled] = useState((league.promotionCount || 0) > 0);
   const [promotionCount, setPromotionCount] = useState(league.promotionCount || 0);
@@ -288,6 +336,7 @@ function LeagueSettingsDialog({ league, open, onOpenChange }: { league: League; 
   useEffect(() => {
     if (open) {
       setName(league.name);
+      setStartDate(league.startDate || "");
       setEndDate(league.endDate || "");
       setPromotionEnabled((league.promotionCount || 0) > 0);
       setPromotionCount(league.promotionCount || 0);
@@ -305,6 +354,7 @@ function LeagueSettingsDialog({ league, open, onOpenChange }: { league: League; 
     try {
       await apiRequest('PUT', `/api/leagues/${league.id}`, {
         name: name.trim(),
+        startDate: startDate || null,
         endDate: endDate || null,
         promotionCount: promotionEnabled ? Math.max(1, promotionCount) : 0,
         relegationCount: relegationEnabled ? Math.max(1, relegationCount) : 0,
@@ -340,20 +390,37 @@ function LeagueSettingsDialog({ league, open, onOpenChange }: { league: League; 
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="league-end-date">End of League Date</Label>
-            <Input
-              id="league-end-date"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              data-testid="input-league-end-date"
-            />
-            {endDate && (
-              <Button variant="ghost" size="sm" onClick={() => setEndDate("")} className="text-xs text-muted-foreground">
-                Clear date
-              </Button>
-            )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="league-start-date">Start Date</Label>
+              <Input
+                id="league-start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                data-testid="input-league-start-date-settings"
+              />
+              {startDate && (
+                <Button variant="ghost" size="sm" onClick={() => setStartDate("")} className="text-xs text-muted-foreground">
+                  Clear
+                </Button>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="league-end-date">End Date</Label>
+              <Input
+                id="league-end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                data-testid="input-league-end-date"
+              />
+              {endDate && (
+                <Button variant="ghost" size="sm" onClick={() => setEndDate("")} className="text-xs text-muted-foreground">
+                  Clear
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="space-y-4 border rounded-xl p-4 bg-muted/20">

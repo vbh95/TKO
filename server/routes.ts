@@ -1580,11 +1580,16 @@ export async function registerRoutes(
   app.post("/api/leagues", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const userId = (req.user as any).id;
-    const { name } = req.body;
+    const { name, startDate, endDate } = req.body;
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ message: "League name is required" });
     }
-    const league = await storage.createLeague({ userId, name: name.trim() });
+    const league = await storage.createLeague({
+      userId,
+      name: name.trim(),
+      startDate: startDate || null,
+      endDate: endDate || null,
+    });
     res.json(league);
   });
 
@@ -1594,11 +1599,12 @@ export async function registerRoutes(
     const leagueId = parseInt(req.params.id);
     const league = await storage.getLeague(leagueId);
     if (!league || league.userId !== userId) return res.status(404).json({ message: "League not found" });
-    const { name, endDate, promotionCount, relegationCount } = req.body;
+    const { name, startDate, endDate, promotionCount, relegationCount } = req.body;
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ message: "League name is required" });
     }
     const updateData: any = { name: name.trim() };
+    if (startDate !== undefined) updateData.startDate = startDate || null;
     if (endDate !== undefined) updateData.endDate = endDate || null;
     if (promotionCount !== undefined) updateData.promotionCount = Math.max(0, parseInt(promotionCount) || 0);
     if (relegationCount !== undefined) updateData.relegationCount = Math.max(0, parseInt(relegationCount) || 0);

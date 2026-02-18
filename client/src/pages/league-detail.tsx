@@ -32,6 +32,7 @@ interface League {
   id: number;
   name: string;
   userId: number;
+  startDate: string | null;
   endDate: string | null;
   promotionCount: number;
   relegationCount: number;
@@ -193,14 +194,20 @@ export default function LeagueDetail() {
               {league.name}
             </h1>
             <div className="flex items-center gap-4 mt-1 flex-wrap">
-              <span className="text-sm text-muted-foreground flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5" />
-                Created {league.createdAt ? format(new Date(league.createdAt), 'MMM d, yyyy') : ''}
-              </span>
-              {league.endDate && (
+              {(league.startDate || league.endDate) ? (
                 <span className="text-sm text-muted-foreground flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
-                  Ends {format(new Date(league.endDate), 'MMM d, yyyy')}
+                  {league.startDate && league.endDate
+                    ? `${format(new Date(league.startDate), 'MMM d, yyyy')} — ${format(new Date(league.endDate), 'MMM d, yyyy')}`
+                    : league.startDate
+                      ? `From ${format(new Date(league.startDate), 'MMM d, yyyy')}`
+                      : `Ends ${format(new Date(league.endDate!), 'MMM d, yyyy')}`
+                  }
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" />
+                  Created {league.createdAt ? format(new Date(league.createdAt), 'MMM d, yyyy') : ''}
                 </span>
               )}
             </div>
