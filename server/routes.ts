@@ -1654,7 +1654,7 @@ export async function registerRoutes(
       const qfMatches = eliminationMatches.filter(m => m.roundKey === 'QF');
 
       for (const player of playersList) {
-        const key = player.name.toLowerCase().trim();
+        const key = player.name.replace(/\s+/g, ' ').toLowerCase().trim();
         if (!playerAgg[key]) {
           playerAgg[key] = { name: player.name, points: 0, legsWon: 0, legsLost: 0, tournaments: 0 };
         }
@@ -1688,7 +1688,7 @@ export async function registerRoutes(
     const manualResults = await storage.getLeagueManualResults(leagueId);
     const manualTournamentsByPlayer: Record<string, Set<string>> = {};
     for (const mr of manualResults) {
-      const key = mr.playerName.toLowerCase().trim();
+      const key = mr.playerName.replace(/\s+/g, ' ').toLowerCase().trim();
       if (!playerAgg[key]) {
         playerAgg[key] = { name: mr.playerName, points: 0, legsWon: 0, legsLost: 0, tournaments: 0 };
       }
