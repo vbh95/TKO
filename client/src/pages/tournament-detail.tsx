@@ -27,7 +27,8 @@ import {
   Pencil,
   Eye,
   Download,
-  ClipboardList
+  ClipboardList,
+  Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -249,6 +250,12 @@ export default function TournamentDetail() {
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("none");
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
   const [editingPlayerName, setEditingPlayerName] = useState("");
+  const [isCreateMatchOpen, setIsCreateMatchOpen] = useState(false);
+  const [newMatchPlayerA, setNewMatchPlayerA] = useState<string>("");
+  const [newMatchPlayerB, setNewMatchPlayerB] = useState<string>("");
+  const [newMatchStage, setNewMatchStage] = useState<string>("GROUP");
+  const [newMatchGroupId, setNewMatchGroupId] = useState<string>("");
+  const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [liveScorings, setLiveScorings] = useState<Map<number, {
     matchId: number;
     remainingA: number;
@@ -941,6 +948,132 @@ export default function TournamentDetail() {
             );
           };
 
+          const handleCreateManualMatch = async () => {
+            if (!newMatchPlayerA || !newMatchPlayerB) return;
+            if (newMatchPlayerA === newMatchPlayerB) {
+              toast({ title: "Error", description: "Cannot match a player against themselves.", variant: "destructive" });
+              return;
+            }
+            setIsCreatingMatch(true);
+            try {
+              await apiRequest("POST", `/api/tournaments/${tournamentId}/matches/manual`, {
+                playerAId: parseInt(newMatchPlayerA),
+                playerBId: parseInt(newMatchPlayerB),
+                stage: newMatchStage,
+                roundKey: newMatchStage === "GROUP" ? "group" : newMatchStage === "KNOCKOUT" ? "QF" : newMatchStage.toLowerCase(),
+                groupId: newMatchGroupId ? parseInt(newMatchGroupId) : null,
+                bestOf: (tournament.settings as any)?.matchFormat || 3,
+              });
+              queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+              toast({ title: "Match Created", description: "New match has been added." });
+              setIsCreateMatchOpen(false);
+              setNewMatchPlayerA("");
+              setNewMatchPlayerB("");
+              setNewMatchGroupId("");
+            } catch {
+              toast({ title: "Error", description: "Failed to create match.", variant: "destructive" });
+            } finally {
+              setIsCreatingMatch(false);
+            }
+          };
+
+          const handleDeleteMatch = async (matchId: number) => {
+            try {
+              await apiRequest("DELETE", `/api/tournaments/${tournamentId}/matches/${matchId}`);
+              queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+              toast({ title: "Match Deleted", description: "Match has been removed." });
+            } catch {
+              toast({ title: "Error", description: "Failed to delete match.", variant: "destructive" });
+            }
+          };
+
+          const renderCreateMatchButton = () => (
+            <div className="flex justify-end">
+              <Dialog open={isCreateMatchOpen} onOpenChange={setIsCreateMatchOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="gap-2" data-testid="button-create-match">
+                    <Plus className="w-4 h-4" />
+                    Create Match
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[450px]">
+                  <DialogHeader>
+                    <DialogTitle>Create Match</DialogTitle>
+                    <DialogDescription>
+                      Choose two players to create a new match.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Player A</label>
+                      <Select value={newMatchPlayerA} onValueChange={setNewMatchPlayerA}>
+                        <SelectTrigger data-testid="select-match-player-a">
+                          <SelectValue placeholder="Select player" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {players.map((p: Player) => (
+                            <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Player B</label>
+                      <Select value={newMatchPlayerB} onValueChange={setNewMatchPlayerB}>
+                        <SelectTrigger data-testid="select-match-player-b">
+                          <SelectValue placeholder="Select player" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {players.filter((p: Player) => p.id.toString() !== newMatchPlayerA).map((p: Player) => (
+                            <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Stage</label>
+                      <Select value={newMatchStage} onValueChange={setNewMatchStage}>
+                        <SelectTrigger data-testid="select-match-stage">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GROUP">Group Stage</SelectItem>
+                          <SelectItem value="KNOCKOUT">Knockout</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {newMatchStage === "GROUP" && groups.length > 0 && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Group</label>
+                        <Select value={newMatchGroupId} onValueChange={setNewMatchGroupId}>
+                          <SelectTrigger data-testid="select-match-group">
+                            <SelectValue placeholder="Select group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {groups.map((g: any) => (
+                              <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button variant="ghost" onClick={() => setIsCreateMatchOpen(false)}>Cancel</Button>
+                    <Button
+                      onClick={handleCreateManualMatch}
+                      disabled={isCreatingMatch || !newMatchPlayerA || !newMatchPlayerB}
+                      data-testid="button-confirm-create-match"
+                    >
+                      {isCreatingMatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Create Match
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          );
+
           const renderGroupMatches = () => (
             <div className="space-y-8">
               {groupMatchData.byGroup.map(({ group, rounds }) => (
@@ -998,12 +1131,25 @@ export default function TournamentDetail() {
                                     </div>
                                   </div>
                                 </div>
-                                <InlineScorerEdit
-                                  matchId={match.id}
-                                  tournamentId={tournament.id}
-                                  currentName={match.scorerName || null}
-                                  isLegacy={tournament.isLegacy || false}
-                                />
+                                <div className="flex items-center justify-between gap-2">
+                                  <InlineScorerEdit
+                                    matchId={match.id}
+                                    tournamentId={tournament.id}
+                                    currentName={match.scorerName || null}
+                                    isLegacy={tournament.isLegacy || false}
+                                  />
+                                  {tournament.isLegacy && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="text-muted-foreground hover:text-destructive"
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteMatch(match.id); }}
+                                      data-testid={`button-delete-match-${match.id}`}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
                                 {match.status === 'COMPLETED' && (
                                   <AdminMatchStats
                                     matchId={match.id}
@@ -1151,11 +1297,13 @@ export default function TournamentDetail() {
               {isMultiStage ? (
                 <>
                   <TabsContent value="group-stage" className="space-y-8" data-testid="content-group-stage">
+                    {tournament.isLegacy && renderCreateMatchButton()}
                     {renderGroupMatches()}
                   </TabsContent>
                 </>
               ) : (
                 <TabsContent value="matches" className="space-y-8">
+                  {tournament.isLegacy && renderCreateMatchButton()}
                   {renderGroupMatches()}
                   {renderKnockoutMatches()}
                 </TabsContent>
@@ -1310,6 +1458,23 @@ export default function TournamentDetail() {
                 }
               };
 
+              const hasGroups = groups && groups.length > 0;
+              const getPlayerGroup = (playerId: number) => {
+                const membership = groupMemberships.find((m: any) => m.playerId === playerId);
+                if (!membership) return null;
+                return groups.find((g: any) => g.id === membership.groupId) || null;
+              };
+
+              const handleGroupReassign = async (playerId: number, newGroupId: number) => {
+                try {
+                  await apiRequest("PATCH", `/api/tournaments/${tournamentId}/players/${playerId}/group`, { groupId: newGroupId });
+                  queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+                  toast({ title: "Group Updated", description: "Player has been moved to a new group." });
+                } catch {
+                  toast({ title: "Error", description: "Failed to reassign group.", variant: "destructive" });
+                }
+              };
+
               return (
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
@@ -1353,13 +1518,16 @@ export default function TournamentDetail() {
                           <TableRow>
                             <TableHead className="w-[50px]">#</TableHead>
                             <TableHead>Player</TableHead>
+                            {hasGroups && <TableHead className="text-center">Group</TableHead>}
                             <TableHead className="text-center">Position</TableHead>
                             <TableHead className="text-center">Legs Won</TableHead>
                             <TableHead className="text-right font-bold">Points</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {playerResults.map((player: any, idx: number) => (
+                          {playerResults.map((player: any, idx: number) => {
+                            const playerGroup = hasGroups ? getPlayerGroup(player.id) : null;
+                            return (
                             <TableRow key={player.id} data-testid={`player-result-row-${player.id}`}>
                               <TableCell className="font-medium text-muted-foreground">
                                 <div className="flex items-center gap-1.5">
@@ -1401,6 +1569,29 @@ export default function TournamentDetail() {
                                   </div>
                                 )}
                               </TableCell>
+                              {hasGroups && (
+                                <TableCell className="text-center">
+                                  {tournament.isLegacy ? (
+                                    <Select
+                                      value={playerGroup?.id?.toString() || ""}
+                                      onValueChange={(val) => handleGroupReassign(player.id, parseInt(val))}
+                                    >
+                                      <SelectTrigger className="h-8 w-28" data-testid={`select-group-${player.id}`}>
+                                        <SelectValue placeholder="No group" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {groups.map((g: any) => (
+                                          <SelectItem key={g.id} value={g.id.toString()}>
+                                            {g.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Badge variant="outline">{playerGroup?.name || "—"}</Badge>
+                                  )}
+                                </TableCell>
+                              )}
                               <TableCell className="text-center">
                                 <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border", getPositionBadgeColor(player.bestRound, player.wonFinal))}>
                                   {player.positionLabel}
@@ -1409,7 +1600,8 @@ export default function TournamentDetail() {
                               <TableCell className="text-center font-mono">{player.legsWon}</TableCell>
                               <TableCell className="text-right font-bold text-primary text-lg">{player.points}</TableCell>
                             </TableRow>
-                          ))}
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </div>

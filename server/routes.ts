@@ -587,6 +587,94 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/tournaments/:id/players/:playerId/group", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const playerId = parseInt(req.params.playerId);
+      const tournament = await storage.getTournament(id);
+      if (!tournament) return res.status(404).json({ message: "Not found" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+      if (!tournament.isLegacy) return res.status(400).json({ message: "Group reassignment is only available for legacy tournaments" });
+      const tournamentPlayers = await storage.getPlayersByTournamentId(id);
+      if (!tournamentPlayers.find(p => p.id === playerId)) return res.status(404).json({ message: "Player not found in this tournament" });
+      const { groupId } = req.body;
+      if (!groupId || typeof groupId !== "number") return res.status(400).json({ message: "groupId is required" });
+      const tournamentGroups = await storage.getGroupsByTournamentId(id);
+      const targetGroup = tournamentGroups.find(g => g.id === groupId);
+      if (!targetGroup) return res.status(404).json({ message: "Group not found in this tournament" });
+      await storage.deleteGroupMembershipsByPlayerId(playerId);
+      const membership = await storage.createGroupMembership({ groupId, playerId });
+      res.json(membership);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/tournaments/:id/matches/manual", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tournament = await storage.getTournament(id);
+      if (!tournament) return res.status(404).json({ message: "Not found" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+      if (!tournament.isLegacy) return res.status(400).json({ message: "Manual match creation is only available for legacy tournaments" });
+      const { playerAId, playerBId, stage, roundKey, groupId, bestOf } = req.body;
+      if (!playerAId || !playerBId) return res.status(400).json({ message: "Both players are required" });
+      if (playerAId === playerBId) return res.status(400).json({ message: "Cannot match a player against themselves" });
+      const tournamentPlayers = await storage.getPlayersByTournamentId(id);
+      const playerIds = tournamentPlayers.map(p => p.id);
+      if (!playerIds.includes(playerAId) || !playerIds.includes(playerBId)) {
+        return res.status(400).json({ message: "Players must belong to this tournament" });
+      }
+      if (groupId) {
+        const tournamentGroups = await storage.getGroupsByTournamentId(id);
+        if (!tournamentGroups.find(g => g.id === groupId)) {
+          return res.status(400).json({ message: "Group not found in this tournament" });
+        }
+      }
+      const existingMatches = await storage.getMatchesByTournamentId(id);
+      const maxOrder = existingMatches.length > 0 ? Math.max(...existingMatches.map(m => m.order)) : 0;
+      const match = await storage.createMatch({
+        tournamentId: id,
+        stage: stage || "GROUP",
+        roundKey: roundKey || "group",
+        groupId: groupId || null,
+        playerAId,
+        playerBId,
+        scoreA: 0,
+        scoreB: 0,
+        bestOf: bestOf || (tournament.settings as any)?.matchFormat || 3,
+        status: "PENDING",
+        winnerId: null,
+        order: maxOrder + 1,
+        boardNumber: null,
+        scorerId: null,
+        scorerName: null,
+      });
+      res.json(match);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.delete("/api/tournaments/:id/matches/:matchId", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const matchId = parseInt(req.params.matchId);
+      const tournament = await storage.getTournament(id);
+      if (!tournament) return res.status(404).json({ message: "Not found" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+      if (!tournament.isLegacy) return res.status(400).json({ message: "Match deletion is only available for legacy tournaments" });
+      const existingMatches = await storage.getMatchesByTournamentId(id);
+      if (!existingMatches.find(m => m.id === matchId)) {
+        return res.status(404).json({ message: "Match not found in this tournament" });
+      }
+      await storage.deleteMatch(matchId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   app.get(api.tournaments.list.path, isAuthenticated, async (req, res) => {
     const userId = (req.user as any).id;
     const tournaments = await storage.getTournamentsByUserId(userId);

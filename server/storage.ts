@@ -46,8 +46,10 @@ export interface IStorage {
   
   // Group Memberships
   createGroupMembership(membership: InsertGroupMembership): Promise<GroupMembership>;
+  deleteGroupMembershipsByPlayerId(playerId: number): Promise<void>;
   getGroupMembershipsByGroupId(groupId: number): Promise<(GroupMembership & { player: Player })[]>;
   getGroupMembershipsByTournamentId(tournamentId: number): Promise<GroupMembership[]>;
+  deleteMatch(id: number): Promise<void>;
   
   // Matches
   getMatchesByTournamentId(tournamentId: number): Promise<(Match & { playerA: Player | null, playerB: Player | null })[]>;
@@ -189,6 +191,14 @@ export class DatabaseStorage implements IStorage {
     return newMembership;
   }
   
+  async deleteGroupMembershipsByPlayerId(playerId: number): Promise<void> {
+    await db.delete(groupMemberships).where(eq(groupMemberships.playerId, playerId));
+  }
+
+  async deleteMatch(id: number): Promise<void> {
+    await db.delete(matches).where(eq(matches.id, id));
+  }
+
   async getGroupMembershipsByGroupId(groupId: number): Promise<(GroupMembership & { player: Player })[]> {
     const results = await db.select().from(groupMemberships)
       .innerJoin(players, eq(groupMemberships.playerId, players.id))
