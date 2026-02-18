@@ -1639,7 +1639,7 @@ export async function registerRoutes(
       'WINNER': 40,
     };
 
-    const playerAgg: Record<string, { name: string; points: number; legsWon: number; legsLost: number; tournaments: number }> = {};
+    const playerAgg: Record<string, { name: string; points: number; legsWon: number; legsLost: number; tournaments: number; wins: number }> = {};
 
     for (const t of leagueTournaments) {
       const allMatches = await storage.getMatchesByTournamentId(t.id);
@@ -1656,7 +1656,7 @@ export async function registerRoutes(
       for (const player of playersList) {
         const key = player.name.replace(/\s+/g, ' ').toLowerCase().trim();
         if (!playerAgg[key]) {
-          playerAgg[key] = { name: player.name, points: 0, legsWon: 0, legsLost: 0, tournaments: 0 };
+          playerAgg[key] = { name: player.name, points: 0, legsWon: 0, legsLost: 0, tournaments: 0, wins: 0 };
         }
 
         const playerMatches = completedMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
@@ -1682,6 +1682,7 @@ export async function registerRoutes(
 
         playerAgg[key].points += STAGE_POINTS[stage] || 0;
         playerAgg[key].tournaments += 1;
+        if (stage === 'WINNER') playerAgg[key].wins += 1;
       }
     }
 
@@ -1690,7 +1691,7 @@ export async function registerRoutes(
     for (const mr of manualResults) {
       const key = mr.playerName.replace(/\s+/g, ' ').toLowerCase().trim();
       if (!playerAgg[key]) {
-        playerAgg[key] = { name: mr.playerName, points: 0, legsWon: 0, legsLost: 0, tournaments: 0 };
+        playerAgg[key] = { name: mr.playerName, points: 0, legsWon: 0, legsLost: 0, tournaments: 0, wins: 0 };
       }
       playerAgg[key].points += mr.points;
       playerAgg[key].legsWon += mr.legsWon;
@@ -1717,6 +1718,7 @@ export async function registerRoutes(
       standings: standings.map((s, i) => ({
         position: i + 1,
         name: s.name,
+        wins: s.wins,
         points: s.points,
         legsWon: s.legsWon,
         legsLost: s.legsLost,

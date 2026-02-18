@@ -30,6 +30,7 @@ interface League {
 interface StandingRow {
   position: number;
   name: string;
+  wins: number;
   points: number;
   legsWon: number;
   legsLost: number;
@@ -190,6 +191,7 @@ export default function LeagueDetail() {
                     <TableRow>
                       <TableHead className="w-14 text-center">Pos</TableHead>
                       <TableHead>Player</TableHead>
+                      <TableHead className="text-center">Wins</TableHead>
                       <TableHead className="text-center">Points</TableHead>
                       <TableHead className="text-center">Legs Won</TableHead>
                       <TableHead className="text-center">Leg Diff</TableHead>
@@ -215,6 +217,16 @@ export default function LeagueDetail() {
                             </div>
                           </TableCell>
                           <TableCell className="font-medium">{row.name}</TableCell>
+                          <TableCell className="text-center tabular-nums">
+                            {row.wins > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold" data-testid={`text-wins-${row.position}`}>
+                                <Trophy className="w-3.5 h-3.5" />
+                                {row.wins}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-center tabular-nums font-bold text-primary text-lg">{row.points}</TableCell>
                           <TableCell className="text-center tabular-nums">{row.legsWon}</TableCell>
                           <TableCell className="text-center tabular-nums">
