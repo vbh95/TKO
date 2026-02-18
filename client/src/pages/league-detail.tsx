@@ -191,7 +191,7 @@ export default function LeagueDetail() {
                     <TableRow>
                       <TableHead className="w-14 text-center">Pos</TableHead>
                       <TableHead>Player</TableHead>
-                      <TableHead className="text-center">Wins</TableHead>
+                      <TableHead className="text-center">Tournament Wins</TableHead>
                       <TableHead className="text-center">Points</TableHead>
                       <TableHead className="text-center">Legs Won</TableHead>
                       <TableHead className="text-center">Leg Diff</TableHead>
