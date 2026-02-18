@@ -39,6 +39,7 @@ export interface IStorage {
   getPlayersByTournamentId(tournamentId: number): Promise<Player[]>;
   createPlayer(player: InsertPlayer): Promise<Player>;
   updatePlayer(id: number, data: { name: string }): Promise<Player>;
+  deletePlayer(id: number): Promise<void>;
   
   // Groups
   getGroupsByTournamentId(tournamentId: number): Promise<Group[]>;
@@ -163,7 +164,7 @@ export class DatabaseStorage implements IStorage {
 
   // Players
   async getPlayersByTournamentId(tournamentId: number): Promise<Player[]> {
-    return await db.select().from(players).where(eq(players.tournamentId, tournamentId));
+    return await db.select().from(players).where(eq(players.tournamentId, tournamentId)).orderBy(players.id);
   }
 
   async createPlayer(player: InsertPlayer): Promise<Player> {
@@ -174,6 +175,11 @@ export class DatabaseStorage implements IStorage {
   async updatePlayer(id: number, data: { name: string }): Promise<Player> {
     const [updated] = await db.update(players).set({ name: data.name }).where(eq(players.id, id)).returning();
     return updated;
+  }
+
+  async deletePlayer(id: number): Promise<void> {
+    await db.delete(groupMemberships).where(eq(groupMemberships.playerId, id));
+    await db.delete(players).where(eq(players.id, id));
   }
   
   // Groups

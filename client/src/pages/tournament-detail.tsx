@@ -318,10 +318,16 @@ export default function TournamentDetail() {
     toast({ title: "Link copied to clipboard" });
   };
 
+  const maxPlayers = players.length;
+
   const handleBulkUpdate = () => {
     const names = bulkInput.split("\n").map(n => n.trim()).filter(n => n !== "");
     if (names.length < 2) {
       toast({ title: "Validation Error", description: "Need at least 2 players", variant: "destructive" });
+      return;
+    }
+    if (names.length > maxPlayers) {
+      toast({ title: "Validation Error", description: `Cannot exceed ${maxPlayers} players (tournament size).`, variant: "destructive" });
       return;
     }
 
@@ -334,6 +340,16 @@ export default function TournamentDetail() {
         setIsBulkDialogOpen(false);
       }
     });
+  };
+
+  const handleDeletePlayer = async (playerId: number) => {
+    try {
+      await apiRequest("DELETE", `/api/tournaments/${tournamentId}/players/${playerId}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+      toast({ title: "Player Removed", description: "Player has been removed from the tournament." });
+    } catch {
+      toast({ title: "Error", description: "Failed to remove player.", variant: "destructive" });
+    }
   };
 
   const getPlayer = (id: number | null) => players.find((p: Player) => p.id === id) || null;
@@ -1578,6 +1594,7 @@ export default function TournamentDetail() {
                           <DialogTitle>Bulk Edit Players</DialogTitle>
                           <DialogDescription>
                             Edit player names below. Enter one name per line.
+                            {tournament.isLegacy && ` You can remove names to delete players. Maximum: ${maxPlayers} players.`}
                           </DialogDescription>
                         </DialogHeader>
                         <div className="py-4">
@@ -1653,6 +1670,19 @@ export default function TournamentDetail() {
                                     >
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
+                                    {tournament.isLegacy && (
+                                      <button
+                                        onClick={() => {
+                                          if (window.confirm(`Remove ${player.name} from this tournament?`)) {
+                                            handleDeletePlayer(player.id);
+                                          }
+                                        }}
+                                        className="text-muted-foreground hover:text-destructive transition-colors"
+                                        data-testid={`button-delete-player-${player.id}`}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
                                   </div>
                                 )}
                               </TableCell>

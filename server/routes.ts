@@ -545,11 +545,30 @@ export async function registerRoutes(
 
       if (replace) {
         const existingPlayers = await storage.getPlayersByTournamentId(id);
-        // Cascading delete handles related records if configured, otherwise be careful.
-        // For now, assume cascade delete is fine as per schema.
-        for (const p of existingPlayers) {
-          // Add deletePlayer to storage if needed, or use raw db
+        if (playerList.length > existingPlayers.length) {
+          return res.status(400).json({ message: `Cannot exceed ${existingPlayers.length} players (tournament size).` });
         }
+        const resultPlayers = [];
+
+        for (let i = 0; i < playerList.length; i++) {
+          if (i < existingPlayers.length) {
+            const updated = await storage.updatePlayer(existingPlayers[i].id, { name: playerList[i].name });
+            resultPlayers.push(updated);
+          } else {
+            const newPlayer = await storage.createPlayer({
+              name: playerList[i].name,
+              tournamentId: id,
+              seed: playerList[i].seed,
+            });
+            resultPlayers.push(newPlayer);
+          }
+        }
+
+        for (let i = playerList.length; i < existingPlayers.length; i++) {
+          await storage.deletePlayer(existingPlayers[i].id);
+        }
+
+        return res.json(resultPlayers);
       }
 
       const createdPlayers = [];
@@ -582,6 +601,23 @@ export async function registerRoutes(
       if (!name || typeof name !== "string" || !name.trim()) return res.status(400).json({ message: "Name is required" });
       const updated = await storage.updatePlayer(playerId, { name: name.trim() });
       res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.delete("/api/tournaments/:id/players/:playerId", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const playerId = parseInt(req.params.playerId);
+      const tournament = await storage.getTournament(id);
+      if (!tournament) return res.status(404).json({ message: "Not found" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+      if (!tournament.isLegacy) return res.status(400).json({ message: "Player deletion is only available for legacy tournaments" });
+      const tournamentPlayers = await storage.getPlayersByTournamentId(id);
+      if (!tournamentPlayers.find(p => p.id === playerId)) return res.status(404).json({ message: "Player not found in this tournament" });
+      await storage.deletePlayer(playerId);
+      res.json({ message: "Player deleted" });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
