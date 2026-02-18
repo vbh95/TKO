@@ -1464,6 +1464,26 @@ export default function TournamentDetail() {
                 </CardContent>
               </Card>
             ))}
+
+            <Card data-testid="standings-criteria">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Standings Criteria</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  Group standings are determined by the following criteria, applied in order:
+                </p>
+                <ol className="list-decimal list-inside space-y-1.5 pl-1">
+                  <li><span className="font-medium text-foreground">Points</span> — {ptsWin} for a win{ptsLoss !== 0 ? `, ${ptsLoss} for a loss` : ''}. The player with the most points is ranked highest.</li>
+                  <li><span className="font-medium text-foreground">Leg Difference</span> — If tied on points, the player with the better leg difference (legs won minus legs lost) is ranked higher.</li>
+                  <li><span className="font-medium text-foreground">Legs Won</span> — If still tied, the player with the most legs won is ranked higher.</li>
+                  <li><span className="font-medium text-foreground">Head-to-Head</span> — If still tied, the result between the tied players is used. The same criteria (points, leg difference, legs won) are applied to only the matches played between the tied players.</li>
+                </ol>
+                <p className="text-xs text-muted-foreground/70 pt-1">
+                  If players remain tied after all criteria, they share the same effective position.
+                </p>
+              </CardContent>
+            </Card>
           </TabsContent>
 
               {isMultiStage && (
