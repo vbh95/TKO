@@ -81,7 +81,9 @@ export default function CreateTournament() {
       if (dd.length !== 2 || mm.length !== 2 || yyyy.length !== 4) return null;
       const day = parseInt(dd), month = parseInt(mm), year = parseInt(yyyy);
       if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-      if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return null;
+      if (month < 1 || month > 12 || day < 1 || year < 1900) return null;
+      const daysInMonth = new Date(year, month, 0).getDate();
+      if (day > daysInMonth) return null;
       return `${yyyy}-${mm}-${dd}`;
     };
 
