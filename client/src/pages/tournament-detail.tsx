@@ -258,6 +258,7 @@ export default function TournamentDetail() {
   const [newMatchGroupId, setNewMatchGroupId] = useState<string>("");
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isRecalcConfirmOpen, setIsRecalcConfirmOpen] = useState(false);
   const [editingKnockoutMatchId, setEditingKnockoutMatchId] = useState<number | null>(null);
   const [liveScorings, setLiveScorings] = useState<Map<number, {
     matchId: number;
@@ -1019,102 +1020,6 @@ export default function TournamentDetail() {
             }
           };
 
-          const renderCreateMatchButton = () => (
-            <div className="flex justify-end gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handleRecalculateMatches}
-                disabled={isRecalculating}
-                data-testid="button-recalculate-matches"
-              >
-                <RefreshCw className={cn("w-4 h-4", isRecalculating && "animate-spin")} />
-                {isRecalculating ? "Recalculating..." : "Recalculate Matches"}
-              </Button>
-              <Dialog open={isCreateMatchOpen} onOpenChange={setIsCreateMatchOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="gap-2" data-testid="button-create-match">
-                    <Plus className="w-4 h-4" />
-                    Create Match
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[450px]">
-                  <DialogHeader>
-                    <DialogTitle>Create Match</DialogTitle>
-                    <DialogDescription>
-                      Choose two players to create a new match.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Player A</label>
-                      <Select value={newMatchPlayerA} onValueChange={setNewMatchPlayerA}>
-                        <SelectTrigger data-testid="select-match-player-a">
-                          <SelectValue placeholder="Select player" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {players.map((p: Player) => (
-                            <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Player B</label>
-                      <Select value={newMatchPlayerB} onValueChange={setNewMatchPlayerB}>
-                        <SelectTrigger data-testid="select-match-player-b">
-                          <SelectValue placeholder="Select player" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {players.filter((p: Player) => p.id.toString() !== newMatchPlayerA).map((p: Player) => (
-                            <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Stage</label>
-                      <Select value={newMatchStage} onValueChange={setNewMatchStage}>
-                        <SelectTrigger data-testid="select-match-stage">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="GROUP">Group Stage</SelectItem>
-                          <SelectItem value="KNOCKOUT">Knockout</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {newMatchStage === "GROUP" && groups.length > 0 && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Group</label>
-                        <Select value={newMatchGroupId} onValueChange={setNewMatchGroupId}>
-                          <SelectTrigger data-testid="select-match-group">
-                            <SelectValue placeholder="Select group" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {groups.map((g: any) => (
-                              <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-                  <DialogFooter>
-                    <Button variant="ghost" onClick={() => setIsCreateMatchOpen(false)}>Cancel</Button>
-                    <Button
-                      onClick={handleCreateManualMatch}
-                      disabled={isCreatingMatch || !newMatchPlayerA || !newMatchPlayerB}
-                      data-testid="button-confirm-create-match"
-                    >
-                      {isCreatingMatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Create Match
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          );
 
           const renderGroupMatches = () => (
             <div className="space-y-8">
@@ -1400,13 +1305,11 @@ export default function TournamentDetail() {
               {isMultiStage ? (
                 <>
                   <TabsContent value="group-stage" className="space-y-8" data-testid="content-group-stage">
-                    {tournament.isLegacy && renderCreateMatchButton()}
                     {renderGroupMatches()}
                   </TabsContent>
                 </>
               ) : (
                 <TabsContent value="matches" className="space-y-8">
-                  {tournament.isLegacy && renderCreateMatchButton()}
                   {renderGroupMatches()}
                   {renderKnockoutMatches()}
                 </TabsContent>
@@ -1600,8 +1503,47 @@ export default function TournamentDetail() {
 
               return (
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
                     <CardTitle>Tournament Results</CardTitle>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {tournament.isLegacy && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setIsRecalcConfirmOpen(true)}
+                            disabled={isRecalculating}
+                            data-testid="button-recalculate-matches"
+                          >
+                            <RefreshCw className={cn("w-4 h-4", isRecalculating && "animate-spin")} />
+                            {isRecalculating ? "Recalculating..." : "Recalculate Matches"}
+                          </Button>
+                          <Dialog open={isRecalcConfirmOpen} onOpenChange={setIsRecalcConfirmOpen}>
+                            <DialogContent className="sm:max-w-[425px]">
+                              <DialogHeader>
+                                <DialogTitle>Recalculate Matches?</DialogTitle>
+                                <DialogDescription>
+                                  This will reset all group stage matches and regenerate them based on current group assignments. All existing group match scores will be lost. This action cannot be undone.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <DialogFooter>
+                                <Button variant="ghost" onClick={() => setIsRecalcConfirmOpen(false)}>Cancel</Button>
+                                <Button
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setIsRecalcConfirmOpen(false);
+                                    handleRecalculateMatches();
+                                  }}
+                                  data-testid="button-confirm-recalculate"
+                                >
+                                  Recalculate
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </>
+                      )}
                     <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-2" onClick={() => setBulkInput(players.map((p: Player) => p.name).join("\n"))}>
@@ -1634,6 +1576,7 @@ export default function TournamentDetail() {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="rounded-md border">

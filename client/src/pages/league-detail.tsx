@@ -1,13 +1,10 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { format } from "date-fns";
 import { LayoutShell } from "@/components/layout-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -16,17 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Trophy, Calendar, ArrowUpCircle, ArrowDownCircle, Plus, Trash2, History } from "lucide-react";
+import { Loader2, ArrowLeft, Trophy, Calendar, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface League {
   id: number;
@@ -55,30 +43,9 @@ interface LeagueStandings {
   standings: StandingRow[];
 }
 
-interface ManualResult {
-  id: number;
-  leagueId: number;
-  playerName: string;
-  tournamentLabel: string;
-  points: number;
-  legsWon: number;
-  legsLost: number;
-  createdAt: string;
-}
-
 export default function LeagueDetail() {
   const [, params] = useRoute("/leagues/:id");
   const leagueId = params?.id ? parseInt(params.id) : 0;
-  const { toast } = useToast();
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    playerName: "",
-    tournamentLabel: "",
-    points: "",
-    legsWon: "",
-    legsLost: "",
-  });
-
   const { data, isLoading, error } = useQuery<LeagueStandings>({
     queryKey: ['/api/leagues/:id/standings', leagueId],
     queryFn: async () => {
@@ -88,57 +55,6 @@ export default function LeagueDetail() {
     },
     enabled: leagueId > 0,
   });
-
-  const { data: manualResults = [] } = useQuery<ManualResult[]>({
-    queryKey: ['/api/leagues/:id/manual-results', leagueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/leagues/${leagueId}/manual-results`, { credentials: 'include' });
-      if (!res.ok) throw new Error("Failed to fetch manual results");
-      return res.json();
-    },
-    enabled: leagueId > 0,
-  });
-
-  const addResultMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      return apiRequest("POST", `/api/leagues/${leagueId}/manual-results`, {
-        playerName: data.playerName,
-        tournamentLabel: data.tournamentLabel,
-        points: parseInt(data.points) || 0,
-        legsWon: parseInt(data.legsWon) || 0,
-        legsLost: parseInt(data.legsLost) || 0,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues/:id/manual-results', leagueId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues/:id/standings', leagueId] });
-      setFormData({ playerName: "", tournamentLabel: "", points: "", legsWon: "", legsLost: "" });
-      setAddDialogOpen(false);
-      toast({ title: "Result added", description: "Past result has been added to the league." });
-    },
-    onError: () => toast({ title: "Error", description: "Failed to add result", variant: "destructive" }),
-  });
-
-  const deleteResultMutation = useMutation({
-    mutationFn: async (resultId: number) => {
-      return apiRequest("DELETE", `/api/leagues/${leagueId}/manual-results/${resultId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues/:id/manual-results', leagueId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues/:id/standings', leagueId] });
-      toast({ title: "Result removed", description: "Past result has been removed from the league." });
-    },
-    onError: () => toast({ title: "Error", description: "Failed to remove result", variant: "destructive" }),
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.playerName.trim() || !formData.tournamentLabel.trim()) {
-      toast({ title: "Missing fields", description: "Player name and tournament name are required.", variant: "destructive" });
-      return;
-    }
-    addResultMutation.mutate(formData);
-  };
 
   if (isLoading) {
     return (
@@ -173,12 +89,6 @@ export default function LeagueDetail() {
     if (relegCount > 0 && totalPlayers > 0 && position > totalPlayers - relegCount) return 'relegation';
     return null;
   };
-
-  const groupedResults: Record<string, ManualResult[]> = {};
-  manualResults.forEach(r => {
-    if (!groupedResults[r.tournamentLabel]) groupedResults[r.tournamentLabel] = [];
-    groupedResults[r.tournamentLabel].push(r);
-  });
 
   return (
     <LayoutShell>
@@ -231,29 +141,44 @@ export default function LeagueDetail() {
           </div>
         )}
 
-        {(promoCount > 0 || relegCount > 0) && (
-          <div className="flex items-center gap-4 flex-wrap">
-            {promoCount > 0 && (
-              <div className="flex items-center gap-1.5 text-sm">
-                <span className="w-3 h-3 rounded-sm bg-green-500/20 border border-green-500/40" />
-                <span className="text-muted-foreground">Promotion (Top {promoCount})</span>
-              </div>
-            )}
-            {relegCount > 0 && (
-              <div className="flex items-center gap-1.5 text-sm">
-                <span className="w-3 h-3 rounded-sm bg-red-500/20 border border-red-500/40" />
-                <span className="text-muted-foreground">Relegation (Bottom {relegCount})</span>
-              </div>
-            )}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3 flex-wrap text-sm text-muted-foreground" data-testid="text-points-system">
+            <span className="font-medium text-foreground">Points:</span>
+            <span>Group Stage — 5</span>
+            <span className="text-border">|</span>
+            <span>QF — 10</span>
+            <span className="text-border">|</span>
+            <span>SF — 20</span>
+            <span className="text-border">|</span>
+            <span>Runner-Up — 30</span>
+            <span className="text-border">|</span>
+            <span>Winner — 40</span>
           </div>
-        )}
+
+          {(promoCount > 0 || relegCount > 0) && (
+            <div className="flex items-center gap-4 flex-wrap">
+              {promoCount > 0 && (
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="w-3 h-3 rounded-sm bg-green-500/20 border border-green-500/40" />
+                  <span className="text-muted-foreground">Promotion (Top {promoCount})</span>
+                </div>
+              )}
+              {relegCount > 0 && (
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="w-3 h-3 rounded-sm bg-red-500/20 border border-red-500/40" />
+                  <span className="text-muted-foreground">Relegation (Bottom {relegCount})</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {standings.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Trophy className="w-12 h-12 text-muted-foreground/50 mb-4" />
               <h3 className="text-lg font-semibold mb-1">No standings yet</h3>
-              <p className="text-muted-foreground text-sm">Add tournaments to this league or add past results to see standings.</p>
+              <p className="text-muted-foreground text-sm">Add tournaments to this league to see standings.</p>
             </CardContent>
           </Card>
         ) : (
@@ -309,143 +234,6 @@ export default function LeagueDetail() {
             </CardContent>
           </Card>
         )}
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <History className="w-4 h-4" />
-                Past Tournament Results
-              </CardTitle>
-              <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" data-testid="button-add-past-result">
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Result
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add Past Tournament Result</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="tournamentLabel">Tournament Name</Label>
-                      <Input
-                        id="tournamentLabel"
-                        placeholder="e.g. Week 1 - Jan 2025"
-                        value={formData.tournamentLabel}
-                        onChange={e => setFormData(d => ({ ...d, tournamentLabel: e.target.value }))}
-                        data-testid="input-tournament-label"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="playerName">Player Name</Label>
-                      <Input
-                        id="playerName"
-                        placeholder="e.g. John Smith"
-                        value={formData.playerName}
-                        onChange={e => setFormData(d => ({ ...d, playerName: e.target.value }))}
-                        data-testid="input-player-name"
-                      />
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="points">Points</Label>
-                        <Input
-                          id="points"
-                          type="number"
-                          min="0"
-                          placeholder="0"
-                          value={formData.points}
-                          onChange={e => setFormData(d => ({ ...d, points: e.target.value }))}
-                          data-testid="input-points"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="legsWon">Legs Won</Label>
-                        <Input
-                          id="legsWon"
-                          type="number"
-                          min="0"
-                          placeholder="0"
-                          value={formData.legsWon}
-                          onChange={e => setFormData(d => ({ ...d, legsWon: e.target.value }))}
-                          data-testid="input-legs-won"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="legsLost">Legs Lost</Label>
-                        <Input
-                          id="legsLost"
-                          type="number"
-                          min="0"
-                          placeholder="0"
-                          value={formData.legsLost}
-                          onChange={e => setFormData(d => ({ ...d, legsLost: e.target.value }))}
-                          data-testid="input-legs-lost"
-                        />
-                      </div>
-                    </div>
-                    <Button type="submit" className="w-full" disabled={addResultMutation.isPending} data-testid="button-submit-past-result">
-                      {addResultMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                      Add Result
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {manualResults.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No past results added yet. Add results from previous tournaments to include them in the league standings.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {Object.entries(groupedResults).map(([label, results]) => (
-                  <div key={label} className="space-y-2">
-                    <h4 className="text-sm font-semibold text-muted-foreground">{label}</h4>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Player</TableHead>
-                            <TableHead className="text-center w-20">Points</TableHead>
-                            <TableHead className="text-center w-24">Legs Won</TableHead>
-                            <TableHead className="text-center w-24">Legs Lost</TableHead>
-                            <TableHead className="w-12" />
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {results.map(r => (
-                            <TableRow key={r.id} data-testid={`row-manual-result-${r.id}`}>
-                              <TableCell className="font-medium">{r.playerName}</TableCell>
-                              <TableCell className="text-center tabular-nums">{r.points}</TableCell>
-                              <TableCell className="text-center tabular-nums">{r.legsWon}</TableCell>
-                              <TableCell className="text-center tabular-nums">{r.legsLost}</TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => deleteResultMutation.mutate(r.id)}
-                                  disabled={deleteResultMutation.isPending}
-                                  data-testid={`button-delete-result-${r.id}`}
-                                >
-                                  <Trash2 className="w-4 h-4 text-muted-foreground" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader className="pb-3">
