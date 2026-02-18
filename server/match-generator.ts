@@ -510,6 +510,46 @@ export async function generateMultiStageMatches(
   }
 }
 
+export async function regenerateGroupMatchesFromMemberships(
+  tournamentId: number,
+  settings: TournamentSettings
+): Promise<void> {
+  await storage.deleteGroupMatchesByTournamentId(tournamentId);
+
+  const groups = await storage.getGroupsByTournamentId(tournamentId);
+  const bestOf = settings.groupBestOf || 3;
+  let matchOrder = 0;
+
+  for (const group of groups) {
+    const memberships = await storage.getGroupMembershipsByGroupId(group.id);
+    const groupPlayers = memberships.map(m => m.player);
+    if (groupPlayers.length < 2) continue;
+
+    const scheduled = generateRoundRobinSchedule(groupPlayers);
+    const scorerIds = assignScorersToMatches(scheduled, groupPlayers);
+    for (let i = 0; i < scheduled.length; i++) {
+      const sm = scheduled[i];
+      const scorer = scorerIds[i] ? groupPlayers.find(p => p.id === scorerIds[i]) : null;
+      await storage.createMatch({
+        tournamentId,
+        stage: "GROUP",
+        roundKey: `R${sm.round}`,
+        groupId: group.id,
+        playerAId: sm.playerA.id,
+        playerBId: sm.playerB.id,
+        scoreA: 0,
+        scoreB: 0,
+        bestOf,
+        status: "PENDING",
+        winnerId: null,
+        order: matchOrder++,
+        scorerId: scorerIds[i],
+        scorerName: scorer?.name || null,
+      });
+    }
+  }
+}
+
 export async function generateMatches(
   tournamentId: number,
   players: Player[],

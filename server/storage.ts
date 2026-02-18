@@ -50,6 +50,7 @@ export interface IStorage {
   getGroupMembershipsByGroupId(groupId: number): Promise<(GroupMembership & { player: Player })[]>;
   getGroupMembershipsByTournamentId(tournamentId: number): Promise<GroupMembership[]>;
   deleteMatch(id: number): Promise<void>;
+  deleteGroupMatchesByTournamentId(tournamentId: number): Promise<void>;
   
   // Matches
   getMatchesByTournamentId(tournamentId: number): Promise<(Match & { playerA: Player | null, playerB: Player | null })[]>;
@@ -197,6 +198,12 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMatch(id: number): Promise<void> {
     await db.delete(matches).where(eq(matches.id, id));
+  }
+
+  async deleteGroupMatchesByTournamentId(tournamentId: number): Promise<void> {
+    await db.delete(matches).where(
+      and(eq(matches.tournamentId, tournamentId), eq(matches.stage, "GROUP"))
+    );
   }
 
   async getGroupMembershipsByGroupId(groupId: number): Promise<(GroupMembership & { player: Player })[]> {

@@ -28,7 +28,8 @@ import {
   Eye,
   Download,
   ClipboardList,
-  Plus
+  Plus,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -256,6 +257,7 @@ export default function TournamentDetail() {
   const [newMatchStage, setNewMatchStage] = useState<string>("GROUP");
   const [newMatchGroupId, setNewMatchGroupId] = useState<string>("");
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   const [liveScorings, setLiveScorings] = useState<Map<number, {
     matchId: number;
     remainingA: number;
@@ -987,8 +989,31 @@ export default function TournamentDetail() {
             }
           };
 
+          const handleRecalculateMatches = async () => {
+            setIsRecalculating(true);
+            try {
+              await apiRequest("POST", `/api/tournaments/${tournamentId}/matches/recalculate`);
+              queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+              toast({ title: "Matches Recalculated", description: "Group matches have been regenerated based on current group assignments." });
+            } catch {
+              toast({ title: "Error", description: "Failed to recalculate matches.", variant: "destructive" });
+            } finally {
+              setIsRecalculating(false);
+            }
+          };
+
           const renderCreateMatchButton = () => (
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={handleRecalculateMatches}
+                disabled={isRecalculating}
+                data-testid="button-recalculate-matches"
+              >
+                <RefreshCw className={cn("w-4 h-4", isRecalculating && "animate-spin")} />
+                {isRecalculating ? "Recalculating..." : "Recalculate Matches"}
+              </Button>
               <Dialog open={isCreateMatchOpen} onOpenChange={setIsCreateMatchOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="gap-2" data-testid="button-create-match">

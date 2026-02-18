@@ -8,7 +8,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { generateMatches } from "./match-generator";
+import { generateMatches, regenerateGroupMatchesFromMemberships } from "./match-generator";
 import type { TournamentSettings } from "@shared/schema";
 import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament } from "./socket";
 
@@ -669,6 +669,21 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Match not found in this tournament" });
       }
       await storage.deleteMatch(matchId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/tournaments/:id/matches/recalculate", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tournament = await storage.getTournament(id);
+      if (!tournament) return res.status(404).json({ message: "Not found" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Unauthorized" });
+      if (!tournament.isLegacy) return res.status(400).json({ message: "Recalculate is only available for legacy tournaments" });
+      const settings = (tournament.settings || {}) as TournamentSettings;
+      await regenerateGroupMatchesFromMemberships(id, settings);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
