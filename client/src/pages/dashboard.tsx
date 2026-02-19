@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TournamentCard } from "@/components/tournament-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LayoutShell } from "@/components/layout-shell";
 import { useTournaments } from "@/hooks/use-tournaments";
@@ -143,10 +144,17 @@ export default function Dashboard() {
         </div>
 
         {isLoading ? (
-          <div className="space-y-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-16 rounded-xl" />
-            ))}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-48 rounded-2xl" />
+              ))}
+            </div>
+            <div className="space-y-2">
+              {[4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-16 rounded-xl" />
+              ))}
+            </div>
           </div>
         ) : sorted.length === 0 ? (
           <div className="text-center py-20 bg-card rounded-2xl border border-dashed">
@@ -160,10 +168,19 @@ export default function Dashboard() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-2">
-            {sorted.map((tournament: any) => (
-              <TournamentListRow key={tournament.id} tournament={tournament} />
-            ))}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sorted.slice(0, 3).map((tournament: any) => (
+                <TournamentCard key={tournament.id} tournament={tournament} />
+              ))}
+            </div>
+            {sorted.length > 3 && (
+              <div className="space-y-2">
+                {sorted.slice(3).map((tournament: any) => (
+                  <TournamentListRow key={tournament.id} tournament={tournament} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
