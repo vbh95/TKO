@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LayoutShell } from "@/components/layout-shell";
-import { TournamentCard } from "@/components/tournament-card";
 import { useTournaments } from "@/hooks/use-tournaments";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
@@ -103,9 +102,6 @@ export default function Dashboard() {
 
   const sorted = filtered ? sortTournaments(filtered, sortBy) : [];
 
-  const activeTournaments = sorted.filter(t => !t.isLegacy && t.status !== 'COMPLETED');
-  const pastTournaments = sorted.filter(t => t.isLegacy || t.status === 'COMPLETED');
-
   return (
     <LayoutShell>
       <div className="space-y-8">
@@ -147,9 +143,9 @@ export default function Dashboard() {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-64 rounded-2xl" />
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-16 rounded-xl" />
             ))}
           </div>
         ) : sorted.length === 0 ? (
@@ -164,45 +160,10 @@ export default function Dashboard() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-6">
-            {activeTournaments.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activeTournaments.map((tournament: any) => (
-                  <TournamentCard key={tournament.id} tournament={tournament} />
-                ))}
-              </div>
-            )}
-
-            {pastTournaments.length > 0 && activeTournaments.length > 0 && (
-              <div className="space-y-2">
-                <h2 className="text-sm font-medium text-muted-foreground px-1" data-testid="text-past-heading">Completed & Legacy</h2>
-                <div className="space-y-2">
-                  {pastTournaments.map((tournament: any) => (
-                    <TournamentListRow key={tournament.id} tournament={tournament} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTournaments.length === 0 && pastTournaments.length > 0 && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {pastTournaments.slice(0, 3).map((tournament: any) => (
-                    <TournamentCard key={tournament.id} tournament={tournament} />
-                  ))}
-                </div>
-                {pastTournaments.length > 3 && (
-                  <div className="space-y-2">
-                    <h2 className="text-sm font-medium text-muted-foreground px-1" data-testid="text-past-heading">Older Tournaments</h2>
-                    <div className="space-y-2">
-                      {pastTournaments.slice(3).map((tournament: any) => (
-                        <TournamentListRow key={tournament.id} tournament={tournament} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+          <div className="space-y-2">
+            {sorted.map((tournament: any) => (
+              <TournamentListRow key={tournament.id} tournament={tournament} />
+            ))}
           </div>
         )}
       </div>
