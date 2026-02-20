@@ -87,7 +87,7 @@ function TournamentListRow({ tournament }: { tournament: Tournament }) {
   return (
     <Card className="flex items-center gap-4 px-4 py-3 hover-elevate transition-all" data-testid={`list-row-tournament-${tournament.id}`}>
       <Link href={`/tournaments/${tournament.id}`} className="flex-1 min-w-0 cursor-pointer">
-        <p className="font-medium text-sm truncate" data-testid={`text-list-name-${tournament.id}`}>{tournament.name}</p>
+        <p className="font-medium text-sm" data-testid={`text-list-name-${tournament.id}`}>{tournament.name}</p>
         <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
           <span className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />

@@ -77,7 +77,7 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
       <div className="p-6 space-y-4">
         <div className="flex justify-between items-start">
           <div className="space-y-1 min-w-0 flex-1">
-            <h3 className="font-display font-bold text-xl text-foreground group-hover:text-primary transition-colors truncate">
+            <h3 className="font-display font-bold text-xl text-foreground group-hover:text-primary transition-colors break-words">
               {tournament.name}
             </h3>
             {leagueName && (
