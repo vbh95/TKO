@@ -468,7 +468,9 @@ export async function registerRoutes(
     } else {
       req.session.cookie.maxAge = 1000 * 60 * 60 * 24; // 1 day
     }
-    res.json(req.user);
+    const user = req.user as any;
+    const { password, memorableWord, recoveryKey, ...safeUser } = user;
+    res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
   });
 
   app.post(api.auth.logout.path, (req, res) => {

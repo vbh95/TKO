@@ -32,7 +32,7 @@ export interface IStorage {
   getTournamentsByUserId(userId: number): Promise<Tournament[]>;
   getTournament(id: number): Promise<Tournament | undefined>;
   getTournamentByShareToken(token: string): Promise<Tournament | undefined>;
-  createTournament(tournament: InsertTournament): Promise<Tournament>;
+  createTournament(tournament: InsertTournament & { userId: number }): Promise<Tournament>;
   updateTournament(id: number, tournament: Partial<InsertTournament>): Promise<Tournament>;
   deleteTournament(id: number): Promise<void>;
   
@@ -154,7 +154,7 @@ export class DatabaseStorage implements IStorage {
     return tournament;
   }
 
-  async createTournament(tournament: InsertTournament): Promise<Tournament> {
+  async createTournament(tournament: InsertTournament & { userId: number }): Promise<Tournament> {
     const [newTournament] = await db.insert(tournaments).values(tournament).returning();
     return newTournament;
   }

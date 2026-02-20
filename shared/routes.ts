@@ -115,6 +115,7 @@ export const api = {
         settings: z.any(),
         leagueId: z.number().nullable().optional(),
         isLegacy: z.boolean().optional(),
+        eventDate: z.string().nullable().optional(),
       }),
       responses: {
         201: z.custom<typeof tournaments.$inferSelect>(),
