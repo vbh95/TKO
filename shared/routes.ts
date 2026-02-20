@@ -12,6 +12,8 @@ import {
   matchNotes
 } from './schema';
 
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
 // ============================================
 // SHARED ERROR SCHEMAS
 // ============================================

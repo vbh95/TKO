@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, ArrowLeft, Sun, Moon, Eye, EyeOff } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Loader2, ArrowLeft, Sun, Moon, Eye, EyeOff, Copy, Check } from "lucide-react";
 import tkoLogoDark from "@assets/Untitled-1-02_1771177331378.png";
 import tkoLogoWhite from "@assets/TKO_White-02_1771177730966.png";
 import { useTheme } from "@/hooks/use-theme";
@@ -18,9 +19,15 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [showRecoveryKeyDialog, setShowRecoveryKeyDialog] = useState(false);
+  const [recoveryKey, setRecoveryKey] = useState("");
+  const [copiedKey, setCopiedKey] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [resetMethod, setResetMethod] = useState<"memorable" | "recovery">("memorable");
   const [resetMemorableWord, setResetMemorableWord] = useState("");
+  const [resetRecoveryKey, setResetRecoveryKey] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isResetting, setIsResetting] = useState(false);
@@ -43,7 +50,21 @@ export default function AuthPage() {
 
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
+    if (password !== signupConfirmPassword) {
+      toast({ title: "Passwords don't match", description: "Please make sure both passwords are the same.", variant: "destructive" });
+      return;
+    }
+    if (password.length < 6) {
+      toast({ title: "Password too short", description: "Password must be at least 6 characters.", variant: "destructive" });
+      return;
+    }
     signup.mutate({ email, password, name }, {
+      onSuccess: (data: any) => {
+        if (data.recoveryKey) {
+          setRecoveryKey(data.recoveryKey);
+          setShowRecoveryKeyDialog(true);
+        }
+      },
       onError: (err) => {
         toast({ title: "Signup failed", description: err.message, variant: "destructive" });
       }
@@ -60,21 +81,28 @@ export default function AuthPage() {
       toast({ title: "Password must be at least 6 characters", variant: "destructive" });
       return;
     }
-    if (!resetMemorableWord.trim()) {
+    if (resetMethod === "memorable" && !resetMemorableWord.trim()) {
       toast({ title: "Please enter your memorable word", variant: "destructive" });
+      return;
+    }
+    if (resetMethod === "recovery" && !resetRecoveryKey.trim()) {
+      toast({ title: "Please enter your recovery key", variant: "destructive" });
       return;
     }
     setIsResetting(true);
     try {
-      const res = await apiRequest("POST", "/api/auth/reset-password", {
-        email: resetEmail,
-        memorableWord: resetMemorableWord,
-        newPassword,
-      });
+      const body: any = { email: resetEmail, newPassword };
+      if (resetMethod === "memorable") {
+        body.memorableWord = resetMemorableWord;
+      } else {
+        body.recoveryKey = resetRecoveryKey;
+      }
+      await apiRequest("POST", "/api/auth/reset-password", body);
       toast({ title: "Password reset successfully", description: "You can now log in with your new password." });
       setShowReset(false);
       setResetEmail("");
       setResetMemorableWord("");
+      setResetRecoveryKey("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: any) {
@@ -114,7 +142,7 @@ export default function AuthPage() {
                 </button>
                 <div>
                   <h2 className="text-lg font-bold">Reset Password</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Verify your identity with your memorable word to reset your password.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Verify your identity to reset your password.</p>
                 </div>
                 <form onSubmit={handleResetPassword} className="space-y-4">
                   <div className="space-y-2">
@@ -130,17 +158,52 @@ export default function AuthPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="reset-memorable">Memorable Word</Label>
-                    <Input
-                      id="reset-memorable"
-                      type="text"
-                      placeholder="Your memorable word"
-                      value={resetMemorableWord}
-                      onChange={(e) => setResetMemorableWord(e.target.value)}
-                      required
-                      data-testid="input-reset-memorable-word"
-                    />
+                    <Label className="text-sm font-medium">Verification Method</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${resetMethod === "memorable" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-muted"}`}
+                        onClick={() => setResetMethod("memorable")}
+                        data-testid="button-reset-method-memorable"
+                      >
+                        Memorable Word
+                      </button>
+                      <button
+                        type="button"
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${resetMethod === "recovery" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-muted"}`}
+                        onClick={() => setResetMethod("recovery")}
+                        data-testid="button-reset-method-recovery"
+                      >
+                        Recovery Key
+                      </button>
+                    </div>
                   </div>
+                  {resetMethod === "memorable" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-memorable">Memorable Word</Label>
+                      <Input
+                        id="reset-memorable"
+                        type="text"
+                        placeholder="Your memorable word"
+                        value={resetMemorableWord}
+                        onChange={(e) => setResetMemorableWord(e.target.value)}
+                        data-testid="input-reset-memorable-word"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-recovery">Recovery Key</Label>
+                      <Input
+                        id="reset-recovery"
+                        type="text"
+                        placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+                        value={resetRecoveryKey}
+                        onChange={(e) => setResetRecoveryKey(e.target.value)}
+                        className="font-mono"
+                        data-testid="input-reset-recovery-key"
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="new-password">New Password</Label>
                     <Input
@@ -270,6 +333,7 @@ export default function AuthPage() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required 
+                        data-testid="input-signup-password"
                       />
                       <Button
                         type="button"
@@ -283,7 +347,18 @@ export default function AuthPage() {
                       </Button>
                     </div>
                   </div>
-                  <Button type="submit" className="w-full" disabled={signup.isPending}>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-confirm-password">Confirm Password</Label>
+                    <Input
+                      id="signup-confirm-password"
+                      type="password"
+                      value={signupConfirmPassword}
+                      onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                      required
+                      data-testid="input-signup-confirm-password"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={signup.isPending} data-testid="button-signup">
                     {signup.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Create Account
                   </Button>
@@ -294,6 +369,46 @@ export default function AuthPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={showRecoveryKeyDialog} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>Your Recovery Key</DialogTitle>
+            <DialogDescription>
+              Save this recovery key somewhere safe. You can use it to reset your password if you ever forget it. This key will only be shown once.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-muted rounded-lg p-4 text-center">
+              <code className="text-lg font-mono font-bold tracking-wider" data-testid="text-recovery-key">
+                {recoveryKey}
+              </code>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                navigator.clipboard.writeText(recoveryKey);
+                setCopiedKey(true);
+                setTimeout(() => setCopiedKey(false), 2000);
+              }}
+              data-testid="button-copy-recovery-key"
+            >
+              {copiedKey ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+              {copiedKey ? "Copied!" : "Copy to Clipboard"}
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => setShowRecoveryKeyDialog(false)}
+              className="w-full"
+              data-testid="button-dismiss-recovery-key"
+            >
+              I've saved my recovery key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

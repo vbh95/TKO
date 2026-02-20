@@ -24,7 +24,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   updateUserPassword(email: string, hashedPassword: string): Promise<boolean>;
   updateUser(id: number, data: Partial<{ name: string; email: string; dateOfBirth: string | null; phone: string | null; billingAddress: string | null; memorableWord: string | null }>): Promise<User>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: InsertUser & { recoveryKey?: string }): Promise<User>;
   
   // Tournaments
   getAllTournaments(): Promise<Tournament[]>;
@@ -122,7 +122,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async createUser(user: InsertUser): Promise<User> {
+  async createUser(user: InsertUser & { recoveryKey?: string }): Promise<User> {
     const [newUser] = await db.insert(users).values(user).returning();
     return newUser;
   }

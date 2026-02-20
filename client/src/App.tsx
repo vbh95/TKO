@@ -18,8 +18,13 @@ import LeagueDetail from "@/pages/league-detail";
 import PublicView from "@/pages/public-view";
 import BoardView from "@/pages/board-view";
 import ScorerPage from "@/pages/scorer";
+import CompleteProfile from "@/pages/complete-profile";
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+function isProfileComplete(user: any): boolean {
+  return !!user.dateOfBirth && !!user.hasMemorableWord;
+}
+
+function ProtectedRoute({ component: Component, skipProfileCheck }: { component: React.ComponentType; skipProfileCheck?: boolean }) {
   const { data: user, isLoading } = useUser();
 
   if (isLoading) {
@@ -32,6 +37,10 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  if (!skipProfileCheck && !isProfileComplete(user)) {
+    return <CompleteProfile />;
   }
 
   return <Component />;

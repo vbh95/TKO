@@ -390,12 +390,15 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Email already exists" });
       }
       
+      const rawRecoveryKey = randomBytes(12).toString("hex").toUpperCase().match(/.{1,4}/g)!.join("-");
+      const hashedRecoveryKey = await hashPassword(rawRecoveryKey.replace(/-/g, "").toLowerCase());
       const hashedPassword = await hashPassword(input.password);
-      const user = await storage.createUser({ ...input, password: hashedPassword });
+      const user = await storage.createUser({ ...input, password: hashedPassword, recoveryKey: hashedRecoveryKey });
       
       req.login(user, (err) => {
         if (err) return res.status(500).json({ message: "Login failed after signup" });
-        res.status(201).json(user);
+        const { password, memorableWord, recoveryKey, ...safeUser } = user;
+        res.status(201).json({ ...safeUser, recoveryKey: rawRecoveryKey, hasMemorableWord: false });
       });
     } catch (err) {
        if (err instanceof z.ZodError) {
@@ -413,9 +416,9 @@ export async function registerRoutes(
 
   app.post("/api/auth/reset-password", async (req, res) => {
     try {
-      const { email, memorableWord, newPassword } = req.body;
-      if (!email || !memorableWord || !newPassword) {
-        return res.status(400).json({ message: "Email, memorable word, and new password are required" });
+      const { email, memorableWord, recoveryKey, newPassword } = req.body;
+      if (!email || (!memorableWord && !recoveryKey) || !newPassword) {
+        return res.status(400).json({ message: "Email, verification method, and new password are required" });
       }
       if (newPassword.length < 6) {
         return res.status(400).json({ message: "Password must be at least 6 characters" });
@@ -432,11 +435,23 @@ export async function registerRoutes(
       });
 
       const user = await storage.getUserByUsername(email);
-      if (!user || !user.memorableWord) {
+      if (!user) {
         return res.status(400).json({ message: "The details you entered don't match our records. Please try again." });
       }
-      const wordValid = await comparePassword(memorableWord.toLowerCase().trim(), user.memorableWord);
-      if (!wordValid) {
+
+      let verified = false;
+      if (recoveryKey) {
+        if (user.recoveryKey) {
+          const keyNormalized = recoveryKey.replace(/-/g, "").toLowerCase();
+          verified = await comparePassword(keyNormalized, user.recoveryKey);
+        }
+      } else if (memorableWord) {
+        if (user.memorableWord) {
+          verified = await comparePassword(memorableWord.toLowerCase().trim(), user.memorableWord);
+        }
+      }
+
+      if (!verified) {
         return res.status(400).json({ message: "The details you entered don't match our records. Please try again." });
       }
       const hashedPassword = await hashPassword(newPassword);
@@ -465,7 +480,7 @@ export async function registerRoutes(
 
   app.get(api.auth.me.path, isAuthenticated, (req, res) => {
     const user = req.user as any;
-    const { password, memorableWord, ...safeUser } = user;
+    const { password, memorableWord, recoveryKey, ...safeUser } = user;
     res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
   });
 
@@ -480,7 +495,7 @@ export async function registerRoutes(
       if (input.phone !== undefined) updateData.phone = input.phone;
       if (input.billingAddress !== undefined) updateData.billingAddress = input.billingAddress;
       const updated = await storage.updateUser(user.id, updateData);
-      const { password, memorableWord, ...safeUser } = updated;
+      const { password, memorableWord, recoveryKey, ...safeUser } = updated;
       res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
     } catch {
       res.status(500).json({ message: "Failed to update profile" });
@@ -496,7 +511,7 @@ export async function registerRoutes(
       const existing = await storage.getUserByUsername(input.email);
       if (existing && existing.id !== user.id) return res.status(400).json({ message: "Email already in use" });
       const updated = await storage.updateUser(user.id, { email: input.email });
-      const { password, memorableWord, ...safeUser } = updated;
+      const { password, memorableWord, recoveryKey, ...safeUser } = updated;
       res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
     } catch {
       res.status(500).json({ message: "Failed to update email" });

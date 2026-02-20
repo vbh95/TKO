@@ -13,10 +13,11 @@ export const users = pgTable("users", {
   phone: text("phone"),
   billingAddress: text("billing_address"),
   memorableWord: text("memorable_word"),
+  recoveryKey: text("recovery_key"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memorableWord: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memorableWord: true, recoveryKey: true });
 
 // === LEAGUES ===
 export const leagues = pgTable("leagues", {

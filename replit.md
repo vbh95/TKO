@@ -39,6 +39,10 @@ The project is a single-workspace monorepo with three main directories:
 - **Sessions**: `express-session` with MemoryStore (should be replaced with a persistent store like `connect-pg-simple` for production)
 - **Cookie Config**: httpOnly cookies, 1-week expiry, secure in production
 - **Auth Routes**: POST `/api/auth/signup`, POST `/api/auth/login`, POST `/api/auth/logout`, GET `/api/auth/me`
+- **Signup**: Requires full name, email, password + password confirmation. Returns a one-time randomized recovery key (hashed in DB, shown once to user)
+- **Password Reset**: Supports two verification methods — memorable word or recovery key. Both are hashed and compared server-side. Rate-limited to 5 attempts per 15 minutes.
+- **Profile Completion**: After signup, users are redirected to a mandatory profile completion page requiring date of birth and memorable word. Phone and billing address are optional. Enforced via `ProtectedRoute` in `App.tsx`.
+- **Recovery Key**: Generated as 24-char hex split into 6 groups of 4, e.g. `ABCD-EF01-2345-6789-ABCD-EF01`. Stored as hashed (stripped hyphens, lowercased). Users can use it on the password reset page.
 
 ### API Design
 - **Contract-First**: API contracts defined in `shared/routes.ts` using Zod schemas — both client and server reference the same contract for type safety and validation
