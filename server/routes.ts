@@ -548,6 +548,25 @@ export async function registerRoutes(
     }
   });
 
+  app.delete(api.account.delete.path, isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const input = api.account.delete.input.parse(req.body);
+      if (input.confirmationPhrase !== "DELETE") {
+        return res.status(400).json({ message: "Please type DELETE to confirm" });
+      }
+      const isValid = await comparePassword(input.password, user.password);
+      if (!isValid) return res.status(400).json({ message: "Password is incorrect" });
+      await storage.deleteUser(user.id);
+      req.logout((err) => {
+        if (err) return res.status(500).json({ message: "Account deleted but logout failed" });
+        res.sendStatus(204);
+      });
+    } catch {
+      res.status(500).json({ message: "Failed to delete account" });
+    }
+  });
+
   // === TOURNAMENT ROUTES ===
   app.post(api.tournaments.bulkPlayers.path, isAuthenticated, async (req, res) => {
     try {

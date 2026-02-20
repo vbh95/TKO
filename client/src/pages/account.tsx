@@ -6,8 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Mail, Lock, KeyRound, Eye, EyeOff, Check } from "lucide-react";
+import { Loader2, User, Mail, Lock, KeyRound, Eye, EyeOff, Check, Trash2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { api } from "@shared/routes";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Account() {
   const { data: user } = useUser();
@@ -33,6 +37,12 @@ export default function Account() {
 
   const [memorableWordValue, setMemorableWordValue] = useState("");
   const [memorableWordPassword, setMemorableWordPassword] = useState("");
+
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (user) {
@@ -337,6 +347,108 @@ export default function Account() {
             </Button>
           </CardContent>
         </Card>
+
+        <Separator />
+
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Delete Account
+            </CardTitle>
+            <CardDescription>
+              Permanently delete your account and all associated data. This action cannot be undone.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Deleting your account will permanently remove all your tournaments, players, matches, results, leagues, and any other data linked to your account. This cannot be reversed.
+            </p>
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteDialog(true)}
+              data-testid="button-open-delete-account"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete My Account
+            </Button>
+          </CardContent>
+        </Card>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete your account and all your data, including all tournaments, players, matches, results, and leagues. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="delete-password">Enter your password</Label>
+                <Input
+                  id="delete-password"
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Your current password"
+                  data-testid="input-delete-account-password"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="delete-confirm">Type <span className="font-mono font-bold">DELETE</span> to confirm</Label>
+                <Input
+                  id="delete-confirm"
+                  type="text"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder="DELETE"
+                  data-testid="input-delete-account-confirm"
+                />
+              </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => { setDeletePassword(""); setDeleteConfirmation(""); }}
+                data-testid="button-cancel-delete-account"
+              >
+                Cancel
+              </AlertDialogCancel>
+              <Button
+                variant="destructive"
+                disabled={isDeleting || deleteConfirmation !== "DELETE" || !deletePassword}
+                data-testid="button-confirm-delete-account"
+                onClick={async () => {
+                  setIsDeleting(true);
+                  try {
+                    await apiRequest("DELETE", api.account.delete.path, {
+                      password: deletePassword,
+                      confirmationPhrase: deleteConfirmation,
+                    });
+                    queryClient.setQueryData([api.auth.me.path], null);
+                    queryClient.invalidateQueries();
+                    toast({ title: "Account deleted", description: "Your account and all associated data have been permanently removed." });
+                  } catch (err: any) {
+                    let msg = "Failed to delete account";
+                    try {
+                      const parsed = JSON.parse(err.message.replace(/^\d+:\s*/, ""));
+                      msg = parsed.message || msg;
+                    } catch { msg = err.message || msg; }
+                    toast({ title: "Error", description: msg, variant: "destructive" });
+                  } finally {
+                    setIsDeleting(false);
+                    setShowDeleteDialog(false);
+                    setDeletePassword("");
+                    setDeleteConfirmation("");
+                  }
+                }}
+              >
+                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                {isDeleting ? "Deleting..." : "Delete My Account"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </LayoutShell>
   );
