@@ -548,6 +548,21 @@ export async function registerRoutes(
     }
   });
 
+  app.post(api.account.regenerateRecoveryKey.path, isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const input = api.account.regenerateRecoveryKey.input.parse(req.body);
+      const isValid = await comparePassword(input.currentPassword, user.password);
+      if (!isValid) return res.status(400).json({ message: "Password is incorrect" });
+      const rawRecoveryKey = randomBytes(12).toString("hex").toUpperCase().match(/.{1,4}/g)!.join("-");
+      const hashedRecoveryKey = await hashPassword(rawRecoveryKey.replace(/-/g, "").toLowerCase());
+      await storage.updateUser(user.id, { recoveryKey: hashedRecoveryKey });
+      res.json({ recoveryKey: rawRecoveryKey });
+    } catch {
+      res.status(500).json({ message: "Failed to regenerate recovery key" });
+    }
+  });
+
   app.delete(api.account.delete.path, isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;

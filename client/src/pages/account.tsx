@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Mail, Lock, KeyRound, Eye, EyeOff, Check, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Loader2, User, Mail, Lock, KeyRound, Eye, EyeOff, Check, Trash2, Copy, RefreshCw, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { api } from "@shared/routes";
 import { useQueryClient } from "@tanstack/react-query";
@@ -37,6 +38,12 @@ export default function Account() {
 
   const [memorableWordValue, setMemorableWordValue] = useState("");
   const [memorableWordPassword, setMemorableWordPassword] = useState("");
+
+  const [recoveryKeyPassword, setRecoveryKeyPassword] = useState("");
+  const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
+  const [showRecoveryKeyDialog, setShowRecoveryKeyDialog] = useState(false);
+  const [recoveryKey, setRecoveryKey] = useState("");
+  const [copiedKey, setCopiedKey] = useState(false);
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
@@ -347,6 +354,103 @@ export default function Account() {
             </Button>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5" />
+              Recovery Key
+            </CardTitle>
+            <CardDescription>
+              Your recovery key can be used to reset your password if you forget it. If you've lost your key, you can generate a new one here. The old key will stop working.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="recovery-key-password">Current Password</Label>
+              <Input
+                id="recovery-key-password"
+                type="password"
+                value={recoveryKeyPassword}
+                onChange={(e) => setRecoveryKeyPassword(e.target.value)}
+                placeholder="Enter password to confirm"
+                data-testid="input-recovery-key-password"
+              />
+            </div>
+            <Button
+              onClick={async () => {
+                if (!recoveryKeyPassword) {
+                  toast({ title: "Please enter your current password", variant: "destructive" });
+                  return;
+                }
+                setIsRegeneratingKey(true);
+                try {
+                  const res = await apiRequest("POST", api.account.regenerateRecoveryKey.path, {
+                    currentPassword: recoveryKeyPassword,
+                  });
+                  const data = await res.json();
+                  setRecoveryKey(data.recoveryKey);
+                  setShowRecoveryKeyDialog(true);
+                  setRecoveryKeyPassword("");
+                } catch (err: any) {
+                  let msg = "Failed to regenerate recovery key";
+                  try {
+                    const parsed = JSON.parse(err.message.replace(/^\d+:\s*/, ""));
+                    msg = parsed.message || msg;
+                  } catch { msg = err.message || msg; }
+                  toast({ title: "Error", description: msg, variant: "destructive" });
+                } finally {
+                  setIsRegeneratingKey(false);
+                }
+              }}
+              disabled={isRegeneratingKey}
+              data-testid="button-regenerate-recovery-key"
+            >
+              {isRegeneratingKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Generate New Recovery Key
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Dialog open={showRecoveryKeyDialog} onOpenChange={() => {}}>
+          <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>Your New Recovery Key</DialogTitle>
+              <DialogDescription>
+                Save this recovery key somewhere safe. Your previous key has been replaced and will no longer work. This key will only be shown once.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-muted rounded-lg p-4 text-center">
+                <code className="text-lg font-mono font-bold tracking-wider" data-testid="text-recovery-key">
+                  {recoveryKey}
+                </code>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  navigator.clipboard.writeText(recoveryKey);
+                  setCopiedKey(true);
+                  setTimeout(() => setCopiedKey(false), 2000);
+                }}
+                data-testid="button-copy-recovery-key"
+              >
+                {copiedKey ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+                {copiedKey ? "Copied!" : "Copy to Clipboard"}
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={() => setShowRecoveryKeyDialog(false)}
+                className="w-full"
+                data-testid="button-dismiss-recovery-key"
+              >
+                I've saved my recovery key
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Separator />
 

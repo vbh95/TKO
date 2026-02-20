@@ -23,7 +23,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   updateUserPassword(email: string, hashedPassword: string): Promise<boolean>;
-  updateUser(id: number, data: Partial<{ name: string; email: string; dateOfBirth: string | null; phone: string | null; billingAddress: string | null; memorableWord: string | null }>): Promise<User>;
+  updateUser(id: number, data: Partial<{ name: string; email: string; dateOfBirth: string | null; phone: string | null; billingAddress: string | null; memorableWord: string | null; recoveryKey: string | null }>): Promise<User>;
   createUser(user: InsertUser & { recoveryKey?: string }): Promise<User>;
   deleteUser(id: number): Promise<boolean>;
   
@@ -118,7 +118,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async updateUser(id: number, data: Partial<{ name: string; email: string; dateOfBirth: string | null; phone: string | null; billingAddress: string | null; memorableWord: string | null }>): Promise<User> {
+  async updateUser(id: number, data: Partial<{ name: string; email: string; dateOfBirth: string | null; phone: string | null; billingAddress: string | null; memorableWord: string | null; recoveryKey: string | null }>): Promise<User> {
     const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
     return updated;
   }

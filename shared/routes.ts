@@ -274,6 +274,16 @@ export const api = {
         400: errorSchemas.validation,
       },
     },
+    regenerateRecoveryKey: {
+      method: 'POST' as const,
+      path: '/api/account/recovery-key' as const,
+      input: z.object({ currentPassword: z.string() }),
+      responses: {
+        200: z.object({ recoveryKey: z.string() }),
+        401: errorSchemas.unauthorized,
+        400: errorSchemas.validation,
+      },
+    },
     delete: {
       method: 'DELETE' as const,
       path: '/api/account' as const,
