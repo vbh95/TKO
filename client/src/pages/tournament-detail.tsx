@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { QRCodeSVG } from "qrcode.react";
-import { useTournament, useTournamentShare, useBulkUpdatePlayers } from "@/hooks/use-tournaments";
+import { useTournament, useTournamentShare, useBulkUpdatePlayers, useDeleteTournament } from "@/hooks/use-tournaments";
 import { calcStandings } from "@/lib/standings";
 import { LayoutShell } from "@/components/layout-shell";
 import { MatchScoreInput } from "@/components/match-score-input";
@@ -53,9 +53,20 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -228,10 +239,12 @@ function AdminMatchStats({ matchId, playerAName, playerBName }: { matchId: numbe
 
 export default function TournamentDetail() {
   const { id } = useParams();
+  const [, setLocation] = useLocation();
   const tournamentId = parseInt(id || "0");
   const { data, isLoading } = useTournament(tournamentId);
   const { enableShare, disableShare } = useTournamentShare(tournamentId);
   const { mutate: bulkUpdate, isPending: isUpdatingPlayers } = useBulkUpdatePlayers(tournamentId);
+  const deleteTournamentMutation = useDeleteTournament();
   const { toast } = useToast();
   const { data: leaguesList = [] } = useQuery<Array<{ id: number; name: string }>>({
     queryKey: ['/api/leagues'],
@@ -248,6 +261,7 @@ export default function TournamentDetail() {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [renameName, setRenameName] = useState("");
   const [isLeagueDialogOpen, setIsLeagueDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("none");
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
   const [editingPlayerName, setEditingPlayerName] = useState("");
@@ -633,6 +647,11 @@ export default function TournamentDetail() {
                   <Medal className="w-4 h-4" />
                   {tournament.leagueId ? "Change League" : "Add to League"}
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem data-testid="menu-item-delete" className="gap-2 cursor-pointer text-destructive focus:text-destructive" onSelect={() => setIsDeleteDialogOpen(true)}>
+                  <Trash2 className="w-4 h-4" />
+                  Delete Tournament
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -734,6 +753,38 @@ export default function TournamentDetail() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Tournament</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{tournament.name}"? This will permanently remove the tournament, all players, matches, and results. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-delete-tournament">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    data-testid="button-confirm-delete-tournament"
+                    disabled={deleteTournamentMutation.isPending}
+                    onClick={() => {
+                      deleteTournamentMutation.mutate(tournamentId, {
+                        onSuccess: () => {
+                          toast({ title: "Tournament deleted", description: `"${tournament.name}" has been removed.` });
+                          setLocation("/tournaments");
+                        },
+                        onError: () => {
+                          toast({ title: "Error", description: "Failed to delete tournament.", variant: "destructive" });
+                        },
+                      });
+                    }}
+                  >
+                    {deleteTournamentMutation.isPending ? "Deleting..." : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
 

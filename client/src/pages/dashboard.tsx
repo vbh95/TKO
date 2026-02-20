@@ -1,13 +1,25 @@
 import { Link } from "wouter";
-import { Plus, Search, Trophy, ArrowUpDown, Calendar, ChevronRight } from "lucide-react";
+import { Plus, Search, Trophy, ArrowUpDown, Calendar, ChevronRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TournamentCard } from "@/components/tournament-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { LayoutShell } from "@/components/layout-shell";
-import { useTournaments } from "@/hooks/use-tournaments";
+import { useTournaments, useDeleteTournament } from "@/hooks/use-tournaments";
+import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -53,43 +65,87 @@ function sortTournaments(list: any[], sortBy: SortOption) {
 }
 
 function TournamentListRow({ tournament }: { tournament: Tournament }) {
+  const { toast } = useToast();
+  const deleteMutation = useDeleteTournament();
   const dateStr = tournament.eventDate
     ? format(new Date(tournament.eventDate + 'T00:00:00'), 'MMM d, yyyy')
     : tournament.createdAt
       ? format(new Date(tournament.createdAt), 'MMM d, yyyy')
       : '';
 
+  const handleDelete = () => {
+    deleteMutation.mutate(tournament.id, {
+      onSuccess: () => {
+        toast({ title: "Tournament deleted", description: `"${tournament.name}" has been removed.` });
+      },
+      onError: () => {
+        toast({ title: "Error", description: "Failed to delete tournament.", variant: "destructive" });
+      },
+    });
+  };
+
   return (
-    <Link href={`/tournaments/${tournament.id}`}>
-      <Card className="flex items-center gap-4 px-4 py-3 cursor-pointer hover-elevate transition-all" data-testid={`list-row-tournament-${tournament.id}`}>
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate" data-testid={`text-list-name-${tournament.id}`}>{tournament.name}</p>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              {dateStr}
-            </span>
-            <span className="flex items-center gap-1">
-              <Trophy className="w-3 h-3" />
-              {typeLabels[tournament.type] || tournament.type}
-            </span>
-          </div>
+    <Card className="flex items-center gap-4 px-4 py-3 hover-elevate transition-all" data-testid={`list-row-tournament-${tournament.id}`}>
+      <Link href={`/tournaments/${tournament.id}`} className="flex-1 min-w-0 cursor-pointer">
+        <p className="font-medium text-sm truncate" data-testid={`text-list-name-${tournament.id}`}>{tournament.name}</p>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
+          <span className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            {dateStr}
+          </span>
+          <span className="flex items-center gap-1">
+            <Trophy className="w-3 h-3" />
+            {typeLabels[tournament.type] || tournament.type}
+          </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {tournament.isLegacy && (
-            <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 text-xs">
-              LEGACY
-            </Badge>
-          )}
-          {tournament.status === 'COMPLETED' && !tournament.isLegacy && (
-            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 text-xs">
-              COMPLETED
-            </Badge>
-          )}
+      </Link>
+      <div className="flex items-center gap-2 shrink-0">
+        {tournament.isLegacy && (
+          <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 text-xs">
+            LEGACY
+          </Badge>
+        )}
+        {tournament.status === 'COMPLETED' && !tournament.isLegacy && (
+          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 text-xs">
+            COMPLETED
+          </Badge>
+        )}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              data-testid={`button-delete-list-tournament-${tournament.id}`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Tournament</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{tournament.name}"? This will permanently remove the tournament, all players, matches, and results. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete"
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <Link href={`/tournaments/${tournament.id}`}>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </div>
-      </Card>
-    </Link>
+        </Link>
+      </div>
+    </Card>
   );
 }
 
