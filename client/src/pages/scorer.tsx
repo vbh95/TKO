@@ -1006,7 +1006,7 @@ export default function ScorerPage() {
           {legVisits.length === 0 && legsWonA === 0 && legsWonB === 0 && (
             <div className="flex justify-center mb-0.5 shrink-0">
               <button
-                className="flex items-center gap-1 text-gray-400 text-[9px] md:text-[10px] px-2 py-0.5 rounded-lg bg-[#2a2a2a] border-2 border-[#22c55e]/30 touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                className="flex items-center gap-1 text-gray-400 text-[9px] md:text-[10px] px-2 py-0.5 rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] touch-manipulation active:bg-[#3a3a3a] transition-colors"
                 onClick={() => setView("bullThrow")}
                 data-testid="button-back-to-bull"
               >
@@ -1031,8 +1031,8 @@ export default function ScorerPage() {
               className={cn(
                 "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
                 currentThrower === leftThrower
-                  ? "bg-[#1a2e1a] ring-2 ring-[#22c55e] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
-                  : "bg-[#0f1a0f] ring-2 ring-[#164e16] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-50"
+                  ? "bg-[hsl(130,28%,20%)] ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
+                  : "bg-[#161b22] ring-2 ring-[#30363d] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-80"
               )}
               data-testid="panel-player-a"
             >
@@ -1069,8 +1069,8 @@ export default function ScorerPage() {
               className={cn(
                 "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
                 currentThrower === rightThrower
-                  ? "bg-[#1a2e1a] ring-2 ring-[#22c55e] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
-                  : "bg-[#0f1a0f] ring-2 ring-[#164e16] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-50"
+                  ? "bg-[hsl(130,28%,20%)] ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
+                  : "bg-[#161b22] ring-2 ring-[#30363d] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-80"
               )}
               data-testid="panel-player-b"
             >
@@ -1185,14 +1185,14 @@ export default function ScorerPage() {
             <div className="flex-1 flex flex-col justify-end gap-1 md:gap-1.5">
               <div className="flex gap-1 md:gap-1.5 items-center shrink-0">
                 <button
-                  className="w-9 h-9 md:w-12 md:h-12 rounded-lg bg-[#2a2a2a] border-2 border-[#22c55e]/30 flex items-center justify-center touch-manipulation"
+                  className="w-9 h-9 md:w-12 md:h-12 rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation"
                   onClick={() => setShowQuickScores(!showQuickScores)}
                   data-testid="button-toggle-quick"
                 >
                   <Grid2x2 className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
                 </button>
                 <div
-                  className="flex-1 bg-[#2a2a2a] border-2 border-[#22c55e]/30 rounded-lg px-3 h-9 md:h-12 text-base md:text-xl font-medium tabular-nums flex items-center justify-between"
+                  className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-lg px-3 h-9 md:h-12 text-base md:text-xl font-medium tabular-nums flex items-center justify-between"
                   data-testid="text-input-value"
                 >
                   <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
@@ -1217,7 +1217,7 @@ export default function ScorerPage() {
                         "h-9 md:h-11 rounded-lg text-xs md:text-sm font-bold touch-manipulation transition-colors",
                         qs === 180
                           ? "bg-yellow-700/40 text-yellow-300 border-2 border-yellow-600/50"
-                          : "bg-[#2a2a2a] text-gray-300 border-2 border-[#22c55e]/30"
+                          : "bg-[#2a2a2a] text-gray-300 border-2 border-[#3a3a3a]"
                       )}
                       onClick={() => handleScoreSubmit(qs)}
                       disabled={updateScoreMutation.isPending}
@@ -1234,7 +1234,7 @@ export default function ScorerPage() {
                   {row.map(key => (
                     <button
                       key={key}
-                      className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#22c55e]/30 text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                      className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
                       onClick={() => handleNumpad(key)}
                       disabled={updateScoreMutation.isPending}
                       data-testid={`button-numpad-${key}`}
@@ -1246,7 +1246,7 @@ export default function ScorerPage() {
               ))}
               <div className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
                 <button
-                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#22c55e]/30 flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
+                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
                   onClick={handleUndo}
                   disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                   data-testid="button-undo"
@@ -1254,7 +1254,7 @@ export default function ScorerPage() {
                   <Undo2 className={cn("w-5 h-5 md:w-7 md:h-7", legVisits.length === 0 ? "text-gray-700" : "text-gray-300")} />
                 </button>
                 <button
-                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#22c55e]/30 text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
                   onClick={() => handleNumpad('0')}
                   disabled={updateScoreMutation.isPending}
                   data-testid="button-numpad-0"
@@ -1262,7 +1262,7 @@ export default function ScorerPage() {
                   0
                 </button>
                 <button
-                  className="h-full min-h-[36px] rounded-lg flex items-center justify-center touch-manipulation transition-all bg-[#22c55e] border-2 border-[#166534] active:bg-[#16a34a] active:scale-[0.98]"
+                  className="h-full min-h-[36px] rounded-lg flex items-center justify-center touch-manipulation transition-all bg-primary border-2 border-primary/50 active:bg-primary/80 active:scale-[0.98]"
                   onClick={() => handleNumpad('OK')}
                   disabled={updateScoreMutation.isPending}
                   data-testid="button-numpad-OK"
