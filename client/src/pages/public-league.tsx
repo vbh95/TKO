@@ -275,8 +275,14 @@ export default function PublicLeague() {
                       <span className="hidden sm:inline">Points</span>
                       <span className="sm:hidden">Pts</span>
                     </TableHead>
-                    <TableHead className="text-center px-2 hidden sm:table-cell">Legs Won</TableHead>
-                    <TableHead className="text-center px-2 hidden sm:table-cell">Leg Diff</TableHead>
+                    <TableHead className="text-center px-1 w-10 sm:w-auto">
+                      <span className="hidden sm:inline">Legs Won</span>
+                      <span className="sm:hidden">LW</span>
+                    </TableHead>
+                    <TableHead className="text-center px-1 w-10 sm:w-auto">
+                      <span className="hidden sm:inline">Leg Diff</span>
+                      <span className="sm:hidden">LD</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -293,35 +299,35 @@ export default function PublicLeague() {
                         onClick={() => setSelectedPlayer(row.name)}
                         data-testid={`row-standing-${row.position}`}
                       >
-                        <TableCell className="text-center font-bold tabular-nums px-2">
+                        <TableCell className="text-center font-bold tabular-nums px-1">
                           <div className="flex items-center justify-center gap-0.5 sm:gap-1">
                             {zone === 'promotion' && <ArrowUpCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-600 dark:text-green-400" />}
                             {zone === 'relegation' && <ArrowDownCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-red-600 dark:text-red-400" />}
                             {row.position}
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium px-2">
+                        <TableCell className="font-medium px-1 max-w-[80px] sm:max-w-none">
                           <button
-                            className="text-left hover:text-primary transition-colors underline decoration-dotted underline-offset-4 text-sm sm:text-base"
+                            className="text-left hover:text-primary transition-colors underline decoration-dotted underline-offset-4 text-[13px] sm:text-base truncate block w-full"
                             onClick={(e) => { e.stopPropagation(); setSelectedPlayer(row.name); }}
                             data-testid={`button-player-${row.position}`}
                           >
                             {row.name}
                           </button>
                         </TableCell>
-                        <TableCell className="text-center tabular-nums px-2">
+                        <TableCell className="text-center tabular-nums px-1">
                           {row.wins > 0 ? (
-                            <span className="inline-flex items-center gap-0.5 sm:gap-1 text-amber-600 dark:text-amber-400 font-semibold">
+                            <span className="inline-flex items-center gap-0.5 sm:gap-1 text-amber-600 dark:text-amber-400 font-semibold text-[13px] sm:text-base">
                               <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                               {row.wins}
                             </span>
                           ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-muted-foreground text-[13px] sm:text-base">—</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-center tabular-nums font-bold text-primary text-base sm:text-lg px-2">{row.points}</TableCell>
-                        <TableCell className="text-center tabular-nums px-2 hidden sm:table-cell">{row.legsWon}</TableCell>
-                        <TableCell className="text-center tabular-nums px-2 hidden sm:table-cell">
+                        <TableCell className="text-center tabular-nums font-bold text-primary text-[14px] sm:text-lg px-1">{row.points}</TableCell>
+                        <TableCell className="text-center tabular-nums px-1 text-[13px] sm:text-base">{row.legsWon}</TableCell>
+                        <TableCell className="text-center tabular-nums px-1 text-[13px] sm:text-base">
                           <span className={cn(
                             row.legDifference > 0 && "text-green-600 dark:text-green-400",
                             row.legDifference < 0 && "text-red-600 dark:text-red-400",
