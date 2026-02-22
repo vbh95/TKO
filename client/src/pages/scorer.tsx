@@ -1,7 +1,25 @@
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Loader2, Target, Trophy, Wifi, WifiOff, Play, ChevronRight, ArrowLeft, Undo2, RotateCcw, Check, Eye, Grid2x2, Delete, Sun, Moon } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Delete,
+  Eye,
+  Grid2x2,
+  Loader2,
+  Moon,
+  Sun,
+  Target,
+  Trophy,
+  Undo2,
+  Wifi,
+  WifiOff,
+  Maximize,
+  Play,
+  ChevronRight,
+  RotateCcw,
+} from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -945,150 +963,162 @@ export default function ScorerPage() {
     const rightLastScore = swapPlayers ? lastScoreA : lastScoreB;
 
     return (
-      <div className="min-h-[100dvh] md:max-h-[100dvh] bg-[#1a1a1a] flex flex-col overflow-hidden" data-testid="scorer-match-view">
-        <div className="bg-primary text-primary-foreground py-2 md:py-3 px-3 shadow-lg shrink-0">
-          <div className="flex items-center gap-2 max-w-4xl mx-auto">
+      <div className="fixed inset-0 bg-[#1a1a1a] flex flex-col overflow-hidden z-[100]" data-testid="scorer-match-view">
+        <div className="bg-primary text-primary-foreground py-1 md:py-2 px-3 shadow-lg shrink-0">
+          <div className="flex items-center gap-2 max-w-4xl mx-auto h-8 md:h-10">
             <Button
               variant="ghost"
               size="icon"
-              className="text-primary-foreground shrink-0 h-8 w-8"
+              className="text-primary-foreground shrink-0 h-7 w-7"
               onClick={() => {
                 setView("matchList");
                 setActiveMatchId(null);
               }}
               data-testid="button-back-to-list"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-3.5 h-3.5" />
             </Button>
             <div className="flex-1 min-w-0">
-              <p className="text-xs md:text-sm text-primary-foreground/80 truncate">
-                {tournament.name} — {group.name} — Board {boardNumber}
+              <p className="text-[10px] md:text-xs text-primary-foreground/80 truncate font-medium">
+                {tournament.name} — Board {boardNumber}
               </p>
             </div>
-            <button
-              onClick={toggleTheme}
-              className="p-1 rounded hover:bg-white/10 transition-colors"
-              data-testid="button-toggle-theme-scorer"
-            >
-              {theme === "light" ? <Moon className="w-3.5 h-3.5 text-primary-foreground" /> : <Sun className="w-3.5 h-3.5 text-primary-foreground" />}
-            </button>
-            {isConnected ? (
-              <Badge variant="outline" className="border-green-400 text-green-100 gap-1 text-xs py-0">
-                <Wifi className="w-3 h-3" /> Live
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="border-red-400 text-red-100 gap-1 text-xs py-0">
-                <WifiOff className="w-3 h-3" /> Off
-              </Badge>
-            )}
+            <div className="flex items-center gap-1.5 md:gap-3">
+              <button
+                onClick={() => {
+                  if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(e => {
+                      console.error(`Error attempting to enable full-screen mode: ${e.message}`);
+                    });
+                  } else {
+                    if (document.exitFullscreen) {
+                      document.exitFullscreen();
+                    }
+                  }
+                }}
+                className="p-1 rounded hover:bg-white/10 transition-colors flex items-center gap-1"
+                data-testid="button-fullscreen"
+              >
+                <Maximize className="w-3 h-3 text-primary-foreground" />
+                <span className="text-[10px] hidden sm:inline text-primary-foreground/80">Fullscreen</span>
+              </button>
+              <button
+                onClick={toggleTheme}
+                className="p-1 rounded hover:bg-white/10 transition-colors"
+                data-testid="button-toggle-theme-scorer"
+              >
+                {theme === "light" ? <Moon className="w-3 h-3 text-primary-foreground" /> : <Sun className="w-3 h-3 text-primary-foreground" />}
+              </button>
+              {isConnected ? (
+                <Badge variant="outline" className="border-green-400 text-green-100 gap-1 text-[9px] md:text-[10px] py-0 px-1.5 h-5">
+                  <Wifi className="w-2.5 h-2.5" /> Live
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-red-400 text-red-100 gap-1 text-[9px] md:text-[10px] py-0 px-1.5 h-5">
+                  <WifiOff className="w-2.5 h-2.5" /> Off
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col w-full max-w-lg md:max-w-2xl mx-auto px-3 md:px-6 py-0.5 overflow-hidden">
+        <div className="flex-1 flex flex-col w-full max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto px-2 md:px-4 py-0.5 md:py-1 overflow-hidden">
           {legVisits.length === 0 && legsWonA === 0 && legsWonB === 0 && (
             <div className="flex justify-center mb-0.5 shrink-0">
               <button
-                className="flex items-center gap-1 text-gray-400 text-[10px] px-2 py-0.5 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                className="flex items-center gap-1 text-gray-400 text-[9px] md:text-[10px] px-2 py-0.5 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] touch-manipulation active:bg-[#3a3a3a] transition-colors"
                 onClick={() => setView("bullThrow")}
                 data-testid="button-back-to-bull"
               >
-                <ArrowLeft className="w-3 h-3" />
+                <ArrowLeft className="w-2.5 h-2.5" />
                 Bull Throw
               </button>
             </div>
           )}
           <div className="text-center py-0.5 md:py-1 shrink-0">
-            <p className="text-gray-400 text-[10px] md:text-xs uppercase tracking-wider">
+            <p className="text-gray-400 text-[9px] md:text-xs uppercase tracking-wider font-semibold">
               Leg {currentLeg} — Best of {matchBestOf}
             </p>
-            <div className="tabular-nums mt-0">
-              <span className={cn("text-2xl md:text-4xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
-              <span className="text-gray-600 mx-2 text-xl md:text-3xl">-</span>
-              <span className={cn("text-2xl md:text-4xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
+            <div className="tabular-nums mt-0 flex items-center justify-center gap-2">
+              <span className={cn("text-xl md:text-4xl lg:text-5xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
+              <span className="text-gray-600 text-lg md:text-2xl">-</span>
+              <span className={cn("text-xl md:text-4xl lg:text-5xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 md:gap-4 mb-1 md:mb-2 shrink-0">
+          <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6 mb-1 md:mb-2 lg:mb-3 shrink-0">
             <div
               className={cn(
-                "rounded-xl p-3 md:p-5 transition-all duration-300",
+                "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
                 currentThrower === leftThrower
-                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a] scale-105 z-10 shadow-xl"
-                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a] scale-95 opacity-70 grayscale-[20%]"
+                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a] scale-105 z-10 shadow-2xl"
+                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a] scale-95 opacity-60 grayscale-[20%]"
               )}
               data-testid="panel-player-a"
             >
-              <div className="h-4 md:h-6 mb-1">
+              <div className="h-3 md:h-5 mb-0.5">
                 {currentThrower === leftThrower && (
                   <div className="flex items-center gap-1">
-                    <Eye className="w-3 h-3 md:w-4 md:h-4 text-white/90" />
-                    <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/90">Throwing</span>
+                    <Eye className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 text-white/90" />
+                    <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-white/90">Throwing</span>
                   </div>
                 )}
               </div>
-              <p className="text-sm md:text-lg font-bold text-white/90 truncate" data-testid="text-player-a-name">
+              <p className="text-[10px] md:text-sm lg:text-base font-bold text-white/80 truncate mb-0.5 uppercase tracking-tight" data-testid="text-player-a-name">
                 {leftPlayer?.name || "Player 1"}
               </p>
               <div
-                className="text-6xl md:text-[7rem] font-bold text-white tabular-nums leading-none mt-1 md:mt-2"
+                className="text-5xl md:text-8xl lg:text-[9rem] font-bold text-white tabular-nums leading-none tracking-tighter"
                 data-testid="text-remaining-a"
               >
                 {leftRemaining}
               </div>
-              <div className="mt-2 md:mt-3 space-y-0.5 md:space-y-1 text-xs md:text-sm">
-                <div className="flex justify-between text-white/60">
-                  <span>3-dart avg.</span>
-                  <span className="text-white font-medium tabular-nums">{leftAvg}</span>
+              <div className="mt-1 md:mt-3 lg:mt-4 grid grid-cols-2 gap-x-2 gap-y-0.5 md:gap-y-1 text-[8px] md:text-xs lg:text-sm border-t border-white/10 pt-1 md:pt-2">
+                <div className="flex flex-col">
+                  <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">3-dart avg</span>
+                  <span className="text-white font-bold tabular-nums">{leftAvg}</span>
                 </div>
-                <div className="flex justify-between text-white/60">
-                  <span>Last score</span>
-                  <span className="text-white font-medium tabular-nums">{leftLastScore !== null ? leftLastScore : '-'}</span>
-                </div>
-                <div className="flex justify-between text-white/60">
-                  <span>Darts thrown</span>
-                  <span className="text-white font-medium tabular-nums">{leftDarts}</span>
+                <div className="flex flex-col items-end">
+                  <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">Last score</span>
+                  <span className="text-white font-bold tabular-nums">{leftLastScore !== null ? leftLastScore : '-'}</span>
                 </div>
               </div>
             </div>
 
             <div
               className={cn(
-                "rounded-xl p-3 md:p-5 transition-all duration-300",
+                "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
                 currentThrower === rightThrower
-                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a] scale-105 z-10 shadow-xl"
-                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a] scale-95 opacity-70 grayscale-[20%]"
+                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a] scale-105 z-10 shadow-2xl"
+                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a] scale-95 opacity-60 grayscale-[20%]"
               )}
               data-testid="panel-player-b"
             >
-              <div className="h-4 md:h-6 mb-1">
+              <div className="h-3 md:h-5 mb-0.5">
                 {currentThrower === rightThrower && (
                   <div className="flex items-center gap-1">
-                    <Eye className="w-3 h-3 md:w-4 md:h-4 text-white/90" />
-                    <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/90">Throwing</span>
+                    <Eye className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 text-white/90" />
+                    <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-white/90">Throwing</span>
                   </div>
                 )}
               </div>
-              <p className="text-sm md:text-lg font-bold text-white/90 truncate" data-testid="text-player-b-name">
+              <p className="text-[10px] md:text-sm lg:text-base font-bold text-white/80 truncate mb-0.5 uppercase tracking-tight" data-testid="text-player-b-name">
                 {rightPlayer?.name || "Player 2"}
               </p>
               <div
-                className="text-6xl md:text-[7rem] font-bold text-white tabular-nums leading-none mt-1 md:mt-2"
+                className="text-5xl md:text-8xl lg:text-[9rem] font-bold text-white tabular-nums leading-none tracking-tighter"
                 data-testid="text-remaining-b"
               >
                 {rightRemaining}
               </div>
-              <div className="mt-2 md:mt-3 space-y-0.5 md:space-y-1 text-xs md:text-sm">
-                <div className="flex justify-between text-white/60">
-                  <span>3-dart avg.</span>
-                  <span className="text-white font-medium tabular-nums">{rightAvg}</span>
+              <div className="mt-1 md:mt-3 lg:mt-4 grid grid-cols-2 gap-x-2 gap-y-0.5 md:gap-y-1 text-[8px] md:text-xs lg:text-sm border-t border-white/10 pt-1 md:pt-2">
+                <div className="flex flex-col">
+                  <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">3-dart avg</span>
+                  <span className="text-white font-bold tabular-nums">{rightAvg}</span>
                 </div>
-                <div className="flex justify-between text-white/60">
-                  <span>Last score</span>
-                  <span className="text-white font-medium tabular-nums">{rightLastScore !== null ? rightLastScore : '-'}</span>
-                </div>
-                <div className="flex justify-between text-white/60">
-                  <span>Darts thrown</span>
-                  <span className="text-white font-medium tabular-nums">{rightDarts}</span>
+                <div className="flex flex-col items-end">
+                  <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">Last score</span>
+                  <span className="text-white font-bold tabular-nums">{rightLastScore !== null ? rightLastScore : '-'}</span>
                 </div>
               </div>
             </div>
@@ -1192,72 +1222,74 @@ export default function ScorerPage() {
             </div>
           )}
 
-          <div className={cn("flex-1 flex flex-col justify-end pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
-            <div className="flex gap-1.5 md:gap-2 items-center mb-1.5 md:mb-2 shrink-0">
+          <div className={cn("flex-1 flex flex-col justify-end pb-1 md:pb-3", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
+            <div className="flex gap-1.5 md:gap-2 items-center mb-1.5 md:mb-3 shrink-0">
               <button
-                className="w-11 h-11 md:w-14 md:h-14 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
+                className="w-10 h-10 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation shadow-lg"
                 onClick={() => setShowQuickScores(!showQuickScores)}
                 data-testid="button-toggle-quick"
               >
-                <Grid2x2 className="w-5 h-5 md:w-6 md:h-6 text-gray-400" />
+                <Grid2x2 className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-gray-400" />
               </button>
               <div
-                className="flex-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl px-4 h-11 md:h-14 text-lg md:text-2xl font-medium tabular-nums flex items-center justify-between"
+                className="flex-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl px-4 h-10 md:h-14 lg:h-16 text-lg md:text-2xl lg:text-3xl font-medium tabular-nums flex items-center justify-between shadow-inner"
                 data-testid="text-input-value"
               >
-                <span className={inputValue ? "text-white" : "text-gray-500"}>{inputValue || 'Enter a score'}</span>
+                <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
                 {inputValue && (
                   <button
-                    className="ml-2 p-1 touch-manipulation"
+                    className="ml-2 p-1.5 touch-manipulation active:scale-90 transition-transform"
                     onClick={() => setInputValue(prev => prev.slice(0, -1))}
                     data-testid="button-backspace"
                   >
-                    <Delete className="w-5 h-5 md:w-6 md:h-6 text-gray-400" />
+                    <Delete className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-gray-400" />
                   </button>
                 )}
               </div>
             </div>
 
-            {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
-              <div key={ri} className="grid grid-cols-3 gap-1.5 md:gap-2 mb-1.5 md:mb-2">
-                {row.map(key => (
-                  <button
-                    key={key}
-                    className="h-[4.8rem] md:h-[7.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-3xl md:text-5xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
-                    onClick={() => handleNumpad(key)}
-                    disabled={updateScoreMutation.isPending}
-                    data-testid={`button-numpad-${key}`}
-                  >
-                    {key}
-                  </button>
-                ))}
+            <div className="flex-1 flex flex-col justify-end space-y-1 md:space-y-3 lg:space-y-4">
+              {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
+                <div key={ri} className="grid grid-cols-3 gap-1.5 md:gap-3 lg:gap-4 flex-1 max-h-[15vh] md:max-h-none">
+                  {row.map(key => (
+                    <button
+                      key={key}
+                      className="h-full min-h-[50px] md:h-[10vh] lg:h-[12vh] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl lg:text-5xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center"
+                      onClick={() => handleNumpad(key)}
+                      disabled={updateScoreMutation.isPending}
+                      data-testid={`button-numpad-${key}`}
+                    >
+                      {key}
+                    </button>
+                  ))}
+                </div>
+              ))}
+              <div className="grid grid-cols-3 gap-1.5 md:gap-3 lg:gap-4 flex-1 max-h-[15vh] md:max-h-none">
+                <button
+                  className="h-full min-h-[50px] md:h-[10vh] lg:h-[12vh] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all shadow-lg"
+                  onClick={handleUndo}
+                  disabled={legVisits.length === 0 || updateScoreMutation.isPending}
+                  data-testid="button-undo"
+                >
+                  <Undo2 className={cn("w-7 h-7 md:w-10 md:h-10 lg:w-12 lg:h-12", legVisits.length === 0 ? "text-gray-700" : "text-gray-300")} />
+                </button>
+                <button
+                  className="h-full min-h-[50px] md:h-[10vh] lg:h-[12vh] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl lg:text-5xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center"
+                  onClick={() => handleNumpad('0')}
+                  disabled={updateScoreMutation.isPending}
+                  data-testid="button-numpad-0"
+                >
+                  0
+                </button>
+                <button
+                  className="h-full min-h-[50px] md:h-[10vh] lg:h-[12vh] rounded-xl flex items-center justify-center touch-manipulation transition-all bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a] active:scale-[0.98] shadow-lg"
+                  onClick={() => handleNumpad('OK')}
+                  disabled={updateScoreMutation.isPending}
+                  data-testid="button-numpad-OK"
+                >
+                  <Check className="w-8 h-8 md:w-12 md:h-12 lg:w-14 lg:h-14 text-white" />
+                </button>
               </div>
-            ))}
-            <div className="grid grid-cols-3 gap-1.5 md:gap-2">
-              <button
-                className="h-[4.8rem] md:h-[7.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] transition-colors"
-                onClick={handleUndo}
-                disabled={legVisits.length === 0 || updateScoreMutation.isPending}
-                data-testid="button-undo"
-              >
-                <Undo2 className={cn("w-7 h-7 md:w-10 md:h-10", legVisits.length === 0 ? "text-gray-600" : "text-gray-300")} />
-              </button>
-              <button
-                className="h-[4.8rem] md:h-[7.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-3xl md:text-5xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
-                onClick={() => handleNumpad('0')}
-                disabled={updateScoreMutation.isPending}
-                data-testid="button-numpad-0"
-              >
-                0
-              </button>
-              <button
-                className="h-[4.8rem] md:h-[7.5rem] rounded-xl flex items-center justify-center touch-manipulation transition-colors bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a]"
-                onClick={() => handleNumpad('OK')}
-                disabled={updateScoreMutation.isPending}
-                data-testid="button-numpad-OK"
-              >
-                <Check className="w-8 h-8 md:w-12 md:h-12 text-white" />
-              </button>
             </div>
           </div>
 
