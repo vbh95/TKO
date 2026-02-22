@@ -534,11 +534,22 @@ export default function TournamentDetail() {
           </div>
           
           <div className="flex gap-2">
+            {!tournament.isLegacy && (
+              <Button 
+                variant="outline" 
+                className="gap-2"
+                onClick={() => setIsDevicesDialogOpen(true)}
+                data-testid="button-tablet-scoring"
+              >
+                <TabletSmartphone className="w-4 h-4" />
+                Tablet Scoring
+              </Button>
+            )}
             {!tournament.isLegacy && <Dialog>
               <DialogTrigger asChild>
                 <Button variant="outline" className="gap-2">
                   <Share2 className="w-4 h-4" />
-                  Share
+                  Share Public Page
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -641,7 +652,7 @@ export default function TournamentDetail() {
                 </DropdownMenuItem>
                 {!tournament.isLegacy && <DropdownMenuItem data-testid="menu-item-devices" className="gap-2 cursor-pointer" onSelect={() => setIsDevicesDialogOpen(true)}>
                   <TabletSmartphone className="w-4 h-4" />
-                  Connected Devices
+                  Tablet Scoring
                 </DropdownMenuItem>}
                 <DropdownMenuItem data-testid="menu-item-league" className="gap-2 cursor-pointer" onSelect={() => { setSelectedLeagueId(tournament.leagueId?.toString() ?? "none"); setIsLeagueDialogOpen(true); }}>
                   <Medal className="w-4 h-4" />
@@ -1813,7 +1824,7 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, enableSha
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TabletSmartphone className="w-5 h-5 text-primary" />
-            Connected Devices
+            Tablet Scoring
           </DialogTitle>
           <DialogDescription>
             Create scorer tablet sessions for each board. Scan the QR code on a tablet to pair it as a scorer.
