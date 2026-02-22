@@ -1111,8 +1111,12 @@ export default function ScorerPage() {
             </div>
           </div>
 
+          {(impossibleWarning || pendingCheckout) && (
+            <div className="fixed inset-0 bg-black/60 z-[150]" />
+          )}
+
           {impossibleWarning && (
-            <div className="bg-primary rounded-xl p-4 md:p-6 mb-1 shrink-0" data-testid="impossible-warning">
+            <div className="bg-primary rounded-xl p-4 md:p-6 mb-1 shrink-0 relative z-[200]" data-testid="impossible-warning">
               <p className="text-primary-foreground font-bold text-center text-2xl md:text-3xl mb-2">
                 {impossibleWarning.includes("not possible") ? "BUST!" : "Impossible Score"}
               </p>
@@ -1146,7 +1150,7 @@ export default function ScorerPage() {
           )}
 
           {pendingCheckout && !pendingDartsAtDouble && (
-            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-3 md:p-5 mb-1 shrink-0" data-testid="checkout-confirm">
+            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="checkout-confirm">
               <div className="text-center mb-2 md:mb-3">
                 <Trophy className="w-6 h-6 md:w-10 md:h-10 text-yellow-400 mx-auto mb-1" />
                 <p className="text-white font-bold text-base md:text-xl">Checkout!</p>
@@ -1175,7 +1179,7 @@ export default function ScorerPage() {
           )}
 
           {pendingCheckout && pendingDartsAtDouble && (
-            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-3 md:p-5 mb-1 shrink-0" data-testid="darts-at-double">
+            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="darts-at-double">
               <div className="text-center mb-2 md:mb-3">
                 <Target className="w-6 h-6 md:w-10 md:h-10 text-yellow-400 mx-auto mb-1" />
                 <p className="text-white font-bold text-base md:text-xl">Darts at Double?</p>
