@@ -1150,24 +1150,24 @@ export default function ScorerPage() {
           )}
 
           {pendingCheckout && !pendingDartsAtDouble && (
-            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="checkout-confirm">
+            <div className="bg-primary rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="checkout-confirm">
               <div className="text-center mb-2 md:mb-3">
-                <Trophy className="w-6 h-6 md:w-10 md:h-10 text-yellow-400 mx-auto mb-1" />
-                <p className="text-white font-bold text-base md:text-xl">Checkout!</p>
-                <p className="text-gray-400 text-xs md:text-sm">
+                <Trophy className="w-6 h-6 md:w-10 md:h-10 text-primary-foreground mx-auto mb-1" />
+                <p className="text-primary-foreground font-bold text-base md:text-xl">Checkout!</p>
+                <p className="text-primary-foreground/70 text-xs md:text-sm">
                   {pendingCheckout.player === 'A' ? (getPlayer(activeMatch.playerAId)?.name || 'Player 1') : (getPlayer(activeMatch.playerBId)?.name || 'Player 2')} checked out
                 </p>
               </div>
               <div className="flex gap-2">
                 <button
-                  className="flex-1 h-10 md:h-14 rounded-xl bg-[#3a3a3a] text-gray-300 font-semibold text-sm md:text-base touch-manipulation active:bg-[#4a4a4a] transition-colors"
+                  className="flex-1 h-10 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-sm md:text-base touch-manipulation active:bg-primary-foreground/30 transition-colors"
                   onClick={cancelCheckout}
                   data-testid="button-cancel-checkout"
                 >
                   Cancel
                 </button>
                 <button
-                  className="flex-1 h-10 md:h-14 rounded-xl bg-[#4a7a3a] text-white font-semibold text-sm md:text-base touch-manipulation active:bg-[#5a8a4a] transition-colors"
+                  className="flex-1 h-10 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-sm md:text-base touch-manipulation active:bg-primary-foreground/30 transition-colors"
                   onClick={handleConfirmCheckoutClick}
                   disabled={updateScoreMutation.isPending}
                   data-testid="button-confirm-checkout"
@@ -1179,17 +1179,17 @@ export default function ScorerPage() {
           )}
 
           {pendingCheckout && pendingDartsAtDouble && (
-            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="darts-at-double">
+            <div className="bg-primary rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="darts-at-double">
               <div className="text-center mb-2 md:mb-3">
-                <Target className="w-6 h-6 md:w-10 md:h-10 text-yellow-400 mx-auto mb-1" />
-                <p className="text-white font-bold text-base md:text-xl">Darts at Double?</p>
-                <p className="text-gray-400 text-xs md:text-sm">How many darts were used on the double</p>
+                <Target className="w-6 h-6 md:w-10 md:h-10 text-primary-foreground mx-auto mb-1" />
+                <p className="text-primary-foreground font-bold text-base md:text-xl">Darts at Double?</p>
+                <p className="text-primary-foreground/70 text-xs md:text-sm">How many darts were used on the double</p>
               </div>
               <div className="flex gap-2 md:gap-3">
                 {[1, 2, 3].map(n => (
                   <button
                     key={n}
-                    className="flex-1 h-12 md:h-16 rounded-xl bg-[#4a7a3a] text-white font-bold text-lg md:text-2xl touch-manipulation active:bg-[#5a8a4a] transition-colors"
+                    className="flex-1 h-12 md:h-16 rounded-xl bg-primary-foreground/20 text-primary-foreground font-bold text-lg md:text-2xl touch-manipulation active:bg-primary-foreground/30 transition-colors"
                     onClick={() => confirmCheckout(n)}
                     disabled={updateScoreMutation.isPending}
                     data-testid={`button-darts-at-double-${n}`}
