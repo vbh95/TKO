@@ -1046,7 +1046,7 @@ export default function ScorerPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6 mb-1 md:mb-2 lg:mb-3 shrink-0">
+          <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6 mt-1 md:mt-2 mb-1 md:mb-2 lg:mb-3 shrink-0">
             <div
               className={cn(
                 "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
@@ -1125,19 +1125,19 @@ export default function ScorerPage() {
           </div>
 
           {bustMessage && (
-            <div className="bg-red-600 text-white text-center py-2 md:py-3 rounded-lg mb-2 text-sm md:text-lg font-bold animate-pulse shrink-0" data-testid="text-bust">
+            <div className="bg-red-600 text-white text-center py-1.5 md:py-2 rounded-lg mb-1 text-sm md:text-lg font-bold animate-pulse shrink-0" data-testid="text-bust">
               {bustMessage}
             </div>
           )}
 
           {impossibleWarning && (
-            <div className="bg-[#222] border-2 border-yellow-500 rounded-xl p-4 md:p-6 mb-2 shrink-0" data-testid="impossible-warning">
+            <div className="bg-[#222] border-2 border-yellow-500 rounded-xl p-3 md:p-5 mb-1 shrink-0" data-testid="impossible-warning">
               <p className="text-yellow-400 font-bold text-center text-base md:text-xl mb-1">
                 {impossibleWarning.startsWith("BUST") ? "BUST!" : "Impossible Score"}
               </p>
-              <p className="text-gray-300 text-center text-sm md:text-base mb-3">{impossibleWarning}</p>
+              <p className="text-gray-300 text-center text-sm md:text-base mb-2">{impossibleWarning}</p>
               <button
-                className="w-full h-11 md:h-14 rounded-xl bg-yellow-600 text-white font-semibold text-base md:text-lg touch-manipulation active:bg-yellow-700 transition-colors"
+                className="w-full h-10 md:h-12 rounded-xl bg-yellow-600 text-white font-semibold text-base md:text-lg touch-manipulation active:bg-yellow-700 transition-colors"
                 onClick={() => {
                   setImpossibleWarning(null);
                   setInputValue("");
@@ -1150,24 +1150,24 @@ export default function ScorerPage() {
           )}
 
           {pendingCheckout && !pendingDartsAtDouble && (
-            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 md:p-6 mb-2 shrink-0" data-testid="checkout-confirm">
-              <div className="text-center mb-3 md:mb-4">
-                <Trophy className="w-8 h-8 md:w-12 md:h-12 text-yellow-400 mx-auto mb-1" />
-                <p className="text-white font-bold text-lg md:text-2xl">Checkout!</p>
-                <p className="text-gray-400 text-sm md:text-base">
+            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-3 md:p-5 mb-1 shrink-0" data-testid="checkout-confirm">
+              <div className="text-center mb-2 md:mb-3">
+                <Trophy className="w-6 h-6 md:w-10 md:h-10 text-yellow-400 mx-auto mb-1" />
+                <p className="text-white font-bold text-base md:text-xl">Checkout!</p>
+                <p className="text-gray-400 text-xs md:text-sm">
                   {pendingCheckout.player === 'A' ? (getPlayer(activeMatch.playerAId)?.name || 'Player 1') : (getPlayer(activeMatch.playerBId)?.name || 'Player 2')} checked out
                 </p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <button
-                  className="flex-1 h-12 md:h-16 rounded-xl bg-[#3a3a3a] text-gray-300 font-semibold text-base md:text-lg touch-manipulation active:bg-[#4a4a4a] transition-colors"
+                  className="flex-1 h-10 md:h-14 rounded-xl bg-[#3a3a3a] text-gray-300 font-semibold text-sm md:text-base touch-manipulation active:bg-[#4a4a4a] transition-colors"
                   onClick={cancelCheckout}
                   data-testid="button-cancel-checkout"
                 >
                   Cancel
                 </button>
                 <button
-                  className="flex-1 h-12 md:h-16 rounded-xl bg-[#4a7a3a] text-white font-semibold text-base md:text-lg touch-manipulation active:bg-[#5a8a4a] transition-colors"
+                  className="flex-1 h-10 md:h-14 rounded-xl bg-[#4a7a3a] text-white font-semibold text-sm md:text-base touch-manipulation active:bg-[#5a8a4a] transition-colors"
                   onClick={handleConfirmCheckoutClick}
                   disabled={updateScoreMutation.isPending}
                   data-testid="button-confirm-checkout"
@@ -1179,17 +1179,17 @@ export default function ScorerPage() {
           )}
 
           {pendingCheckout && pendingDartsAtDouble && (
-            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-4 md:p-6 mb-2 shrink-0" data-testid="darts-at-double">
-              <div className="text-center mb-3 md:mb-4">
-                <Target className="w-8 h-8 md:w-12 md:h-12 text-yellow-400 mx-auto mb-1" />
-                <p className="text-white font-bold text-lg md:text-2xl">Darts at Double?</p>
-                <p className="text-gray-400 text-sm md:text-base">How many darts were used on the double</p>
+            <div className="bg-[#222] border border-[#3a3a3a] rounded-xl p-3 md:p-5 mb-1 shrink-0" data-testid="darts-at-double">
+              <div className="text-center mb-2 md:mb-3">
+                <Target className="w-6 h-6 md:w-10 md:h-10 text-yellow-400 mx-auto mb-1" />
+                <p className="text-white font-bold text-base md:text-xl">Darts at Double?</p>
+                <p className="text-gray-400 text-xs md:text-sm">How many darts were used on the double</p>
               </div>
-              <div className="flex gap-3 md:gap-4">
+              <div className="flex gap-2 md:gap-3">
                 {[1, 2, 3].map(n => (
                   <button
                     key={n}
-                    className="flex-1 h-14 md:h-20 rounded-xl bg-[#4a7a3a] text-white font-bold text-xl md:text-3xl touch-manipulation active:bg-[#5a8a4a] transition-colors"
+                    className="flex-1 h-12 md:h-16 rounded-xl bg-[#4a7a3a] text-white font-bold text-lg md:text-2xl touch-manipulation active:bg-[#5a8a4a] transition-colors"
                     onClick={() => confirmCheckout(n)}
                     disabled={updateScoreMutation.isPending}
                     data-testid={`button-darts-at-double-${n}`}
@@ -1201,29 +1201,8 @@ export default function ScorerPage() {
             </div>
           )}
 
-          {showQuickScores && !pendingCheckout && (
-            <div className="grid grid-cols-4 gap-1.5 md:gap-2 mb-2 shrink-0">
-              {QUICK_SCORES.map(qs => (
-                <button
-                  key={qs}
-                  className={cn(
-                    "h-11 md:h-14 rounded-lg text-sm md:text-lg font-bold touch-manipulation transition-colors",
-                    qs === 180
-                      ? "bg-yellow-700/40 text-yellow-300 border border-yellow-600/50"
-                      : "bg-[#2a2a2a] text-gray-300 border border-[#3a3a3a]"
-                  )}
-                  onClick={() => handleScoreSubmit(qs)}
-                  disabled={updateScoreMutation.isPending}
-                  data-testid={`button-quick-${qs}`}
-                >
-                  {qs}
-                </button>
-              ))}
-            </div>
-          )}
-
           <div className={cn("flex-1 flex flex-col justify-end pb-1 md:pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
-            <div className="flex gap-1 md:gap-1.5 items-center mb-1 md:mb-1.5 shrink-0">
+            <div className="flex gap-1 md:gap-1.5 items-center mb-1 shrink-0">
               <button
                 className="w-9 h-9 md:w-12 md:h-12 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
                 onClick={() => setShowQuickScores(!showQuickScores)}
@@ -1247,6 +1226,27 @@ export default function ScorerPage() {
                 )}
               </div>
             </div>
+
+            {showQuickScores && !pendingCheckout && (
+              <div className="grid grid-cols-4 gap-1 md:gap-1.5 mb-1 shrink-0">
+                {QUICK_SCORES.map(qs => (
+                  <button
+                    key={qs}
+                    className={cn(
+                      "h-9 md:h-11 rounded-lg text-xs md:text-sm font-bold touch-manipulation transition-colors",
+                      qs === 180
+                        ? "bg-yellow-700/40 text-yellow-300 border border-yellow-600/50"
+                        : "bg-[#2a2a2a] text-gray-300 border border-[#3a3a3a]"
+                    )}
+                    onClick={() => handleScoreSubmit(qs)}
+                    disabled={updateScoreMutation.isPending}
+                    data-testid={`button-quick-${qs}`}
+                  >
+                    {qs}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="flex-1 flex flex-col justify-end gap-1 md:gap-1.5">
               {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
@@ -1294,9 +1294,9 @@ export default function ScorerPage() {
           </div>
 
           {updateScoreMutation.isPending && (
-            <div className="flex items-center justify-center py-1 shrink-0">
-              <Loader2 className="w-4 h-4 animate-spin text-green-400 mr-2" />
-              <span className="text-xs text-gray-500">Updating...</span>
+            <div className="flex items-center justify-center py-0.5 shrink-0">
+              <Loader2 className="w-3 h-3 animate-spin text-green-400 mr-1" />
+              <span className="text-[10px] text-gray-500">Updating...</span>
             </div>
           )}
         </div>
