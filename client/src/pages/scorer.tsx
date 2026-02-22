@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ArrowLeft,
   Check,
+  Crosshair,
   Delete,
-  Eye,
   Grid2x2,
   Loader2,
   Moon,
@@ -15,11 +15,11 @@ import {
   Undo2,
   Wifi,
   WifiOff,
-  Maximize,
   Play,
   ChevronRight,
   RotateCcw,
 } from "lucide-react";
+import tkoLogoWhite from "@assets/TKO_White-02_1771177730966.png";
 import { useTheme } from "@/hooks/use-theme";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -963,7 +963,7 @@ export default function ScorerPage() {
     const rightLastScore = swapPlayers ? lastScoreA : lastScoreB;
 
     return (
-      <div className="fixed inset-0 bg-[#1a1a1a] flex flex-col overflow-hidden z-[100]" data-testid="scorer-match-view">
+      <div className="fixed inset-0 bg-[hsl(222.2,84%,4.9%)] flex flex-col overflow-hidden z-[100]" data-testid="scorer-match-view">
         <div className="bg-primary text-primary-foreground py-1 md:py-2 px-3 shadow-lg shrink-0">
           <div className="flex items-center gap-2 max-w-4xl mx-auto h-8 md:h-10">
             <Button
@@ -978,30 +978,10 @@ export default function ScorerPage() {
             >
               <ArrowLeft className="w-3.5 h-3.5" />
             </Button>
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] md:text-xs text-primary-foreground/80 truncate font-medium">
-                {tournament.name} — Board {boardNumber}
-              </p>
+            <div className="flex-1 flex items-center justify-center min-w-0">
+              <img src={tkoLogoWhite} alt="TKO" className="h-5 md:h-7" />
             </div>
             <div className="flex items-center gap-1.5 md:gap-3">
-              <button
-                onClick={() => {
-                  if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen().catch(e => {
-                      console.error(`Error attempting to enable full-screen mode: ${e.message}`);
-                    });
-                  } else {
-                    if (document.exitFullscreen) {
-                      document.exitFullscreen();
-                    }
-                  }
-                }}
-                className="p-1 rounded hover:bg-white/10 transition-colors flex items-center gap-1"
-                data-testid="button-fullscreen"
-              >
-                <Maximize className="w-3 h-3 text-primary-foreground" />
-                <span className="text-[10px] hidden sm:inline text-primary-foreground/80">Fullscreen</span>
-              </button>
               <button
                 onClick={toggleTheme}
                 className="p-1 rounded hover:bg-white/10 transition-colors"
@@ -1026,7 +1006,7 @@ export default function ScorerPage() {
           {legVisits.length === 0 && legsWonA === 0 && legsWonB === 0 && (
             <div className="flex justify-center mb-0.5 shrink-0">
               <button
-                className="flex items-center gap-1 text-gray-400 text-[9px] md:text-[10px] px-2 py-0.5 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                className="flex items-center gap-1 text-gray-400 text-[9px] md:text-[10px] px-2 py-0.5 rounded-lg bg-[#1a2e1a] border border-[#2a4a2a] touch-manipulation active:bg-[#2a4a2a] transition-colors"
                 onClick={() => setView("bullThrow")}
                 data-testid="button-back-to-bull"
               >
@@ -1051,16 +1031,16 @@ export default function ScorerPage() {
               className={cn(
                 "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
                 currentThrower === leftThrower
-                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a] scale-105 z-10 shadow-2xl"
-                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a] scale-95 opacity-60 grayscale-[20%]"
+                  ? "bg-[#2d6a2e] ring-2 ring-[#4a9a4a] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
+                  : "bg-[#1e3a1e] ring-2 ring-[#2a4a2a] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-70"
               )}
               data-testid="panel-player-a"
             >
               <div className="h-3 md:h-5 mb-0.5">
                 {currentThrower === leftThrower && (
-                  <div className="flex items-center gap-1">
-                    <Eye className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 text-white/90" />
+                  <div className="flex items-center justify-end gap-1">
                     <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-white/90">Throwing</span>
+                    <Crosshair className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 text-white/90" />
                   </div>
                 )}
               </div>
@@ -1089,16 +1069,16 @@ export default function ScorerPage() {
               className={cn(
                 "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
                 currentThrower === rightThrower
-                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a] scale-105 z-10 shadow-2xl"
-                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a] scale-95 opacity-60 grayscale-[20%]"
+                  ? "bg-[#2d6a2e] ring-2 ring-[#4a9a4a] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
+                  : "bg-[#1e3a1e] ring-2 ring-[#2a4a2a] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-70"
               )}
               data-testid="panel-player-b"
             >
               <div className="h-3 md:h-5 mb-0.5">
                 {currentThrower === rightThrower && (
-                  <div className="flex items-center gap-1">
-                    <Eye className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 text-white/90" />
+                  <div className="flex items-center justify-end gap-1">
                     <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-white/90">Throwing</span>
+                    <Crosshair className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 text-white/90" />
                   </div>
                 )}
               </div>
@@ -1202,59 +1182,59 @@ export default function ScorerPage() {
           )}
 
           <div className={cn("flex-1 flex flex-col justify-end pb-1 md:pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
-            <div className="flex gap-1 md:gap-1.5 items-center mb-1 mt-auto shrink-0">
-              <button
-                className="w-9 h-9 md:w-12 md:h-12 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
-                onClick={() => setShowQuickScores(!showQuickScores)}
-                data-testid="button-toggle-quick"
-              >
-                <Grid2x2 className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
-              </button>
-              <div
-                className="flex-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg px-3 h-9 md:h-12 text-base md:text-xl font-medium tabular-nums flex items-center justify-between"
-                data-testid="text-input-value"
-              >
-                <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
-                {inputValue && (
-                  <button
-                    className="ml-2 p-1 touch-manipulation active:scale-90 transition-transform"
-                    onClick={() => setInputValue(prev => prev.slice(0, -1))}
-                    data-testid="button-backspace"
-                  >
-                    <Delete className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {showQuickScores && !pendingCheckout && (
-              <div className="grid grid-cols-4 gap-1 md:gap-1.5 mb-1 shrink-0">
-                {QUICK_SCORES.map(qs => (
-                  <button
-                    key={qs}
-                    className={cn(
-                      "h-9 md:h-11 rounded-lg text-xs md:text-sm font-bold touch-manipulation transition-colors",
-                      qs === 180
-                        ? "bg-yellow-700/40 text-yellow-300 border border-yellow-600/50"
-                        : "bg-[#2a2a2a] text-gray-300 border border-[#3a3a3a]"
-                    )}
-                    onClick={() => handleScoreSubmit(qs)}
-                    disabled={updateScoreMutation.isPending}
-                    data-testid={`button-quick-${qs}`}
-                  >
-                    {qs}
-                  </button>
-                ))}
-              </div>
-            )}
-
             <div className="flex-1 flex flex-col justify-end gap-1 md:gap-1.5">
+              <div className="flex gap-1 md:gap-1.5 items-center shrink-0">
+                <button
+                  className="w-9 h-9 md:w-12 md:h-12 rounded-lg bg-[#1a2e1a] border border-[#2a4a2a] flex items-center justify-center touch-manipulation"
+                  onClick={() => setShowQuickScores(!showQuickScores)}
+                  data-testid="button-toggle-quick"
+                >
+                  <Grid2x2 className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
+                </button>
+                <div
+                  className="flex-1 bg-[#1a2e1a] border border-[#2a4a2a] rounded-lg px-3 h-9 md:h-12 text-base md:text-xl font-medium tabular-nums flex items-center justify-between"
+                  data-testid="text-input-value"
+                >
+                  <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
+                  {inputValue && (
+                    <button
+                      className="ml-2 p-1 touch-manipulation active:scale-90 transition-transform"
+                      onClick={() => setInputValue(prev => prev.slice(0, -1))}
+                      data-testid="button-backspace"
+                    >
+                      <Delete className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {showQuickScores && !pendingCheckout && (
+                <div className="grid grid-cols-4 gap-1 md:gap-1.5 shrink-0">
+                  {QUICK_SCORES.map(qs => (
+                    <button
+                      key={qs}
+                      className={cn(
+                        "h-9 md:h-11 rounded-lg text-xs md:text-sm font-bold touch-manipulation transition-colors",
+                        qs === 180
+                          ? "bg-yellow-700/40 text-yellow-300 border border-yellow-600/50"
+                          : "bg-[#1a2e1a] text-gray-300 border border-[#2a4a2a]"
+                      )}
+                      onClick={() => handleScoreSubmit(qs)}
+                      disabled={updateScoreMutation.isPending}
+                      data-testid={`button-quick-${qs}`}
+                    >
+                      {qs}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
                 <div key={ri} className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
                   {row.map(key => (
                     <button
                       key={key}
-                      className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                      className="h-full min-h-[36px] rounded-lg bg-[#1a2e1a] border border-[#2a4a2a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#2a4a2a] active:scale-[0.98] transition-all flex items-center justify-center"
                       onClick={() => handleNumpad(key)}
                       disabled={updateScoreMutation.isPending}
                       data-testid={`button-numpad-${key}`}
@@ -1266,7 +1246,7 @@ export default function ScorerPage() {
               ))}
               <div className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
                 <button
-                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
+                  className="h-full min-h-[36px] rounded-lg bg-[#1a2e1a] border border-[#2a4a2a] flex items-center justify-center touch-manipulation active:bg-[#2a4a2a] active:scale-[0.98] transition-all"
                   onClick={handleUndo}
                   disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                   data-testid="button-undo"
@@ -1274,7 +1254,7 @@ export default function ScorerPage() {
                   <Undo2 className={cn("w-5 h-5 md:w-7 md:h-7", legVisits.length === 0 ? "text-gray-700" : "text-gray-300")} />
                 </button>
                 <button
-                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                  className="h-full min-h-[36px] rounded-lg bg-[#1a2e1a] border border-[#2a4a2a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#2a4a2a] active:scale-[0.98] transition-all flex items-center justify-center"
                   onClick={() => handleNumpad('0')}
                   disabled={updateScoreMutation.isPending}
                   data-testid="button-numpad-0"
@@ -1282,7 +1262,7 @@ export default function ScorerPage() {
                   0
                 </button>
                 <button
-                  className="h-full min-h-[36px] rounded-lg flex items-center justify-center touch-manipulation transition-all bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a] active:scale-[0.98]"
+                  className="h-full min-h-[36px] rounded-lg flex items-center justify-center touch-manipulation transition-all bg-[#2d6a2e] border border-[#4a9a4a] active:bg-[#3a7a3a] active:scale-[0.98]"
                   onClick={() => handleNumpad('OK')}
                   disabled={updateScoreMutation.isPending}
                   data-testid="button-numpad-OK"
