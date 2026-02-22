@@ -440,14 +440,8 @@ export default function ScorerPage() {
 
     if (newRemaining < 0 || newRemaining === 1) {
       setBustMessage(`BUST! Stays on ${currentRemaining}`);
-      setTimeout(() => setBustMessage(null), 2000);
-      const nextThrower = currentThrower === 'A' ? 'B' : 'A';
-      const bustVisits = [...legVisits, { player: currentThrower, score: 0 }];
-      setCurrentThrower(nextThrower);
-      setLegVisits(bustVisits);
       setInputValue("");
-      emitLiveState(remainingA, remainingB, nextThrower, legsWonA, legsWonB);
-      persistCurrentState({ currentThrower: nextThrower, legVisits: bustVisits });
+      setImpossibleWarning(`BUST! ${score} is not possible from ${currentRemaining}. You must enter 0 or click the checkmark to pass the turn.`);
       return;
     }
 
@@ -990,11 +984,11 @@ export default function ScorerPage() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col w-full max-w-lg md:max-w-2xl mx-auto px-3 md:px-6 py-1 overflow-hidden">
+        <div className="flex-1 flex flex-col w-full max-w-lg md:max-w-2xl mx-auto px-3 md:px-6 py-0.5 overflow-hidden">
           {legVisits.length === 0 && legsWonA === 0 && legsWonB === 0 && (
-            <div className="flex justify-center mb-1 shrink-0">
+            <div className="flex justify-center mb-0.5 shrink-0">
               <button
-                className="flex items-center gap-1 text-gray-400 text-xs px-3 py-1 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                className="flex items-center gap-1 text-gray-400 text-[10px] px-2 py-0.5 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] touch-manipulation active:bg-[#3a3a3a] transition-colors"
                 onClick={() => setView("bullThrow")}
                 data-testid="button-back-to-bull"
               >
@@ -1003,24 +997,24 @@ export default function ScorerPage() {
               </button>
             </div>
           )}
-          <div className="text-center py-1 md:py-2 shrink-0">
-            <p className="text-gray-400 text-xs md:text-sm uppercase tracking-wider">
+          <div className="text-center py-0.5 md:py-1 shrink-0">
+            <p className="text-gray-400 text-[10px] md:text-xs uppercase tracking-wider">
               Leg {currentLeg} — Best of {matchBestOf}
             </p>
-            <div className="tabular-nums mt-0.5">
-              <span className={cn("text-3xl md:text-5xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
-              <span className="text-gray-600 mx-2 text-2xl md:text-4xl">-</span>
-              <span className={cn("text-3xl md:text-5xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
+            <div className="tabular-nums mt-0">
+              <span className={cn("text-2xl md:text-4xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
+              <span className="text-gray-600 mx-2 text-xl md:text-3xl">-</span>
+              <span className={cn("text-2xl md:text-4xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 md:gap-4 mb-2 md:mb-3 shrink-0">
+          <div className="grid grid-cols-2 gap-2 md:gap-4 mb-1 md:mb-2 shrink-0">
             <div
               className={cn(
-                "rounded-xl p-3 md:p-5 transition-all",
+                "rounded-xl p-3 md:p-5 transition-all duration-300",
                 currentThrower === leftThrower
-                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a]"
-                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a]"
+                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a] scale-105 z-10 shadow-xl"
+                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a] scale-95 opacity-70 grayscale-[20%]"
               )}
               data-testid="panel-player-a"
             >
@@ -1059,10 +1053,10 @@ export default function ScorerPage() {
 
             <div
               className={cn(
-                "rounded-xl p-3 md:p-5 transition-all",
+                "rounded-xl p-3 md:p-5 transition-all duration-300",
                 currentThrower === rightThrower
-                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a]"
-                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a]"
+                  ? "bg-[#c0392b] ring-2 ring-[#e74c3c] ring-offset-2 ring-offset-[#1a1a1a] scale-105 z-10 shadow-xl"
+                  : "bg-[#3a6635] ring-2 ring-[#4a8045] ring-offset-2 ring-offset-[#1a1a1a] scale-95 opacity-70 grayscale-[20%]"
               )}
               data-testid="panel-player-b"
             >
@@ -1229,7 +1223,7 @@ export default function ScorerPage() {
                 {row.map(key => (
                   <button
                     key={key}
-                    className="h-[4.2rem] md:h-[6.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                    className="h-[4.8rem] md:h-[7.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-3xl md:text-5xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
                     onClick={() => handleNumpad(key)}
                     disabled={updateScoreMutation.isPending}
                     data-testid={`button-numpad-${key}`}
@@ -1241,15 +1235,15 @@ export default function ScorerPage() {
             ))}
             <div className="grid grid-cols-3 gap-1.5 md:gap-2">
               <button
-                className="h-[4.2rem] md:h-[6.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                className="h-[4.8rem] md:h-[7.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] transition-colors"
                 onClick={handleUndo}
                 disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                 data-testid="button-undo"
               >
-                <Undo2 className={cn("w-6 h-6 md:w-8 md:h-8", legVisits.length === 0 ? "text-gray-600" : "text-gray-300")} />
+                <Undo2 className={cn("w-7 h-7 md:w-10 md:h-10", legVisits.length === 0 ? "text-gray-600" : "text-gray-300")} />
               </button>
               <button
-                className="h-[4.2rem] md:h-[6.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
+                className="h-[4.8rem] md:h-[7.5rem] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-3xl md:text-5xl font-semibold touch-manipulation active:bg-[#3a3a3a] transition-colors"
                 onClick={() => handleNumpad('0')}
                 disabled={updateScoreMutation.isPending}
                 data-testid="button-numpad-0"
@@ -1257,12 +1251,12 @@ export default function ScorerPage() {
                 0
               </button>
               <button
-                className="h-[4.2rem] md:h-[6.5rem] rounded-xl flex items-center justify-center touch-manipulation transition-colors bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a]"
+                className="h-[4.8rem] md:h-[7.5rem] rounded-xl flex items-center justify-center touch-manipulation transition-colors bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a]"
                 onClick={() => handleNumpad('OK')}
                 disabled={updateScoreMutation.isPending}
                 data-testid="button-numpad-OK"
               >
-                <Check className="w-7 h-7 md:w-10 md:h-10 text-white" />
+                <Check className="w-8 h-8 md:w-12 md:h-12 text-white" />
               </button>
             </div>
           </div>
