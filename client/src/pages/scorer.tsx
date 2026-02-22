@@ -161,7 +161,6 @@ export default function ScorerPage() {
   const [currentThrower, setCurrentThrower] = useState<'A' | 'B'>('A');
   const [legVisits, setLegVisits] = useState<Visit[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [bustMessage, setBustMessage] = useState<string | null>(null);
   const [legStartingThrower, setLegStartingThrower] = useState<'A' | 'B'>('A');
   const [showQuickScores, setShowQuickScores] = useState(false);
   const [allMatchVisits, setAllMatchVisits] = useState<Visit[]>([]);
@@ -402,7 +401,6 @@ export default function ScorerPage() {
     setLegStartingThrower(startingThrower);
     setLegVisits([]);
     setInputValue("");
-    setBustMessage(null);
   };
 
   const persistCurrentState = useCallback((overrides?: Partial<ScorerState>) => {
@@ -470,9 +468,8 @@ export default function ScorerPage() {
     const newRemaining = currentRemaining - score;
 
     if (newRemaining < 0 || newRemaining === 1) {
-      setBustMessage(`BUST! Stays on ${currentRemaining}`);
       setInputValue("");
-      setImpossibleWarning(`BUST! ${score} is not possible from ${currentRemaining}. You must enter 0 or click the checkmark to pass the turn.`);
+      setImpossibleWarning(`${score} is not possible from ${currentRemaining}`);
       return;
     }
 
@@ -502,7 +499,6 @@ export default function ScorerPage() {
 
     const nextThrower = currentThrower === 'A' ? 'B' : 'A';
     setCurrentThrower(nextThrower);
-    setBustMessage(null);
 
     emitLiveState(
       isPlayerA ? newRemaining : remainingA,
@@ -668,7 +664,6 @@ export default function ScorerPage() {
       persistCurrentState({ remainingB: newR, currentThrower: 'B', legVisits: newVisits });
     }
 
-    setBustMessage(null);
     setInputValue("");
   };
 
@@ -684,8 +679,7 @@ export default function ScorerPage() {
       }
       const score = parseInt(inputValue);
       if (isNaN(score) || score < 0) {
-        setBustMessage("Invalid score");
-        setTimeout(() => setBustMessage(null), 1500);
+        setImpossibleWarning("Invalid score");
         return;
       }
       handleScoreSubmit(score);
@@ -1117,28 +1111,37 @@ export default function ScorerPage() {
             </div>
           </div>
 
-          {bustMessage && (
-            <div className="bg-red-600 text-white text-center py-1.5 md:py-2 rounded-lg mb-1 text-sm md:text-lg font-bold animate-pulse shrink-0" data-testid="text-bust">
-              {bustMessage}
-            </div>
-          )}
-
           {impossibleWarning && (
-            <div className="bg-[#222] border-2 border-yellow-500 rounded-xl p-3 md:p-5 mb-1 shrink-0" data-testid="impossible-warning">
-              <p className="text-yellow-400 font-bold text-center text-base md:text-xl mb-1">
-                {impossibleWarning.startsWith("BUST") ? "BUST!" : "Impossible Score"}
+            <div className="bg-primary rounded-xl p-4 md:p-6 mb-1 shrink-0" data-testid="impossible-warning">
+              <p className="text-primary-foreground font-bold text-center text-2xl md:text-3xl mb-2">
+                {impossibleWarning.includes("not possible") ? "BUST!" : "Impossible Score"}
               </p>
-              <p className="text-gray-300 text-center text-sm md:text-base mb-2">{impossibleWarning}</p>
-              <button
-                className="w-full h-10 md:h-12 rounded-xl bg-yellow-600 text-white font-semibold text-base md:text-lg touch-manipulation active:bg-yellow-700 transition-colors"
-                onClick={() => {
-                  setImpossibleWarning(null);
-                  setInputValue("");
-                }}
-                data-testid="button-dismiss-impossible"
-              >
-                OK
-              </button>
+              <p className="text-primary-foreground/80 text-center text-sm md:text-lg mb-4">{impossibleWarning}</p>
+              <div className="flex gap-2">
+                <button
+                  className="flex-1 h-12 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-base md:text-lg touch-manipulation active:bg-primary-foreground/30 transition-colors"
+                  onClick={() => {
+                    setImpossibleWarning(null);
+                    setInputValue("");
+                  }}
+                  data-testid="button-dismiss-impossible"
+                >
+                  OK
+                </button>
+                {impossibleWarning.includes("not possible") && (
+                  <button
+                    className="flex-1 h-12 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-base md:text-lg touch-manipulation active:bg-primary-foreground/30 transition-colors"
+                    onClick={() => {
+                      setImpossibleWarning(null);
+                      setInputValue("");
+                      handleScoreSubmit(0);
+                    }}
+                    data-testid="button-pass-turn"
+                  >
+                    Pass Turn
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
