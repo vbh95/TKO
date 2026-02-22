@@ -1202,7 +1202,7 @@ export default function ScorerPage() {
           )}
 
           <div className={cn("flex-1 flex flex-col justify-end pb-1 md:pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
-            <div className="flex gap-1 md:gap-1.5 items-center mb-1 shrink-0">
+            <div className="flex gap-1 md:gap-1.5 items-center mb-1 mt-auto shrink-0">
               <button
                 className="w-9 h-9 md:w-12 md:h-12 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
                 onClick={() => setShowQuickScores(!showQuickScores)}
