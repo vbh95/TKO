@@ -82,6 +82,20 @@ function getRoundDisplayName(roundKey: string): string {
   }
 }
 
+function getMatchSortOrder(stage: string, roundKey: string): number {
+  if (roundKey === 'F' || stage === 'GRAND_FINAL') return 1000;
+  if (roundKey === 'SF') return 900;
+  if (roundKey === 'QF') return 800;
+  if (roundKey === 'R16') return 700;
+  if (roundKey === 'R32') return 600;
+  if (stage === 'GROUP') {
+    const roundNum = parseInt(roundKey.replace('R', ''), 10);
+    return isNaN(roundNum) ? 100 : 100 + roundNum;
+  }
+  const num = parseInt(roundKey.replace('R', ''), 10);
+  return isNaN(num) ? 50 : 50 + num;
+}
+
 function getStageLabel(stage: string, roundKey: string): string {
   if (stage === 'GROUP') return `Group — ${getRoundDisplayName(roundKey)}`;
   if (stage === 'GRAND_FINAL') return 'Grand Final';
@@ -154,6 +168,9 @@ export default function PublicLeague() {
       tournamentOrder.push(key);
     }
     matchesByTournament[key].push(m);
+  }
+  for (const key of tournamentOrder) {
+    matchesByTournament[key].sort((a, b) => getMatchSortOrder(b.stage, b.roundKey) - getMatchSortOrder(a.stage, a.roundKey));
   }
 
   const totalWins = selectedMatches.filter(m => m.won).length;
