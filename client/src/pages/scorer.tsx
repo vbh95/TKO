@@ -178,6 +178,19 @@ export default function ScorerPage() {
   const checkoutStatsRef = useRef({ attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 });
   const [swapPlayers, setSwapPlayers] = useState(false);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    html.style.overscrollBehavior = 'none';
+    body.style.overscrollBehavior = 'none';
+    body.style.touchAction = 'pan-x pan-y';
+    return () => {
+      html.style.overscrollBehavior = '';
+      body.style.overscrollBehavior = '';
+      body.style.touchAction = '';
+    };
+  }, []);
+
   const { data, isLoading, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/scorer/board-data'],
     queryFn: async () => {
