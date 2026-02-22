@@ -402,12 +402,8 @@ export default function PublicLeague() {
                 </Badge>
                 <span className="text-green-600 dark:text-green-400 font-medium">{totalWins}W</span>
                 <span className="text-red-600 dark:text-red-400 font-medium">{totalLosses}L</span>
-                {playerAvg && (
-                  <>
-                    <span className="text-muted-foreground">—</span>
-                    <span className="text-foreground font-medium">Avg: {playerAvg}</span>
-                  </>
-                )}
+                <span className="text-muted-foreground">—</span>
+                <span className="text-foreground font-medium">Avg: {playerAvg || 'N/A'}</span>
               </div>
 
               {tournamentOrder.map((tournamentName) => {
