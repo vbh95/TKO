@@ -75,8 +75,8 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
   return (
     <Card className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-border/50">
       <div className="p-6 space-y-4">
-        <div className="flex justify-between items-start">
-          <div className="space-y-1 min-w-0 flex-1">
+        <div className="flex flex-wrap justify-between items-start gap-2">
+          <div className="space-y-1 min-w-0 flex-1 basis-[60%]">
             <h3 className="font-display font-bold text-xl text-foreground group-hover:text-primary transition-colors break-words">
               {tournament.name}
             </h3>
@@ -93,7 +93,7 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
                 : tournament.createdAt ? format(new Date(tournament.createdAt), 'MMM d, yyyy') : 'Date unknown'}
             </div>
           </div>
-          <div className="flex items-center gap-1 ml-2 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             {tournament.isLegacy ? (
               <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
                 LEGACY
