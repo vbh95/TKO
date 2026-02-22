@@ -965,11 +965,11 @@ export default function ScorerPage() {
     return (
       <div className="fixed inset-0 bg-[hsl(222.2,84%,4.9%)] flex flex-col overflow-hidden z-[100]" data-testid="scorer-match-view">
         <div className="bg-primary text-primary-foreground py-1 md:py-2 px-3 shadow-lg shrink-0">
-          <div className="flex items-center gap-2 max-w-4xl mx-auto h-8 md:h-10">
+          <div className="relative flex items-center max-w-4xl mx-auto h-8 md:h-10">
             <Button
               variant="ghost"
               size="icon"
-              className="text-primary-foreground shrink-0 h-7 w-7"
+              className="text-primary-foreground shrink-0 h-7 w-7 z-10"
               onClick={() => {
                 setView("matchList");
                 setActiveMatchId(null);
@@ -978,10 +978,10 @@ export default function ScorerPage() {
             >
               <ArrowLeft className="w-3.5 h-3.5" />
             </Button>
-            <div className="flex-1 flex items-center justify-center min-w-0">
-              <img src={tkoLogoWhite} alt="TKO" className="h-5 md:h-7" />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <img src={tkoLogoWhite} alt="TKO" className="h-5 md:h-7 pointer-events-auto" />
             </div>
-            <div className="flex items-center gap-1.5 md:gap-3">
+            <div className="ml-auto flex items-center gap-1.5 md:gap-3 z-10">
               <button
                 onClick={toggleTheme}
                 className="p-1 rounded hover:bg-white/10 transition-colors"
@@ -1031,8 +1031,8 @@ export default function ScorerPage() {
               className={cn(
                 "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
                 currentThrower === leftThrower
-                  ? "bg-[hsl(130,28%,20%)] ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
-                  : "bg-[#161b22] ring-2 ring-[#30363d] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-80"
+                  ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
+                  : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-80 grayscale-[30%]"
               )}
               data-testid="panel-player-a"
             >
@@ -1069,8 +1069,8 @@ export default function ScorerPage() {
               className={cn(
                 "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
                 currentThrower === rightThrower
-                  ? "bg-[hsl(130,28%,20%)] ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
-                  : "bg-[#161b22] ring-2 ring-[#30363d] ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-80"
+                  ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
+                  : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-80 grayscale-[30%]"
               )}
               data-testid="panel-player-b"
             >
