@@ -12,6 +12,7 @@ import { generateMatches, regenerateGroupMatchesFromMemberships } from "./match-
 import type { TournamentSettings } from "@shared/schema";
 import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament } from "./socket";
 import cookieParser from "cookie-parser";
+type StoredPlayer = Awaited<ReturnType<(typeof storage)["createPlayer"]>>;
 
 const scryptAsync = promisify(scrypt);
 
@@ -613,7 +614,7 @@ export async function registerRoutes(
         if (playerList.length > existingPlayers.length) {
           return res.status(400).json({ message: `Cannot exceed ${existingPlayers.length} players (tournament size).` });
         }
-        const resultPlayers = [];
+        const resultPlayers: StoredPlayer[] = [];
 
         for (let i = 0; i < playerList.length; i++) {
           if (i < existingPlayers.length) {
@@ -636,7 +637,7 @@ export async function registerRoutes(
         return res.json(resultPlayers);
       }
 
-      const createdPlayers = [];
+      const createdPlayers: StoredPlayer[] = [];
       for (const p of playerList) {
         const newPlayer = await storage.createPlayer({
           name: p.name,
@@ -886,7 +887,7 @@ export async function registerRoutes(
         }
       }
       
-      const createdPlayers = [];
+      const createdPlayers: StoredPlayer[] = [];
       for (const p of playerInputs) {
         const created = await storage.createPlayer(p);
         createdPlayers.push(created);
