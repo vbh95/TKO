@@ -287,6 +287,20 @@ export type CreateTournamentRequest = {
   eventDate?: string | null;
 };
 
+// === BETA FEEDBACK ===
+export const betaFeedback = pgTable("beta_feedback", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  category: text("category").notNull(),
+  message: text("message").notNull(),
+  page: text("page"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBetaFeedbackSchema = createInsertSchema(betaFeedback).omit({ id: true, createdAt: true });
+export type BetaFeedback = typeof betaFeedback.$inferSelect;
+export type InsertBetaFeedback = z.infer<typeof insertBetaFeedbackSchema>;
+
 export type UpdateMatchScoreRequest = {
   scoreA: number;
   scoreB: number;

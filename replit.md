@@ -38,7 +38,7 @@ The project is a single-workspace monorepo with three main directories:
 ### Authentication & Sessions
 - **Strategy**: Passport.js with Local Strategy (email/password)
 - **Password Hashing**: Node.js native `crypto.scrypt` with random salt (not bcrypt/argon2)
-- **Sessions**: `express-session` with MemoryStore (should be replaced with a persistent store like `connect-pg-simple` for production)
+- **Sessions**: `express-session` with `connect-pg-simple` (PostgreSQL-backed persistent sessions in `user_sessions` table)
 - **Cookie Config**: httpOnly cookies, 1-week expiry, secure in production
 - **Auth Routes**: POST `/api/auth/signup`, POST `/api/auth/login`, POST `/api/auth/logout`, GET `/api/auth/me`
 - **Signup**: Requires full name, email, password + password confirmation. Returns a one-time randomized recovery key (hashed in DB, shown once to user)
@@ -77,7 +77,7 @@ The project is a single-workspace monorepo with three main directories:
 ### Storage Layer
 - `server/storage.ts` defines an `IStorage` interface abstracting all data operations
 - Current implementation uses Drizzle ORM queries against PostgreSQL
-- Session store currently uses MemoryStore (should be upgraded to `connect-pg-simple` for production persistence)
+- Session store uses `connect-pg-simple` for PostgreSQL-backed persistent sessions
 
 ## External Dependencies
 
@@ -89,7 +89,9 @@ The project is a single-workspace monorepo with three main directories:
 ### Authentication
 - **Passport.js** + **passport-local** — Authentication middleware
 - **express-session** — Session management
-- **memorystore** — In-memory session store (development; should migrate to `connect-pg-simple`)
+- **connect-pg-simple** — PostgreSQL-backed session store for persistent sessions
+- **helmet** — Secure HTTP headers middleware
+- **express-rate-limit** — Rate limiting for auth endpoints
 
 ### Frontend Libraries
 - **@tanstack/react-query** — Server state management and caching

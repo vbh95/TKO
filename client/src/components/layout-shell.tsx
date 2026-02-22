@@ -23,6 +23,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { FeedbackDialog } from "@/components/feedback-dialog";
+import { Badge } from "@/components/ui/badge";
 
 export function LayoutShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -47,6 +49,9 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 cursor-pointer">
             <img src={tkoLogo} alt="TKO" className="w-9 h-9" />
             <h1 className="text-2xl font-display font-bold text-primary">TKO</h1>
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-bold border-primary/50 text-primary bg-primary/10 uppercase tracking-wider">
+              Beta
+            </Badge>
           </div>
         </Link>
       </div>
@@ -74,6 +79,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="p-4 border-t bg-muted/30 space-y-2">
+        <FeedbackDialog />
         <button
           onClick={toggleTheme}
           className="flex items-center gap-3 px-4 py-2.5 w-full rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
@@ -115,6 +121,9 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2 font-display font-bold text-lg text-primary">
           <img src={tkoLogo} alt="TKO" className="w-7 h-7" />
           TKO
+          <Badge variant="outline" className="text-[9px] px-1 py-0 font-bold border-primary/50 text-primary bg-primary/10 uppercase tracking-wider">
+            Beta
+          </Badge>
         </div>
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>

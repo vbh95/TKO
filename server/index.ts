@@ -4,12 +4,18 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupSocketIO } from "./socket";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
 
 const app = express();
 app.set("trust proxy", 1);
 const httpServer = createServer(app);
 
 setupSocketIO(httpServer);
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
 
 declare module "http" {
   interface IncomingMessage {

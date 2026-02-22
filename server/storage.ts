@@ -1,4 +1,4 @@
-import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues, leagueManualResults } from "@shared/schema";
+import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues, leagueManualResults, betaFeedback } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -9,14 +9,16 @@ import type {
   MatchNote, InsertMatchNote,
   BoardSession, InsertBoardSession,
   League, InsertLeague,
-  LeagueManualResult, InsertLeagueManualResult
+  LeagueManualResult, InsertLeagueManualResult,
+  BetaFeedback, InsertBetaFeedback
 } from "@shared/schema";
 import { db } from "./db";
+import { pool } from "./db";
 import { eq, and, desc } from "drizzle-orm";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPgSimple from "connect-pg-simple";
 
-const MemoryStore = createMemoryStore(session);
+const PgStore = connectPgSimple(session);
 
 export interface IStorage {
   // Users
@@ -88,6 +90,9 @@ export interface IStorage {
   createLeagueManualResult(result: InsertLeagueManualResult): Promise<LeagueManualResult>;
   deleteLeagueManualResult(id: number): Promise<void>;
 
+  // Beta Feedback
+  createBetaFeedback(feedback: InsertBetaFeedback): Promise<BetaFeedback>;
+
   // Reset
   resetTournamentData(tournamentId: number): Promise<void>;
   
@@ -99,8 +104,11 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
+    this.sessionStore = new PgStore({
+      pool: pool,
+      tableName: 'user_sessions',
+      createTableIfMissing: true,
+      pruneSessionInterval: 60 * 15,
     });
   }
 
@@ -379,6 +387,11 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLeagueManualResult(id: number): Promise<void> {
     await db.delete(leagueManualResults).where(eq(leagueManualResults.id, id));
+  }
+
+  async createBetaFeedback(feedback: InsertBetaFeedback): Promise<BetaFeedback> {
+    const [newFeedback] = await db.insert(betaFeedback).values(feedback).returning();
+    return newFeedback;
   }
 
   async resetTournamentData(tournamentId: number): Promise<void> {

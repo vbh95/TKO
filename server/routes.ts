@@ -11,6 +11,15 @@ import { promisify } from "util";
 import { generateMatches, regenerateGroupMatchesFromMemberships } from "./match-generator";
 import type { TournamentSettings } from "@shared/schema";
 import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament } from "./socket";
+import rateLimit from "express-rate-limit";
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: { message: "Too many attempts. Please try again in 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const scryptAsync = promisify(scrypt);
 
@@ -382,7 +391,7 @@ export async function registerRoutes(
   };
 
   // === AUTH ROUTES ===
-  app.post(api.auth.signup.path, async (req, res) => {
+  app.post(api.auth.signup.path, authLimiter, async (req, res) => {
     try {
       const input = api.auth.signup.input.parse(req.body);
       const existing = await storage.getUserByUsername(input.email);
@@ -414,7 +423,7 @@ export async function registerRoutes(
 
   const resetAttempts = new Map<string, { count: number; lastAttempt: number }>();
 
-  app.post("/api/auth/reset-password", async (req, res) => {
+  app.post("/api/auth/reset-password", authLimiter, async (req, res) => {
     try {
       const { email, memorableWord, recoveryKey, newPassword } = req.body;
       if (!email || (!memorableWord && !recoveryKey) || !newPassword) {
@@ -462,7 +471,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.auth.login.path, passport.authenticate("local"), (req, res) => {
+  app.post(api.auth.login.path, authLimiter, passport.authenticate("local"), (req, res) => {
     if (req.body.rememberMe) {
       req.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30; // 30 days
     } else {
@@ -484,6 +493,27 @@ export async function registerRoutes(
     const user = req.user as any;
     const { password, memorableWord, recoveryKey, ...safeUser } = user;
     res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
+  });
+
+  // === BETA FEEDBACK ===
+  app.post("/api/beta-feedback", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { category, message, page } = req.body;
+      if (!category || !message) {
+        return res.status(400).json({ message: "Category and message are required" });
+      }
+      const feedback = await storage.createBetaFeedback({
+        userId: user.id,
+        category,
+        message,
+        page: page || null,
+      });
+      res.json(feedback);
+    } catch (err) {
+      console.error("Beta feedback error:", err);
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
   });
 
   // === ACCOUNT ROUTES ===

@@ -265,6 +265,7 @@ export default function TournamentDetail() {
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("none");
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
   const [editingPlayerName, setEditingPlayerName] = useState("");
+  const [deletePlayerTarget, setDeletePlayerTarget] = useState<{ id: number; name: string } | null>(null);
   const [isCreateMatchOpen, setIsCreateMatchOpen] = useState(false);
   const [newMatchPlayerA, setNewMatchPlayerA] = useState<string>("");
   const [newMatchPlayerB, setNewMatchPlayerB] = useState<string>("");
@@ -1697,11 +1698,7 @@ export default function TournamentDetail() {
                                     </button>
                                     {tournament.isLegacy && (
                                       <button
-                                        onClick={() => {
-                                          if (window.confirm(`Remove ${player.name} from this tournament?`)) {
-                                            handleDeletePlayer(player.id);
-                                          }
-                                        }}
+                                        onClick={() => setDeletePlayerTarget({ id: player.id, name: player.name })}
                                         className="text-muted-foreground hover:text-destructive transition-colors"
                                         data-testid={`button-delete-player-${player.id}`}
                                       >
@@ -1769,6 +1766,32 @@ export default function TournamentDetail() {
           />
         )}
       </div>
+
+      <AlertDialog open={!!deletePlayerTarget} onOpenChange={(open) => !open && setDeletePlayerTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Player</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove "{deletePlayerTarget?.name}" from this tournament? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-player">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-player"
+              onClick={() => {
+                if (deletePlayerTarget) {
+                  handleDeletePlayer(deletePlayerTarget.id);
+                  setDeletePlayerTarget(null);
+                }
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </LayoutShell>
   );
 }
