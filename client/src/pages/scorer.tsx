@@ -880,8 +880,7 @@ export default function ScorerPage() {
             </div>
           </div>
         </div>
-
-        <div className="flex-1 flex flex-col items-center justify-center px-6">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 bg-[#020817]">
           <Target className="w-14 h-14 md:w-20 md:h-20 text-yellow-400 mb-4" />
           <h2 className="text-white text-2xl md:text-4xl font-bold mb-1">Throw for the Bull</h2>
           <p className="text-gray-400 text-sm md:text-lg mb-8">Select player to start</p>
