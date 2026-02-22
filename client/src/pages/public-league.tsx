@@ -176,6 +176,16 @@ export default function PublicLeague() {
   const totalWins = selectedMatches.filter(m => m.won).length;
   const totalLosses = selectedMatches.filter(m => !m.won).length;
 
+  const playerAvg = (() => {
+    const avgs = selectedMatches
+      .map(m => m.stats?.threeDartAvg)
+      .filter((v): v is string => v != null && v !== '')
+      .map(v => parseFloat(v))
+      .filter(v => !isNaN(v));
+    if (avgs.length === 0) return null;
+    return (avgs.reduce((sum, a) => sum + a, 0) / avgs.length).toFixed(2);
+  })();
+
   return (
     <div className={cn("min-h-screen bg-background text-foreground overflow-x-hidden", isEmbed && "p-0")}>
       {!isEmbed && (
@@ -386,12 +396,18 @@ export default function PublicLeague() {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-3 sm:gap-4 text-sm flex-wrap">
                 <Badge variant="outline" className="text-xs">
                   {selectedMatches.length} match{selectedMatches.length !== 1 ? 'es' : ''}
                 </Badge>
                 <span className="text-green-600 dark:text-green-400 font-medium">{totalWins}W</span>
                 <span className="text-red-600 dark:text-red-400 font-medium">{totalLosses}L</span>
+                {playerAvg && (
+                  <>
+                    <span className="text-muted-foreground">—</span>
+                    <span className="text-foreground font-medium">Avg: {playerAvg}</span>
+                  </>
+                )}
               </div>
 
               {tournamentOrder.map((tournamentName) => {
