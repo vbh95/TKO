@@ -1222,39 +1222,39 @@ export default function ScorerPage() {
             </div>
           )}
 
-          <div className={cn("flex-1 flex flex-col justify-end pb-1 md:pb-3", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
-            <div className="flex gap-1.5 md:gap-2 items-center mb-1.5 md:mb-3 shrink-0">
+          <div className={cn("flex-1 flex flex-col justify-end pb-1 md:pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
+            <div className="flex gap-1 md:gap-1.5 items-center mb-1 md:mb-1.5 shrink-0">
               <button
-                className="w-10 h-10 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation shadow-lg"
+                className="w-9 h-9 md:w-12 md:h-12 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation"
                 onClick={() => setShowQuickScores(!showQuickScores)}
                 data-testid="button-toggle-quick"
               >
-                <Grid2x2 className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-gray-400" />
+                <Grid2x2 className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
               </button>
               <div
-                className="flex-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl px-4 h-10 md:h-14 lg:h-16 text-lg md:text-2xl lg:text-3xl font-medium tabular-nums flex items-center justify-between shadow-inner"
+                className="flex-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg px-3 h-9 md:h-12 text-base md:text-xl font-medium tabular-nums flex items-center justify-between"
                 data-testid="text-input-value"
               >
                 <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
                 {inputValue && (
                   <button
-                    className="ml-2 p-1.5 touch-manipulation active:scale-90 transition-transform"
+                    className="ml-2 p-1 touch-manipulation active:scale-90 transition-transform"
                     onClick={() => setInputValue(prev => prev.slice(0, -1))}
                     data-testid="button-backspace"
                   >
-                    <Delete className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-gray-400" />
+                    <Delete className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
                   </button>
                 )}
               </div>
             </div>
 
-            <div className="flex-1 flex flex-col justify-end space-y-1 md:space-y-3 lg:space-y-4">
+            <div className="flex-1 flex flex-col justify-end gap-1 md:gap-1.5">
               {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
-                <div key={ri} className="grid grid-cols-3 gap-1.5 md:gap-3 lg:gap-4 flex-1 max-h-[15vh] md:max-h-none">
+                <div key={ri} className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
                   {row.map(key => (
                     <button
                       key={key}
-                      className="h-full min-h-[50px] md:h-[10vh] lg:h-[12vh] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl lg:text-5xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center"
+                      className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
                       onClick={() => handleNumpad(key)}
                       disabled={updateScoreMutation.isPending}
                       data-testid={`button-numpad-${key}`}
@@ -1264,17 +1264,17 @@ export default function ScorerPage() {
                   ))}
                 </div>
               ))}
-              <div className="grid grid-cols-3 gap-1.5 md:gap-3 lg:gap-4 flex-1 max-h-[15vh] md:max-h-none">
+              <div className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
                 <button
-                  className="h-full min-h-[50px] md:h-[10vh] lg:h-[12vh] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all shadow-lg"
+                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
                   onClick={handleUndo}
                   disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                   data-testid="button-undo"
                 >
-                  <Undo2 className={cn("w-7 h-7 md:w-10 md:h-10 lg:w-12 lg:h-12", legVisits.length === 0 ? "text-gray-700" : "text-gray-300")} />
+                  <Undo2 className={cn("w-5 h-5 md:w-7 md:h-7", legVisits.length === 0 ? "text-gray-700" : "text-gray-300")} />
                 </button>
                 <button
-                  className="h-full min-h-[50px] md:h-[10vh] lg:h-[12vh] rounded-xl bg-[#2a2a2a] border border-[#3a3a3a] text-white text-2xl md:text-4xl lg:text-5xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center"
+                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
                   onClick={() => handleNumpad('0')}
                   disabled={updateScoreMutation.isPending}
                   data-testid="button-numpad-0"
@@ -1282,12 +1282,12 @@ export default function ScorerPage() {
                   0
                 </button>
                 <button
-                  className="h-full min-h-[50px] md:h-[10vh] lg:h-[12vh] rounded-xl flex items-center justify-center touch-manipulation transition-all bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a] active:scale-[0.98] shadow-lg"
+                  className="h-full min-h-[36px] rounded-lg flex items-center justify-center touch-manipulation transition-all bg-[#4a7a3a] border border-[#5a9a4a] active:bg-[#5a8a4a] active:scale-[0.98]"
                   onClick={() => handleNumpad('OK')}
                   disabled={updateScoreMutation.isPending}
                   data-testid="button-numpad-OK"
                 >
-                  <Check className="w-8 h-8 md:w-12 md:h-12 lg:w-14 lg:h-14 text-white" />
+                  <Check className="w-6 h-6 md:w-8 md:h-8 text-white" />
                 </button>
               </div>
             </div>
