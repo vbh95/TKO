@@ -11,6 +11,7 @@ import { promisify } from "util";
 import { generateMatches, regenerateGroupMatchesFromMemberships } from "./match-generator";
 import type { TournamentSettings } from "@shared/schema";
 import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament } from "./socket";
+import cookieParser from "cookie-parser";
 
 const scryptAsync = promisify(scrypt);
 
@@ -332,19 +333,32 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // AUTH SETUP
+  // AUTH SETUP (beta-safe)
+  if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET is required in production");
+  }
+
+  // Required when running behind Render/any proxy so secure cookies work correctly
+  app.set("trust proxy", 1);
+
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || "default_secret_change_me",
+      secret: process.env.SESSION_SECRET || "dev_only_secret",
       resave: false,
       saveUninitialized: false,
       store: storage.sessionStore,
+      proxy: true,
       cookie: {
+        httpOnly: true,
         secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
       },
     })
   );
+
+  // IMPORTANT: enables req.cookies so your boardAccessToken auth works
+  app.use(cookieParser());
 
   app.use(passport.initialize());
   app.use(passport.session());
