@@ -139,10 +139,20 @@ export default function PublicLeague() {
   const selectedPlayerKey = selectedPlayer ? selectedPlayer.replace(/\s+/g, ' ').toLowerCase().trim() : null;
   const selectedMatches = selectedPlayerKey ? (playerMatches[selectedPlayerKey] || []) : [];
 
+  const sortedMatches = [...selectedMatches].sort((a, b) => {
+    const dateA = a.eventDate ? new Date(a.eventDate).getTime() : 0;
+    const dateB = b.eventDate ? new Date(b.eventDate).getTime() : 0;
+    return dateB - dateA;
+  });
+
   const matchesByTournament: Record<string, PlayerMatch[]> = {};
-  for (const m of selectedMatches) {
+  const tournamentOrder: string[] = [];
+  for (const m of sortedMatches) {
     const key = m.tournamentName;
-    if (!matchesByTournament[key]) matchesByTournament[key] = [];
+    if (!matchesByTournament[key]) {
+      matchesByTournament[key] = [];
+      tournamentOrder.push(key);
+    }
     matchesByTournament[key].push(m);
   }
 
@@ -337,7 +347,9 @@ export default function PublicLeague() {
                 <span className="text-red-600 dark:text-red-400 font-medium">{totalLosses}L</span>
               </div>
 
-              {Object.entries(matchesByTournament).map(([tournamentName, matches]) => (
+              {tournamentOrder.map((tournamentName) => {
+                const matches = matchesByTournament[tournamentName];
+                return (
                 <div key={tournamentName} className="space-y-2">
                   <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
                     <Trophy className="w-3.5 h-3.5 text-primary" />
@@ -354,7 +366,8 @@ export default function PublicLeague() {
                     ))}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </DialogContent>
@@ -366,6 +379,7 @@ export default function PublicLeague() {
 function MatchRow({ match, playerName }: { match: PlayerMatch; playerName: string }) {
   const [expanded, setExpanded] = useState(false);
   const hasStats = match.stats && (match.stats.threeDartAvg || match.stats.ton80s !== null);
+  const isFinalWin = match.won && (match.roundKey === 'F' || match.stage === 'GRAND_FINAL');
 
   return (
     <div className="border rounded-lg overflow-hidden">
@@ -384,6 +398,7 @@ function MatchRow({ match, playerName }: { match: PlayerMatch; playerName: strin
           )}>
             {match.won ? 'W' : 'L'}
           </span>
+          {isFinalWin && <Trophy className="w-3.5 h-3.5 text-amber-500" />}
           <span className="font-medium truncate">vs {match.opponent}</span>
           <span className="text-xs text-muted-foreground shrink-0">
             ({getStageLabel(match.stage, match.roundKey)})
