@@ -19,6 +19,7 @@ import PublicView from "@/pages/public-view";
 import BoardView from "@/pages/board-view";
 import ScorerPage from "@/pages/scorer";
 import CompleteProfile from "@/pages/complete-profile";
+import PublicLeague from "@/pages/public-league";
 
 function isProfileComplete(user: any): boolean {
   return !!user.dateOfBirth && !!user.hasMemorableWord;
@@ -53,6 +54,7 @@ function Router() {
       <Route path="/scorer/:tournamentId/:boardNumber" component={ScorerPage} />
       <Route path="/public/t/:shareToken/board/:boardNumber" component={BoardView} />
       <Route path="/public/t/:shareToken" component={PublicView} />
+      <Route path="/public/league/:shareToken" component={PublicLeague} />
       
       {/* Auth Routes */}
       <Route path="/login" component={AuthPage} />

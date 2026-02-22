@@ -28,6 +28,7 @@ export const leagues = pgTable("leagues", {
   endDate: text("end_date"),
   promotionCount: integer("promotion_count").default(0),
   relegationCount: integer("relegation_count").default(0),
+  shareToken: text("share_token").unique(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

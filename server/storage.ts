@@ -81,6 +81,8 @@ export interface IStorage {
   deleteLeague(id: number): Promise<void>;
   getTournamentsByLeagueId(leagueId: number): Promise<Tournament[]>;
 
+  getLeagueByShareToken(token: string): Promise<League | undefined>;
+
   // League Manual Results
   getLeagueManualResults(leagueId: number): Promise<LeagueManualResult[]>;
   createLeagueManualResult(result: InsertLeagueManualResult): Promise<LeagueManualResult>;
@@ -359,6 +361,11 @@ export class DatabaseStorage implements IStorage {
 
   async getTournamentsByLeagueId(leagueId: number): Promise<Tournament[]> {
     return await db.select().from(tournaments).where(eq(tournaments.leagueId, leagueId)).orderBy(desc(tournaments.createdAt));
+  }
+
+  async getLeagueByShareToken(token: string): Promise<League | undefined> {
+    const [league] = await db.select().from(leagues).where(eq(leagues.shareToken, token));
+    return league;
   }
 
   async getLeagueManualResults(leagueId: number): Promise<LeagueManualResult[]> {

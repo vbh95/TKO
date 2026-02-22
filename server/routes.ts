@@ -1635,11 +1635,13 @@ export async function registerRoutes(
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ message: "League name is required" });
     }
+    const shareToken = randomBytes(16).toString('hex');
     const league = await storage.createLeague({
       userId,
       name: name.trim(),
       startDate: startDate || null,
       endDate: endDate || null,
+      shareToken,
     });
     res.json(league);
   });
@@ -1776,6 +1778,7 @@ export async function registerRoutes(
         legDifference: s.legsWon - s.legsLost,
         tournaments: s.tournaments,
       })),
+      shareToken: league.shareToken,
     });
   });
 
@@ -1839,6 +1842,179 @@ export async function registerRoutes(
 
     const updated = await storage.updateTournament(tournamentId, { leagueId: leagueId || null });
     res.json(updated);
+  });
+
+  // === PUBLIC LEAGUE ENDPOINT ===
+  app.get("/api/public/league/:shareToken", async (req, res) => {
+    const { shareToken } = req.params;
+    const league = await storage.getLeagueByShareToken(shareToken);
+    if (!league) return res.status(404).json({ message: "League not found" });
+
+    const leagueTournaments = await storage.getTournamentsByLeagueId(league.id);
+
+    const STAGE_POINTS: Record<string, number> = {
+      'GROUP': 5,
+      'QF': 10,
+      'SF': 20,
+      'RUNNER_UP': 30,
+      'WINNER': 40,
+    };
+
+    const playerAgg: Record<string, { name: string; points: number; legsWon: number; legsLost: number; tournaments: number; wins: number }> = {};
+    const playerMatches: Record<string, Array<{
+      tournamentName: string;
+      tournamentId: number;
+      eventDate: string | null;
+      opponent: string;
+      scoreFor: number;
+      scoreAgainst: number;
+      won: boolean;
+      stage: string;
+      roundKey: string;
+      bestOf: number;
+      stats: {
+        threeDartAvg: string | null;
+        checkoutPct: string | null;
+        highestFinish: number | null;
+        highestVisit: number | null;
+        ton80s: number | null;
+        ton40s: number | null;
+        tons: number | null;
+      } | null;
+    }>> = {};
+
+    for (const t of leagueTournaments) {
+      const allMatches = await storage.getMatchesByTournamentId(t.id);
+      const playersList = await storage.getPlayersByTournamentId(t.id);
+      const completedMatches = allMatches.filter(m => m.status === 'COMPLETED');
+
+      const matchNoteMap: Record<number, any> = {};
+      for (const m of completedMatches) {
+        const note = await storage.getMatchNote(m.id);
+        if (note) matchNoteMap[m.id] = note;
+      }
+
+      const eliminationMatches = completedMatches.filter(m =>
+        m.stage === 'KNOCKOUT' || m.stage === 'WINNERS_BRACKET' || m.stage === 'LOSERS_BRACKET' || m.stage === 'GRAND_FINAL'
+      );
+      const finalMatch = eliminationMatches.find(m => m.roundKey === 'F' || m.stage === 'GRAND_FINAL');
+      const sfMatches = eliminationMatches.filter(m => m.roundKey === 'SF');
+      const qfMatches = eliminationMatches.filter(m => m.roundKey === 'QF');
+
+      for (const player of playersList) {
+        const key = player.name.replace(/\s+/g, ' ').toLowerCase().trim();
+        if (!playerAgg[key]) {
+          playerAgg[key] = { name: player.name, points: 0, legsWon: 0, legsLost: 0, tournaments: 0, wins: 0 };
+        }
+        if (!playerMatches[key]) playerMatches[key] = [];
+
+        const pMatches = completedMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
+
+        if (pMatches.length === 0) continue;
+
+        pMatches.forEach(m => {
+          const isA = m.playerAId === player.id;
+          playerAgg[key].legsWon += isA ? (m.scoreA || 0) : (m.scoreB || 0);
+          playerAgg[key].legsLost += isA ? (m.scoreB || 0) : (m.scoreA || 0);
+
+          const opponent = isA ? m.playerB : m.playerA;
+          const note = matchNoteMap[m.id];
+          let stats = null;
+          if (note) {
+            const totalVisits = isA ? note.totalVisitsA : note.totalVisitsB;
+            const totalScored = isA ? note.totalScoredA : note.totalScoredB;
+            const checkoutAttempts = isA ? note.checkoutAttemptsA : note.checkoutAttemptsB;
+            const checkoutSuccess = isA ? note.checkoutSuccessA : note.checkoutSuccessB;
+            stats = {
+              threeDartAvg: totalVisits > 0 ? ((totalScored / totalVisits) * 3).toFixed(1) : null,
+              checkoutPct: checkoutAttempts > 0 ? ((checkoutSuccess / checkoutAttempts) * 100).toFixed(1) : null,
+              highestFinish: isA ? note.highestFinishA : note.highestFinishB,
+              highestVisit: isA ? note.highestVisitA : note.highestVisitB,
+              ton80s: isA ? note.ton80sA : note.ton80sB,
+              ton40s: isA ? note.ton40sA : note.ton40sB,
+              tons: isA ? note.tonsA : note.tonsB,
+            };
+          }
+
+          playerMatches[key].push({
+            tournamentName: t.name,
+            tournamentId: t.id,
+            eventDate: t.eventDate || null,
+            opponent: opponent?.name || 'Unknown',
+            scoreFor: isA ? (m.scoreA || 0) : (m.scoreB || 0),
+            scoreAgainst: isA ? (m.scoreB || 0) : (m.scoreA || 0),
+            won: m.winnerId === player.id,
+            stage: m.stage,
+            roundKey: m.roundKey,
+            bestOf: m.bestOf,
+            stats,
+          });
+        });
+
+        let stage = 'GROUP';
+        if (finalMatch && finalMatch.winnerId === player.id) {
+          stage = 'WINNER';
+        } else if (finalMatch && (finalMatch.playerAId === player.id || finalMatch.playerBId === player.id)) {
+          stage = 'RUNNER_UP';
+        } else if (sfMatches.some(m => m.playerAId === player.id || m.playerBId === player.id)) {
+          stage = 'SF';
+        } else if (qfMatches.some(m => m.playerAId === player.id || m.playerBId === player.id)) {
+          stage = 'QF';
+        }
+
+        playerAgg[key].points += STAGE_POINTS[stage] || 0;
+        playerAgg[key].tournaments += 1;
+        if (stage === 'WINNER') playerAgg[key].wins += 1;
+      }
+    }
+
+    const manualResults = await storage.getLeagueManualResults(league.id);
+    const manualTournamentsByPlayer: Record<string, Set<string>> = {};
+    for (const mr of manualResults) {
+      const key = mr.playerName.replace(/\s+/g, ' ').toLowerCase().trim();
+      if (!playerAgg[key]) {
+        playerAgg[key] = { name: mr.playerName, points: 0, legsWon: 0, legsLost: 0, tournaments: 0, wins: 0 };
+      }
+      playerAgg[key].points += mr.points;
+      playerAgg[key].legsWon += mr.legsWon;
+      playerAgg[key].legsLost += mr.legsLost;
+      if (!manualTournamentsByPlayer[key]) manualTournamentsByPlayer[key] = new Set();
+      manualTournamentsByPlayer[key].add(mr.tournamentLabel.toLowerCase().trim());
+    }
+    for (const [key, labels] of Object.entries(manualTournamentsByPlayer)) {
+      if (playerAgg[key]) playerAgg[key].tournaments += labels.size;
+    }
+
+    const standings = Object.values(playerAgg).sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.legsWon !== a.legsWon) return b.legsWon - a.legsWon;
+      const diffA = a.legsWon - a.legsLost;
+      const diffB = b.legsWon - b.legsLost;
+      if (diffB !== diffA) return diffB - diffA;
+      return b.tournaments - a.tournaments;
+    });
+
+    res.json({
+      league: {
+        name: league.name,
+        startDate: league.startDate,
+        endDate: league.endDate,
+        promotionCount: league.promotionCount,
+        relegationCount: league.relegationCount,
+      },
+      tournaments: leagueTournaments.map(t => ({ id: t.id, name: t.name, status: t.status, eventDate: t.eventDate })),
+      standings: standings.map((s, i) => ({
+        position: i + 1,
+        name: s.name,
+        wins: s.wins,
+        points: s.points,
+        legsWon: s.legsWon,
+        legsLost: s.legsLost,
+        legDifference: s.legsWon - s.legsLost,
+        tournaments: s.tournaments,
+      })),
+      playerMatches,
+    });
   });
 
   backfillKnockoutScorers();

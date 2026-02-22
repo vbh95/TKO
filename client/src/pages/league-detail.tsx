@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
+import { useState } from "react";
 import { format } from "date-fns";
 import { LayoutShell } from "@/components/layout-shell";
 import { Button } from "@/components/ui/button";
@@ -13,8 +14,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, ArrowLeft, Trophy, Calendar, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Loader2, ArrowLeft, Trophy, Calendar, ArrowUpCircle, ArrowDownCircle, Share2, Copy, Check, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { QRCodeSVG } from "qrcode.react";
 
 interface League {
   id: number;
@@ -25,6 +34,7 @@ interface League {
   promotionCount: number;
   relegationCount: number;
   createdAt: string;
+  shareToken: string | null;
 }
 
 interface StandingRow {
@@ -42,11 +52,15 @@ interface LeagueStandings {
   league: League;
   tournaments: Array<{ id: number; name: string; status: string }>;
   standings: StandingRow[];
+  shareToken: string | null;
 }
 
 export default function LeagueDetail() {
   const [, params] = useRoute("/leagues/:id");
   const leagueId = params?.id ? parseInt(params.id) : 0;
+  const [shareOpen, setShareOpen] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const { toast } = useToast();
   const { data, isLoading, error } = useQuery<LeagueStandings>({
     queryKey: ['/api/leagues/:id/standings', leagueId],
     queryFn: async () => {
@@ -80,7 +94,17 @@ export default function LeagueDetail() {
     );
   }
 
-  const { league, tournaments, standings } = data;
+  const { league, tournaments, standings, shareToken } = data;
+  const publicUrl = shareToken ? `${window.location.origin}/public/league/${shareToken}` : null;
+  const embedCode = publicUrl ? `<iframe src="${publicUrl}?embed=true" width="100%" height="600" frameborder="0" style="border-radius: 8px;"></iframe>` : null;
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    toast({ title: "Copied!", description: `${label} copied to clipboard.` });
+    setTimeout(() => setCopied(null), 2000);
+  };
+
   const promoCount = league.promotionCount || 0;
   const relegCount = league.relegationCount || 0;
   const totalPlayers = standings.length;
@@ -123,6 +147,18 @@ export default function LeagueDetail() {
               )}
             </div>
           </div>
+          {publicUrl && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-2"
+              onClick={() => setShareOpen(true)}
+              data-testid="button-share-league"
+            >
+              <Share2 className="w-4 h-4" />
+              Share Public Page
+            </Button>
+          )}
         </div>
 
         {tournaments.length > 0 && (
@@ -267,6 +303,84 @@ export default function LeagueDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="w-5 h-5 text-primary" />
+              Share League
+            </DialogTitle>
+          </DialogHeader>
+
+          {publicUrl && (
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Public Link</label>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={publicUrl}
+                    className="flex-1 text-sm bg-muted px-3 py-2 rounded-md border font-mono truncate"
+                    data-testid="input-public-league-url"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1"
+                    onClick={() => copyToClipboard(publicUrl, 'Link')}
+                    data-testid="button-copy-league-link"
+                  >
+                    {copied === 'Link' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copied === 'Link' ? 'Copied' : 'Copy'}
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-primary"
+                  onClick={() => window.open(publicUrl, '_blank')}
+                  data-testid="button-open-public-league"
+                >
+                  Open in new tab
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <Code className="w-3.5 h-3.5" />
+                  Embed Code
+                </label>
+                <div className="bg-muted rounded-md border p-3">
+                  <code className="text-xs font-mono break-all text-muted-foreground">
+                    {embedCode}
+                  </code>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => copyToClipboard(embedCode!, 'Embed code')}
+                  data-testid="button-copy-embed-code"
+                >
+                  {copied === 'Embed code' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copied === 'Embed code' ? 'Copied' : 'Copy Embed Code'}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">QR Code</label>
+                <div className="flex justify-center bg-white rounded-lg p-4">
+                  <QRCodeSVG value={publicUrl} size={180} />
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Scan to view league standings on any device
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </LayoutShell>
   );
 }
