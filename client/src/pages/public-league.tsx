@@ -3,7 +3,7 @@ import { useParams, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Loader2, Trophy, Calendar, ArrowUpCircle, ArrowDownCircle, X, Target, ChevronDown, ChevronUp } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -343,6 +343,26 @@ export default function PublicLeague() {
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Scoring Criteria</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              League positions are determined by the following criteria, applied in order:
+            </p>
+            <ol className="list-decimal list-inside space-y-1.5 pl-1">
+              <li><span className="font-medium text-foreground">Points</span> — Players are ranked by total points earned across all league tournaments. The player with the most points is ranked highest.</li>
+              <li><span className="font-medium text-foreground">Legs Won</span> — If two or more players are tied on points, the player with the most legs won is ranked higher.</li>
+              <li><span className="font-medium text-foreground">Leg Difference</span> — If still tied, the player with the better leg difference (legs won minus legs lost) is ranked higher.</li>
+              <li><span className="font-medium text-foreground">Tournaments Attended</span> — If still tied, the player who has attended more tournaments is ranked higher.</li>
+            </ol>
+            <p className="text-xs text-muted-foreground/70 pt-1">
+              If players remain tied after all criteria, they share the same effective position.
+            </p>
+          </CardContent>
+        </Card>
 
         {!isEmbed && (
           <p className="text-xs text-center text-muted-foreground pt-4">
