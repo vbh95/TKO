@@ -156,7 +156,7 @@ export default function LeagueDetail() {
               data-testid="button-share-league"
             >
               <Share2 className="w-4 h-4" />
-              Share Public Page
+              Share League Table
             </Button>
           )}
         </div>
