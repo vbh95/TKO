@@ -107,7 +107,7 @@ export class DatabaseStorage implements IStorage {
     this.sessionStore = new PgStore({
       pool: pool,
       tableName: 'user_sessions',
-      createTableIfMissing: true,
+      createTableIfMissing: false,
       pruneSessionInterval: 60 * 15,
     });
   }
