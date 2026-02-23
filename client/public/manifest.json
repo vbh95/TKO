@@ -1,0 +1,17 @@
+{
+  "name": "TKO Scorer",
+  "short_name": "TKO Scorer",
+  "description": "TKO Tournament Scorer - Real-time darts scoring tablet",
+  "start_url": "/scorer",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0a",
+  "theme_color": "#16a34a",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
