@@ -253,6 +253,63 @@ function ScorerReconnect() {
       {scanError && (
         <p className="text-red-400 mt-4 max-w-sm text-sm" data-testid="text-scan-error">{scanError}</p>
       )}
+      <AddToHomeBanner />
+    </div>
+  );
+}
+
+function AddToHomeBanner() {
+  const [dismissed, setDismissed] = useState(false);
+  const [platform, setPlatform] = useState<'ios' | 'android' | null>(null);
+
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || (navigator as any).standalone === true;
+    if (isStandalone) return;
+
+    const wasDismissed = sessionStorage.getItem('tko_a2hs_dismissed');
+    if (wasDismissed) return;
+
+    const ua = navigator.userAgent.toLowerCase();
+    if (/iphone|ipad|ipod/.test(ua) && /safari/.test(ua) && !/crios|fxios/.test(ua)) {
+      setPlatform('ios');
+    } else if (/android/.test(ua) && /chrome/.test(ua)) {
+      setPlatform('android');
+    }
+  }, []);
+
+  if (dismissed || !platform) return null;
+
+  const handleDismiss = () => {
+    setDismissed(true);
+    sessionStorage.setItem('tko_a2hs_dismissed', '1');
+  };
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-[300] p-3 animate-in slide-in-from-bottom duration-300" data-testid="add-to-home-banner">
+      <div className="bg-primary rounded-xl p-4 shadow-lg max-w-md mx-auto">
+        <div className="flex items-start gap-3">
+          <div className="flex-1">
+            <p className="text-primary-foreground font-bold text-sm mb-1">Add TKO Scorer to Home Screen</p>
+            {platform === 'ios' ? (
+              <p className="text-primary-foreground/70 text-xs">
+                Tap the <span className="inline-block px-1 font-semibold">Share</span> button, then <span className="font-semibold">"Add to Home Screen"</span> for full-screen mode.
+              </p>
+            ) : (
+              <p className="text-primary-foreground/70 text-xs">
+                Tap the <span className="font-semibold">menu (⋮)</span> button, then <span className="font-semibold">"Add to Home screen"</span> for full-screen mode.
+              </p>
+            )}
+          </div>
+          <button
+            onClick={handleDismiss}
+            className="text-primary-foreground/60 hover:text-primary-foreground text-lg font-bold leading-none mt-0.5 touch-manipulation"
+            data-testid="button-dismiss-a2hs"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1751,6 +1808,7 @@ export default function ScorerPage() {
           </Card>
         )}
       </div>
+      <AddToHomeBanner />
     </div>
   );
 }
