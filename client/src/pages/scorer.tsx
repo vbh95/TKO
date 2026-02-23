@@ -153,6 +153,32 @@ function ScorerReconnect() {
 
   const startScanning = useCallback(async () => {
     setScanError(null);
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setScanError("Camera is not available on this device or browser. Try opening this page in Safari or Chrome.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      stream.getTracks().forEach(track => track.stop());
+    } catch (permErr: any) {
+      if (permErr.name === "NotAllowedError" || permErr.name === "PermissionDeniedError") {
+        const ua = navigator.userAgent.toLowerCase();
+        const isIOS = /iphone|ipad|ipod/.test(ua) || (/macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+        if (isIOS) {
+          setScanError("Camera access was denied. Go to Settings > Safari > Camera and set it to 'Allow', then reload this page.");
+        } else {
+          setScanError("Camera access was denied. Tap the camera icon in your browser's address bar to allow access, then try again.");
+        }
+      } else if (permErr.name === "NotFoundError") {
+        setScanError("No camera found on this device.");
+      } else {
+        setScanError("Could not access camera: " + (permErr.message || "Unknown error"));
+      }
+      return;
+    }
+
     setScanning(true);
 
     try {
@@ -198,7 +224,7 @@ function ScorerReconnect() {
         () => {}
       );
     } catch (err: any) {
-      setScanError(err?.message || "Could not access camera. Please allow camera permissions.");
+      setScanError(err?.message || "Could not start the QR scanner. Please try again.");
       setScanning(false);
     }
   }, []);
