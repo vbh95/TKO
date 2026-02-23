@@ -271,7 +271,11 @@ function AddToHomeBanner() {
     if (wasDismissed) return;
 
     const ua = navigator.userAgent.toLowerCase();
-    if (/iphone|ipad|ipod/.test(ua) && /safari/.test(ua) && !/crios|fxios/.test(ua)) {
+    const isIPadOS = /macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+    const isIOS = /iphone|ipad|ipod/.test(ua) || isIPadOS;
+    const isSafari = /safari/.test(ua) && !/crios|fxios|chrome|android/.test(ua);
+
+    if (isIOS && isSafari) {
       setPlatform('ios');
     } else if (/android/.test(ua) && /chrome/.test(ua)) {
       setPlatform('android');
