@@ -1087,7 +1087,8 @@ export default function ScorerPage() {
   const ptsLoss = (tournament.settings as any)?.pointsForLoss ?? 0;
 
   const completedMatches = matches.filter(m => m.status === 'COMPLETED');
-  const pendingMatches = matches.filter(m => m.status === 'PENDING');
+  const pendingMatches = matches.filter(m => m.status === 'PENDING' && m.playerAId && m.playerBId);
+  const waitingMatches = matches.filter(m => m.status === 'PENDING' && (!m.playerAId || !m.playerBId));
   const inProgressMatch = matches.find(m => m.status === 'IN_PROGRESS');
 
   const standings = players.map(player => {
@@ -1906,7 +1907,17 @@ export default function ScorerPage() {
           </Card>
         )}
 
-        {pendingMatches.length === 0 && !inProgressMatch && (
+        {pendingMatches.length === 0 && !inProgressMatch && waitingMatches.length > 0 && (
+          <Card className="border-2 border-primary/30 border-dashed" data-testid="card-waiting-for-players">
+            <CardContent className="py-12 text-center">
+              <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
+              <h2 className="text-xl font-bold mb-2">Waiting for Next Match</h2>
+              <p className="text-muted-foreground">The next match will appear here once the other board finishes.</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {pendingMatches.length === 0 && !inProgressMatch && waitingMatches.length === 0 && (
           <Card className="border-2 border-dashed" data-testid="card-all-done">
             <CardContent className="py-12 text-center">
               <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />

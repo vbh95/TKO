@@ -229,19 +229,14 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     }
   }
 
-  const sfBoardMap: Record<number, number> = { 0: 2, 1: 3 };
-  const fBoardMap: Record<number, number> = { 0: 3 };
+  const totalBoards = groupsList.length;
   for (const km of sorted) {
     if (km.roundKey === firstRoundKey) continue;
+    if (km.boardNumber) continue;
     const roundMatches = sorted.filter(m => m.roundKey === km.roundKey);
     const idx = roundMatches.findIndex(m => m.id === km.id);
-    let assignedBoard: number | undefined;
-    if (km.roundKey === 'SF') assignedBoard = sfBoardMap[idx];
-    else if (km.roundKey === 'F') assignedBoard = fBoardMap[idx];
-    else if (km.roundKey === 'GF') assignedBoard = fBoardMap[idx];
-    if (assignedBoard != null && !km.boardNumber) {
-      await storage.updateMatch(km.id, { boardNumber: assignedBoard } as any);
-    }
+    const assignedBoard = (idx % totalBoards) + 1;
+    await storage.updateMatch(km.id, { boardNumber: assignedBoard } as any);
   }
 
   try {
@@ -1106,10 +1101,13 @@ export async function registerRoutes(
 
           if (nextMatchIndex < nextRoundMatches.length) {
             const nextMatch = nextRoundMatches[nextMatchIndex];
-            const updatedNextMatch = await storage.updateMatch(nextMatch.id, isTopSlot
-              ? { playerAId: winnerId } as any
-              : { playerBId: winnerId } as any
-            );
+            const updateData: any = isTopSlot
+              ? { playerAId: winnerId }
+              : { playerBId: winnerId };
+            if (!nextMatch.boardNumber && (match as any).boardNumber) {
+              updateData.boardNumber = (match as any).boardNumber;
+            }
+            const updatedNextMatch = await storage.updateMatch(nextMatch.id, updateData);
             // Emit update for the next-round match so boards/spectators see the new player
             try {
               const t = await storage.getTournament(match.tournamentId);
@@ -1521,10 +1519,13 @@ export async function registerRoutes(
 
             if (nextMatchIndex < nextRoundMatches.length) {
               const nextMatch = nextRoundMatches[nextMatchIndex];
-              const updatedNextMatch = await storage.updateMatch(nextMatch.id, isTopSlot
-                ? { playerAId: winnerId } as any
-                : { playerBId: winnerId } as any
-              );
+              const updateData: any = isTopSlot
+                ? { playerAId: winnerId }
+                : { playerBId: winnerId };
+              if (!nextMatch.boardNumber && (match as any).boardNumber) {
+                updateData.boardNumber = (match as any).boardNumber;
+              }
+              const updatedNextMatch = await storage.updateMatch(nextMatch.id, updateData);
               emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedNextMatch);
               if ((updatedNextMatch as any).boardNumber) {
                 emitBoardMatchUpdate(tournamentId, (updatedNextMatch as any).boardNumber, updatedNextMatch);
