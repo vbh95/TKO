@@ -397,7 +397,7 @@ function ScorerReconnect() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-[hsl(222.2,84%,4.9%)]">
-      <img src={tkoLogoWhite} alt="TKO" className="w-20 h-20 mb-6 opacity-80" />
+      <img src={tkoLogoWhite} alt="TKO" className="h-12 w-auto mb-6 opacity-80 object-contain" />
       <ScanLine className="w-14 h-14 text-primary mb-4" />
       <h1 className="text-2xl font-bold text-white mb-2">Board Not Connected</h1>
       <p className="text-gray-400 max-w-sm mb-8">
