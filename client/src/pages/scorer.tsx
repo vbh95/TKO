@@ -151,17 +151,157 @@ function ScorerReconnect() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = "qr-reader";
 
+  const handleQrResult = useCallback((decodedText: string) => {
+    try {
+      let targetPath: string | null = null;
+
+      if (decodedText.startsWith("/")) {
+        targetPath = decodedText;
+      } else {
+        const url = new URL(decodedText);
+        if (url.origin !== window.location.origin) {
+          setScanError("That QR code is from a different site. Please scan the QR from your tournament admin.");
+          setScanning(false);
+          return;
+        }
+        targetPath = url.pathname + url.search;
+      }
+
+      const isPairUrl = targetPath.startsWith("/pair?") || targetPath.startsWith("/pair&");
+      const isScorerUrl = /^\/scorer\/\d+\/\d+/.test(targetPath);
+
+      if (isPairUrl || isScorerUrl) {
+        window.location.href = targetPath;
+      } else {
+        setScanError("That QR code doesn't look like a board pairing code. Please scan the QR from the tournament admin.");
+        setScanning(false);
+      }
+    } catch {
+      setScanError("Invalid QR code. Please scan the pairing QR from the tournament admin.");
+      setScanning(false);
+    }
+  }, []);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [showFileFallback, setShowFileFallback] = useState(false);
+
+  const handleFileScan = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScanError(null);
+    try {
+      const scanner = new Html5Qrcode("qr-file-scanner");
+      const result = await scanner.scanFile(file, false);
+      scanner.clear();
+      handleQrResult(result);
+    } catch {
+      setScanError("No QR code found in that image. Please try again with a clear photo of the QR code.");
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [handleQrResult]);
+
+  const nativeStreamRef = useRef<MediaStream | null>(null);
+  const nativeVideoRef = useRef<HTMLVideoElement | null>(null);
+  const nativeScanIntervalRef = useRef<number | null>(null);
+
+  const stopNativeScanner = useCallback(() => {
+    if (nativeScanIntervalRef.current) {
+      clearInterval(nativeScanIntervalRef.current);
+      nativeScanIntervalRef.current = null;
+    }
+    if (nativeStreamRef.current) {
+      nativeStreamRef.current.getTracks().forEach(t => t.stop());
+      nativeStreamRef.current = null;
+    }
+    if (nativeVideoRef.current) {
+      nativeVideoRef.current.srcObject = null;
+      nativeVideoRef.current = null;
+    }
+    const container = document.getElementById(scannerContainerId);
+    if (container) container.innerHTML = '';
+  }, []);
+
+  const tryNativeScanner = useCallback(async (): Promise<boolean> => {
+    if (!('BarcodeDetector' in window)) return false;
+
+    try {
+      const formats = await (window as any).BarcodeDetector.getSupportedFormats();
+      if (!formats.includes('qr_code')) return false;
+    } catch {
+      return false;
+    }
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    } catch {
+      return false;
+    }
+    nativeStreamRef.current = stream;
+
+    setScanning(true);
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    const container = document.getElementById(scannerContainerId);
+    if (!container) {
+      stream.getTracks().forEach(t => t.stop());
+      nativeStreamRef.current = null;
+      setScanning(false);
+      return false;
+    }
+
+    const video = document.createElement('video');
+    video.setAttribute('playsinline', 'true');
+    video.setAttribute('autoplay', 'true');
+    video.style.width = '100%';
+    video.style.borderRadius = '12px';
+    video.srcObject = stream;
+    container.innerHTML = '';
+    container.appendChild(video);
+    nativeVideoRef.current = video;
+
+    try {
+      await video.play();
+    } catch {
+      stopNativeScanner();
+      setScanning(false);
+      return false;
+    }
+
+    const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+    let found = false;
+
+    nativeScanIntervalRef.current = window.setInterval(async () => {
+      if (found || video.readyState < 2) return;
+      try {
+        const barcodes = await detector.detect(video);
+        if (barcodes.length > 0) {
+          found = true;
+          stopNativeScanner();
+          setScanning(false);
+          handleQrResult(barcodes[0].rawValue);
+        }
+      } catch {}
+    }, 200);
+
+    return true;
+  }, [handleQrResult, stopNativeScanner]);
+
   const startScanning = useCallback(async () => {
     setScanError(null);
+    setShowFileFallback(false);
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setScanError("Camera is not available on this device or browser. Try opening this page in Safari or Chrome.");
       return;
     }
 
+    const nativeWorked = await tryNativeScanner();
+    if (nativeWorked) return;
+
+    let cameras: Array<{ id: string; label: string }> = [];
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      stream.getTracks().forEach(track => track.stop());
+      cameras = await Html5Qrcode.getCameras();
     } catch (permErr: any) {
       if (permErr.name === "NotAllowedError" || permErr.name === "PermissionDeniedError") {
         const ua = navigator.userAgent.toLowerCase();
@@ -179,71 +319,81 @@ function ScorerReconnect() {
       return;
     }
 
+    if (!cameras.length) {
+      setScanError("No camera found on this device.");
+      return;
+    }
+
+    const rearCamera = cameras.find(c => {
+      const label = c.label.toLowerCase();
+      return label.includes("back") || label.includes("rear") || label.includes("environment");
+    });
+    const selectedCamera = rearCamera || cameras[cameras.length - 1];
+
     setScanning(true);
+
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     try {
       const scanner = new Html5Qrcode(scannerContainerId);
       scannerRef.current = scanner;
 
       await scanner.start(
-        { facingMode: "environment" },
+        { deviceId: { exact: selectedCamera.id } },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
           scanner.stop().catch(() => {});
           scannerRef.current = null;
-
-          try {
-            let targetPath: string | null = null;
-
-            if (decodedText.startsWith("/")) {
-              targetPath = decodedText;
-            } else {
-              const url = new URL(decodedText);
-              if (url.origin !== window.location.origin) {
-                setScanError("That QR code is from a different site. Please scan the QR from your tournament admin.");
-                setScanning(false);
-                return;
-              }
-              targetPath = url.pathname + url.search;
-            }
-
-            const isPairUrl = targetPath.startsWith("/pair?") || targetPath.startsWith("/pair&");
-            const isScorerUrl = /^\/scorer\/\d+\/\d+/.test(targetPath);
-
-            if (isPairUrl || isScorerUrl) {
-              window.location.href = targetPath;
-            } else {
-              setScanError("That QR code doesn't look like a board pairing code. Please scan the QR from the tournament admin.");
-              setScanning(false);
-            }
-          } catch {
-            setScanError("Invalid QR code. Please scan the pairing QR from the tournament admin.");
-            setScanning(false);
-          }
+          handleQrResult(decodedText);
         },
         () => {}
       );
-    } catch (err: any) {
-      setScanError(err?.message || "Could not start the QR scanner. Please try again.");
-      setScanning(false);
+    } catch (firstErr: any) {
+      try {
+        if (scannerRef.current) {
+          await scannerRef.current.stop().catch(() => {});
+          scannerRef.current = null;
+        }
+        const scanner = new Html5Qrcode(scannerContainerId);
+        scannerRef.current = scanner;
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            scanner.stop().catch(() => {});
+            scannerRef.current = null;
+            handleQrResult(decodedText);
+          },
+          () => {}
+        );
+      } catch (secondErr: any) {
+        if (scannerRef.current) {
+          scannerRef.current = null;
+        }
+        setScanning(false);
+        setShowFileFallback(true);
+        setScanError("Camera could not start. You can scan a photo of the QR code instead using the button below.");
+      }
     }
-  }, []);
+  }, [handleQrResult, tryNativeScanner]);
 
   const stopScanning = useCallback(() => {
     if (scannerRef.current) {
       scannerRef.current.stop().catch(() => {});
       scannerRef.current = null;
     }
+    stopNativeScanner();
     setScanning(false);
-  }, []);
+  }, [stopNativeScanner]);
 
   useEffect(() => {
     return () => {
       if (scannerRef.current) {
         scannerRef.current.stop().catch(() => {});
       }
+      stopNativeScanner();
     };
-  }, []);
+  }, [stopNativeScanner]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-[hsl(222.2,84%,4.9%)]">
@@ -279,6 +429,30 @@ function ScorerReconnect() {
       {scanError && (
         <p className="text-red-400 mt-4 max-w-sm text-sm" data-testid="text-scan-error">{scanError}</p>
       )}
+
+      {showFileFallback && (
+        <div className="mt-4">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileScan}
+            className="hidden"
+            data-testid="input-qr-file"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-3 px-8 py-4 rounded-xl bg-primary text-primary-foreground font-semibold text-lg touch-manipulation active:bg-primary/80 transition-colors"
+            data-testid="button-scan-photo"
+          >
+            <Camera className="w-6 h-6" />
+            Take Photo of QR Code
+          </button>
+        </div>
+      )}
+
+      <div id="qr-file-scanner" className="hidden" />
       <AddToHomeBanner />
     </div>
   );
