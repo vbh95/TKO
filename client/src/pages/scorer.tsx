@@ -1926,15 +1926,17 @@ export default function ScorerPage() {
                 {pendingMatches.slice(1).map((match) => (
                   <button
                     key={match.id}
-                    className="flex items-center justify-between p-4 w-full text-left hover:bg-muted/50 transition-colors touch-manipulation"
+                    className="flex items-center p-4 w-full hover:bg-muted/50 transition-colors touch-manipulation"
                     onClick={() => handleTapMatch(match.id)}
                     disabled={!!inProgressMatch || startMatchMutation.isPending}
                     data-testid={`button-upcoming-match-${match.id}`}
                   >
-                    <span className="font-medium">{getPlayer(match.playerAId)?.name || "TBD"}</span>
-                    <span className="text-muted-foreground text-sm">vs</span>
-                    <span className="font-medium">{getPlayer(match.playerBId)?.name || "TBD"}</span>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground ml-2 shrink-0" />
+                    <div className="flex-1 flex items-center justify-center gap-3 text-center">
+                      <span className="flex-1 font-medium text-right">{getPlayer(match.playerAId)?.name || "TBD"}</span>
+                      <span className="text-muted-foreground text-sm shrink-0">vs</span>
+                      <span className="flex-1 font-medium text-left">{getPlayer(match.playerBId)?.name || "TBD"}</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground ml-3 shrink-0" />
                   </button>
                 ))}
               </div>
