@@ -53,6 +53,7 @@ function Router() {
     <Switch>
       {/* Public Routes */}
       <Route path="/scorer/:tournamentId/:boardNumber" component={ScorerPage} />
+      <Route path="/scorer" component={ScorerPage} />
       <Route path="/public/t/:shareToken/board/:boardNumber" component={BoardView} />
       <Route path="/public/t/:shareToken" component={PublicView} />
       <Route path="/public/league/:shareToken" component={PublicLeague} />

@@ -18,7 +18,10 @@ import {
   Play,
   ChevronRight,
   RotateCcw,
+  Camera,
+  ScanLine,
 } from "lucide-react";
+import { Html5Qrcode } from "html5-qrcode";
 import tkoLogoWhite from "@assets/TKO_White-04_1771796486840.png";
 import { useTheme } from "@/hooks/use-theme";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -140,6 +143,118 @@ function clearScorerState(matchId: number) {
   try {
     localStorage.removeItem(`tko_scorer_${matchId}`);
   } catch {}
+}
+
+function ScorerReconnect() {
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerContainerId = "qr-reader";
+
+  const startScanning = useCallback(async () => {
+    setScanError(null);
+    setScanning(true);
+
+    try {
+      const scanner = new Html5Qrcode(scannerContainerId);
+      scannerRef.current = scanner;
+
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          scanner.stop().catch(() => {});
+          scannerRef.current = null;
+
+          try {
+            let targetPath: string | null = null;
+
+            if (decodedText.startsWith("/")) {
+              targetPath = decodedText;
+            } else {
+              const url = new URL(decodedText);
+              if (url.origin !== window.location.origin) {
+                setScanError("That QR code is from a different site. Please scan the QR from your tournament admin.");
+                setScanning(false);
+                return;
+              }
+              targetPath = url.pathname + url.search;
+            }
+
+            const isPairUrl = targetPath.startsWith("/pair?") || targetPath.startsWith("/pair&");
+            const isScorerUrl = /^\/scorer\/\d+\/\d+/.test(targetPath);
+
+            if (isPairUrl || isScorerUrl) {
+              window.location.href = targetPath;
+            } else {
+              setScanError("That QR code doesn't look like a board pairing code. Please scan the QR from the tournament admin.");
+              setScanning(false);
+            }
+          } catch {
+            setScanError("Invalid QR code. Please scan the pairing QR from the tournament admin.");
+            setScanning(false);
+          }
+        },
+        () => {}
+      );
+    } catch (err: any) {
+      setScanError(err?.message || "Could not access camera. Please allow camera permissions.");
+      setScanning(false);
+    }
+  }, []);
+
+  const stopScanning = useCallback(() => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().catch(() => {});
+      scannerRef.current = null;
+    }
+    setScanning(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
+  }, []);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-[hsl(222.2,84%,4.9%)]">
+      <img src={tkoLogoWhite} alt="TKO" className="w-20 h-20 mb-6 opacity-80" />
+      <ScanLine className="w-14 h-14 text-primary mb-4" />
+      <h1 className="text-2xl font-bold text-white mb-2">Board Not Connected</h1>
+      <p className="text-gray-400 max-w-sm mb-8">
+        This scorer tablet needs to be paired to a board. Scan the QR code from the tournament admin to connect.
+      </p>
+
+      {!scanning ? (
+        <button
+          onClick={startScanning}
+          className="flex items-center gap-3 px-8 py-4 rounded-xl bg-primary text-primary-foreground font-semibold text-lg touch-manipulation active:bg-primary/80 transition-colors"
+          data-testid="button-scan-qr"
+        >
+          <Camera className="w-6 h-6" />
+          Scan QR Code
+        </button>
+      ) : (
+        <div className="w-full max-w-sm">
+          <div id={scannerContainerId} className="rounded-xl overflow-hidden mb-4" />
+          <button
+            onClick={stopScanning}
+            className="w-full py-3 rounded-xl bg-gray-700 text-white font-semibold touch-manipulation active:bg-gray-600 transition-colors"
+            data-testid="button-stop-scan"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {scanError && (
+        <p className="text-red-400 mt-4 max-w-sm text-sm" data-testid="text-scan-error">{scanError}</p>
+      )}
+    </div>
+  );
 }
 
 export default function ScorerPage() {
@@ -699,15 +814,7 @@ export default function ScorerPage() {
   }
 
   if (error || !data) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center text-center p-4 bg-background">
-        <Target className="w-16 h-16 text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-bold">Scorer Not Paired</h1>
-        <p className="text-muted-foreground mt-2 max-w-md">
-          {(error as any)?.message || "This device isn't paired to a board. Scan the QR code from the tournament admin to pair."}
-        </p>
-      </div>
-    );
+    return <ScorerReconnect />;
   }
 
   const { tournament, group, players, matches } = data;
