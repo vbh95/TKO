@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Trophy, Calendar, ArrowUpCircle, ArrowDownCircle, Share2, Copy, Check, Code } from "lucide-react";
+import { Loader2, ArrowLeft, Trophy, Calendar, ArrowUpCircle, ArrowDownCircle, Share2, Copy, Check, Code, Target, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
@@ -48,6 +48,28 @@ interface StandingRow {
   tournaments: number;
 }
 
+interface PlayerMatch {
+  tournamentName: string;
+  tournamentId: number;
+  eventDate: string | null;
+  opponent: string;
+  scoreFor: number;
+  scoreAgainst: number;
+  won: boolean;
+  stage: string;
+  roundKey: string;
+  bestOf: number;
+  stats: {
+    threeDartAvg: string | null;
+    checkoutPct: string | null;
+    highestFinish: number | null;
+    highestVisit: number | null;
+    ton80s: number | null;
+    ton40s: number | null;
+    tons: number | null;
+  } | null;
+}
+
 interface LeagueStandings {
   league: League;
   tournaments: Array<{ id: number; name: string; status: string }>;
@@ -55,11 +77,45 @@ interface LeagueStandings {
   shareToken: string | null;
 }
 
+function getRoundDisplayName(roundKey: string): string {
+  switch (roundKey) {
+    case 'QF': return 'Quarter-Final';
+    case 'SF': return 'Semi-Final';
+    case 'F': return 'Final';
+    case 'R16': return 'Round of 16';
+    case 'R32': return 'Round of 32';
+    default:
+      if (roundKey.startsWith('R')) return `Round ${roundKey.replace('R', '')}`;
+      return roundKey;
+  }
+}
+
+function getMatchSortOrder(stage: string, roundKey: string): number {
+  if (roundKey === 'F' || stage === 'GRAND_FINAL') return 1000;
+  if (roundKey === 'SF') return 900;
+  if (roundKey === 'QF') return 800;
+  if (roundKey === 'R16') return 700;
+  if (roundKey === 'R32') return 600;
+  if (stage === 'GROUP') {
+    const roundNum = parseInt(roundKey.replace('R', ''), 10);
+    return isNaN(roundNum) ? 100 : 100 + roundNum;
+  }
+  const num = parseInt(roundKey.replace('R', ''), 10);
+  return isNaN(num) ? 50 : 50 + num;
+}
+
+function getStageLabel(stage: string, roundKey: string): string {
+  if (stage === 'GROUP') return `Group — ${getRoundDisplayName(roundKey)}`;
+  if (stage === 'GRAND_FINAL') return 'Grand Final';
+  return getRoundDisplayName(roundKey);
+}
+
 export default function LeagueDetail() {
   const [, params] = useRoute("/leagues/:id");
   const leagueId = params?.id ? parseInt(params.id) : 0;
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const { toast } = useToast();
   const { data, isLoading, error } = useQuery<LeagueStandings>({
     queryKey: ['/api/leagues/:id/standings', leagueId],
@@ -70,6 +126,52 @@ export default function LeagueDetail() {
     },
     enabled: leagueId > 0,
   });
+
+  const { data: playerMatchesData } = useQuery<Record<string, PlayerMatch[]>>({
+    queryKey: ['/api/leagues/:id/player-matches', leagueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/leagues/${leagueId}/player-matches`, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch player matches");
+      return res.json();
+    },
+    enabled: leagueId > 0,
+  });
+
+  const selectedPlayerKey = selectedPlayer ? selectedPlayer.replace(/\s+/g, ' ').toLowerCase().trim() : null;
+  const selectedMatches = selectedPlayerKey && playerMatchesData ? (playerMatchesData[selectedPlayerKey] || []) : [];
+
+  const sortedMatches = [...selectedMatches].sort((a, b) => {
+    const dateA = a.eventDate ? new Date(a.eventDate).getTime() : 0;
+    const dateB = b.eventDate ? new Date(b.eventDate).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  const matchesByTournament: Record<string, PlayerMatch[]> = {};
+  const tournamentOrder: string[] = [];
+  for (const m of sortedMatches) {
+    const key = m.tournamentName;
+    if (!matchesByTournament[key]) {
+      matchesByTournament[key] = [];
+      tournamentOrder.push(key);
+    }
+    matchesByTournament[key].push(m);
+  }
+  for (const key of tournamentOrder) {
+    matchesByTournament[key].sort((a, b) => getMatchSortOrder(b.stage, b.roundKey) - getMatchSortOrder(a.stage, a.roundKey));
+  }
+
+  const totalWins = selectedMatches.filter(m => m.won).length;
+  const totalLosses = selectedMatches.filter(m => !m.won).length;
+
+  const playerAvg = (() => {
+    const avgs = selectedMatches
+      .map(m => m.stats?.threeDartAvg)
+      .filter((v): v is string => v != null && v !== '')
+      .map(v => parseFloat(v))
+      .filter(v => !isNaN(v));
+    if (avgs.length === 0) return null;
+    return (avgs.reduce((sum, a) => sum + a, 0) / avgs.length).toFixed(2);
+  })();
 
   if (isLoading) {
     return (
@@ -228,7 +330,7 @@ export default function LeagueDetail() {
                       <TableHead className="w-14 text-center">Pos</TableHead>
                       <TableHead>Player</TableHead>
                       <TableHead className="text-center">Tournament Wins</TableHead>
-                      <TableHead className="text-center">Points</TableHead>
+
                       <TableHead className="text-center">Legs Won</TableHead>
                       <TableHead className="text-center">Leg Diff</TableHead>
                     </TableRow>
@@ -252,7 +354,15 @@ export default function LeagueDetail() {
                               {row.position}
                             </div>
                           </TableCell>
-                          <TableCell className="font-medium">{row.name}</TableCell>
+                          <TableCell className="font-medium">
+                            <button
+                              className="text-left hover:text-primary hover:underline underline-offset-2 transition-colors cursor-pointer"
+                              onClick={() => setSelectedPlayer(row.name)}
+                              data-testid={`button-player-${row.position}`}
+                            >
+                              {row.name}
+                            </button>
+                          </TableCell>
                           <TableCell className="text-center tabular-nums">
                             {row.wins > 0 ? (
                               <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold" data-testid={`text-wins-${row.position}`}>
@@ -263,7 +373,7 @@ export default function LeagueDetail() {
                               <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-center tabular-nums font-bold text-primary text-lg">{row.points}</TableCell>
+
                           <TableCell className="text-center tabular-nums">{row.legsWon}</TableCell>
                           <TableCell className="text-center tabular-nums">
                             <span className={cn(
@@ -303,6 +413,57 @@ export default function LeagueDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-primary" />
+              {selectedPlayer}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedMatches.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No matches found for this player.</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 sm:gap-4 text-sm flex-wrap">
+                <Badge variant="outline" className="text-xs">
+                  {selectedMatches.length} match{selectedMatches.length !== 1 ? 'es' : ''}
+                </Badge>
+                <span className="text-green-600 dark:text-green-400 font-medium">{totalWins}W</span>
+                <span className="text-red-600 dark:text-red-400 font-medium">{totalLosses}L</span>
+                <span className="text-muted-foreground">—</span>
+                <span className="text-foreground font-medium">League Avg: {playerAvg || 'N/A'}</span>
+              </div>
+
+              {tournamentOrder.map((tournamentName) => {
+                const tMatches = matchesByTournament[tournamentName];
+                return (
+                <div key={tournamentName} className="space-y-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                    <Trophy className="w-3.5 h-3.5 text-primary" />
+                    {tournamentName}
+                    {tMatches[0]?.eventDate && (
+                      <span className="font-normal text-xs">
+                        ({format(new Date(tMatches[0].eventDate), 'MMM d, yyyy')})
+                      </span>
+                    )}
+                  </h3>
+                  <div className="space-y-1">
+                    {tMatches.map((match, idx) => (
+                      <MatchRow key={idx} match={match} playerName={selectedPlayer!} />
+                    ))}
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent className="max-w-md">
@@ -382,5 +543,94 @@ export default function LeagueDetail() {
         </DialogContent>
       </Dialog>
     </LayoutShell>
+  );
+}
+
+function MatchRow({ match, playerName }: { match: PlayerMatch; playerName: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasStats = match.stats && (match.stats.threeDartAvg || match.stats.ton80s !== null);
+  const isFinalWin = match.won && (match.roundKey === 'F' || match.stage === 'GRAND_FINAL');
+
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <button
+        className={cn(
+          "w-full flex items-center justify-between px-3 py-2 text-sm transition-colors",
+          match.won ? "bg-green-500/5 hover:bg-green-500/10" : "bg-red-500/5 hover:bg-red-500/10"
+        )}
+        onClick={() => hasStats && setExpanded(!expanded)}
+        data-testid={`match-row-${match.opponent}`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={cn(
+            "text-xs font-bold px-1.5 py-0.5 rounded",
+            match.won ? "bg-green-500/20 text-green-600 dark:text-green-400" : "bg-red-500/20 text-red-600 dark:text-red-400"
+          )}>
+            {match.won ? 'W' : 'L'}
+          </span>
+          {isFinalWin && <Trophy className="w-3.5 h-3.5 text-amber-500" />}
+          <span className="font-medium truncate">vs {match.opponent}</span>
+          <span className="text-xs text-muted-foreground shrink-0">
+            ({getStageLabel(match.stage, match.roundKey)})
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="font-bold tabular-nums">
+            {match.scoreFor} - {match.scoreAgainst}
+          </span>
+          {hasStats && (
+            expanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+          )}
+        </div>
+      </button>
+      {expanded && match.stats && (
+        <div className="border-t px-3 py-2 bg-muted/30">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            {match.stats.threeDartAvg && (
+              <div>
+                <span className="text-muted-foreground">3-Dart Avg</span>
+                <p className="font-semibold">{match.stats.threeDartAvg}</p>
+              </div>
+            )}
+            {match.stats.checkoutPct && (
+              <div>
+                <span className="text-muted-foreground">Checkout %</span>
+                <p className="font-semibold">{match.stats.checkoutPct}%</p>
+              </div>
+            )}
+            {match.stats.highestFinish != null && (
+              <div>
+                <span className="text-muted-foreground">Highest Finish</span>
+                <p className="font-semibold">{match.stats.highestFinish}</p>
+              </div>
+            )}
+            {match.stats.highestVisit != null && (
+              <div>
+                <span className="text-muted-foreground">Highest Visit</span>
+                <p className="font-semibold">{match.stats.highestVisit}</p>
+              </div>
+            )}
+            {match.stats.ton80s != null && match.stats.ton80s > 0 && (
+              <div>
+                <span className="text-muted-foreground">180s</span>
+                <p className="font-semibold">{match.stats.ton80s}</p>
+              </div>
+            )}
+            {match.stats.ton40s != null && match.stats.ton40s > 0 && (
+              <div>
+                <span className="text-muted-foreground">140+</span>
+                <p className="font-semibold">{match.stats.ton40s}</p>
+              </div>
+            )}
+            {match.stats.tons != null && match.stats.tons > 0 && (
+              <div>
+                <span className="text-muted-foreground">100+</span>
+                <p className="font-semibold">{match.stats.tons}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

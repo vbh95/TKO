@@ -8,8 +8,22 @@ const boardSocketCounts = new Map<string, number>();
 const liveScoringCache = new Map<number, any>();
 let connectedSocketCount = 0;
 
+interface ConnectedUserInfo {
+  userId: number;
+  name: string;
+  email: string;
+  tournamentId: number | null;
+  tournamentName: string | null;
+}
+
+const connectedUsers = new Map<string, ConnectedUserInfo>();
+
 export function getConnectedCount(): number {
   return connectedSocketCount;
+}
+
+export function getConnectedUsers(): ConnectedUserInfo[] {
+  return Array.from(connectedUsers.values());
 }
 
 export function getIO(): SocketIOServer {
@@ -31,10 +45,27 @@ export function setupSocketIO(httpServer: Server): SocketIOServer {
     connectedSocketCount++;
     socket.on("join:tournament", async (data: { tournamentId: number; userId?: number }) => {
       const tournamentId = typeof data === 'number' ? data : data.tournamentId;
+      const userId = typeof data === 'number' ? undefined : data.userId;
       socket.join(`tournament:${tournamentId}`);
       const cached = getLiveScoringForTournament(tournamentId);
       for (const scoring of cached) {
         socket.emit("leg:scoring", scoring);
+      }
+
+      if (userId) {
+        try {
+          const user = await storage.getUser(userId);
+          const tournament = await storage.getTournament(tournamentId);
+          if (user) {
+            connectedUsers.set(socket.id, {
+              userId: user.id,
+              name: user.name,
+              email: user.email,
+              tournamentId,
+              tournamentName: tournament?.name || null,
+            });
+          }
+        } catch {}
       }
     });
 
@@ -89,6 +120,7 @@ export function setupSocketIO(httpServer: Server): SocketIOServer {
 
     socket.on("disconnect", () => {
       connectedSocketCount = Math.max(0, connectedSocketCount - 1);
+      connectedUsers.delete(socket.id);
       const session = (socket as any).boardSession;
       if (session) {
         const key = `${session.tournamentId}:${session.boardNumber}`;

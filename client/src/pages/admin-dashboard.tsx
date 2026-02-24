@@ -4,7 +4,16 @@ import { LayoutShell } from "@/components/layout-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Users,
   Trophy,
@@ -15,6 +24,11 @@ import {
   Wifi,
   Search,
   Clock,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Shield,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -26,9 +40,39 @@ const CATEGORY_COLORS: Record<string, string> = {
   "General Feedback": "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30",
 };
 
+interface ConnectedUser {
+  userId: number;
+  name: string;
+  email: string;
+  tournamentId: number | null;
+  tournamentName: string | null;
+}
+
+interface LiveTournament {
+  id: number;
+  name: string;
+  type: string;
+  ownerName: string;
+  playerCount: number;
+  totalMatches: number;
+  completedMatches: number;
+  shareEnabled: boolean;
+  shareToken: string | null;
+}
+
+interface AdminUser {
+  id: number;
+  name: string;
+  email: string;
+  createdAt: string | null;
+  isSuperUser: boolean;
+}
+
 export default function AdminDashboard() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [feedbackSearch, setFeedbackSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [userSearch, setUserSearch] = useState("");
+  const [liveUsersExpanded, setLiveUsersExpanded] = useState(false);
 
   const { data: stats } = useQuery<{
     totalUsers: number;
@@ -61,14 +105,36 @@ export default function AdminDashboard() {
     refetchInterval: 10000,
   });
 
+  const { data: connectedUsers } = useQuery<ConnectedUser[]>({
+    queryKey: ["/api/admin/connected-users"],
+    refetchInterval: 10000,
+  });
+
+  const { data: liveTournaments } = useQuery<LiveTournament[]>({
+    queryKey: ["/api/admin/live-tournaments"],
+    refetchInterval: 15000,
+  });
+
+  const { data: allUsers } = useQuery<AdminUser[]>({
+    queryKey: ["/api/admin/users"],
+  });
+
+  const connectedUserIds = new Set((connectedUsers || []).map(u => u.userId));
+
   const filteredFeedback = (feedback || []).filter((f) => {
     const matchesCategory = categoryFilter === "all" || f.category === categoryFilter;
     const matchesSearch =
-      !searchQuery ||
-      f.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (f.userName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (f.userEmail || "").toLowerCase().includes(searchQuery.toLowerCase());
+      !feedbackSearch ||
+      f.message.toLowerCase().includes(feedbackSearch.toLowerCase()) ||
+      (f.userName || "").toLowerCase().includes(feedbackSearch.toLowerCase()) ||
+      (f.userEmail || "").toLowerCase().includes(feedbackSearch.toLowerCase());
     return matchesCategory && matchesSearch;
+  });
+
+  const filteredUsers = (allUsers || []).filter((u) => {
+    if (!userSearch) return true;
+    const q = userSearch.toLowerCase();
+    return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
   });
 
   return (
@@ -80,18 +146,38 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card data-testid="stat-card-live-users">
+          <Card data-testid="stat-card-live-users" className="col-span-1">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Live Users</p>
                   <p className="text-3xl font-bold mt-1">{liveStats?.connectedUsers ?? 0}</p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-green-500/15 flex items-center justify-center">
+                <button
+                  className="w-10 h-10 rounded-full bg-green-500/15 flex items-center justify-center relative cursor-pointer"
+                  onClick={() => setLiveUsersExpanded(!liveUsersExpanded)}
+                  data-testid="button-toggle-live-users"
+                >
                   <Wifi className="w-5 h-5 text-green-600 dark:text-green-400" />
                   <span className="absolute w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
-                </div>
+                </button>
               </div>
+              {liveUsersExpanded && connectedUsers && connectedUsers.length > 0 && (
+                <div className="mt-3 border-t pt-3 space-y-2">
+                  {connectedUsers.map((u, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full shrink-0" />
+                      <span className="font-medium truncate">{u.name}</span>
+                      {u.tournamentName && (
+                        <span className="text-muted-foreground truncate">— {u.tournamentName}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {liveUsersExpanded && (!connectedUsers || connectedUsers.length === 0) && (
+                <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">No identified users connected</p>
+              )}
             </CardContent>
           </Card>
 
@@ -146,6 +232,72 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
+        {liveTournaments && liveTournaments.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <CardTitle className="text-lg">Live Tournaments</CardTitle>
+                <Badge variant="secondary" className="tabular-nums">{liveTournaments.length}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {liveTournaments.map((t) => {
+                  const progress = t.totalMatches > 0 ? Math.round((t.completedMatches / t.totalMatches) * 100) : 0;
+                  return (
+                    <div key={t.id} className="border rounded-lg p-4 space-y-3" data-testid={`live-tournament-${t.id}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-sm truncate">{t.name}</h4>
+                          <p className="text-xs text-muted-foreground">{t.ownerName}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs shrink-0">{t.type.replace(/_/g, ' ')}</Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{t.playerCount} players</span>
+                        <span>{t.completedMatches}/{t.totalMatches} matches</span>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground text-right">{progress}%</p>
+                      </div>
+                      {t.shareToken ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-1.5 text-xs"
+                          onClick={() => window.open(`/public/${t.shareToken}`, '_blank')}
+                          data-testid={`button-view-live-${t.id}`}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          View Live
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-1.5 text-xs"
+                          onClick={() => window.open(`/tournaments/${t.id}`, '_blank')}
+                          data-testid={`button-view-tournament-${t.id}`}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          View Tournament
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
@@ -190,6 +342,76 @@ export default function AdminDashboard() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                <CardTitle className="text-lg">Registered Users</CardTitle>
+                <Badge variant="secondary" className="tabular-nums">{allUsers?.length ?? 0}</Badge>
+              </div>
+              <div className="relative flex-1 min-w-[200px] max-w-sm">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search users..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="pl-9 h-9"
+                  data-testid="input-search-users"
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead className="text-center">Joined</TableHead>
+                    <TableHead className="text-center">Role</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        {allUsers && allUsers.length > 0 ? "No users match your search" : "No users yet"}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                        <TableCell>
+                          <span className={cn(
+                            "w-2 h-2 rounded-full inline-block",
+                            connectedUserIds.has(user.id) ? "bg-green-500" : "bg-muted-foreground/30"
+                          )} />
+                        </TableCell>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{user.email}</TableCell>
+                        <TableCell className="text-center text-sm text-muted-foreground">
+                          {user.createdAt ? format(new Date(user.createdAt), "dd MMM yyyy") : "—"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {user.isSuperUser && (
+                            <Badge variant="default" className="text-xs gap-1">
+                              <Shield className="w-3 h-3" />
+                              Admin
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-primary" />
                 <CardTitle className="text-lg">Feedback & Reports</CardTitle>
                 <Badge variant="secondary" className="tabular-nums">{filteredFeedback.length}</Badge>
@@ -199,8 +421,8 @@ export default function AdminDashboard() {
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     placeholder="Search feedback..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    value={feedbackSearch}
+                    onChange={(e) => setFeedbackSearch(e.target.value)}
                     className="pl-9 h-9"
                     data-testid="input-search-feedback"
                   />

@@ -94,6 +94,10 @@ export interface IStorage {
   // Beta Feedback
   createBetaFeedback(feedback: InsertBetaFeedback): Promise<BetaFeedback>;
 
+  // Admin
+  getAllUsersAdmin(): Promise<Array<{ id: number; name: string; email: string; createdAt: Date | null; isSuperUser: boolean }>>;
+  getLiveTournaments(): Promise<Tournament[]>;
+
   // Reset
   resetTournamentData(tournamentId: number): Promise<void>;
   
@@ -450,6 +454,21 @@ export class DatabaseStorage implements IStorage {
       recentSignups: allUsers.filter(u => u.createdAt && u.createdAt >= sevenDaysAgo).length,
       recentTournaments: allTournaments.filter(t => t.createdAt && t.createdAt >= sevenDaysAgo).length,
     };
+  }
+
+  async getAllUsersAdmin(): Promise<Array<{ id: number; name: string; email: string; createdAt: Date | null; isSuperUser: boolean }>> {
+    const allUsers = await db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      createdAt: users.createdAt,
+      isSuperUser: users.isSuperUser,
+    }).from(users).orderBy(desc(users.createdAt));
+    return allUsers.map(u => ({ ...u, isSuperUser: u.isSuperUser ?? false }));
+  }
+
+  async getLiveTournaments(): Promise<Tournament[]> {
+    return await db.select().from(tournaments).where(eq(tournaments.status, 'IN_PROGRESS'));
   }
 
   async resetTournamentData(tournamentId: number): Promise<void> {

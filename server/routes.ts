@@ -651,6 +651,51 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/connected-users", isSuperUser, async (_req, res) => {
+    try {
+      const { getConnectedUsers } = await import("./socket");
+      res.json(getConnectedUsers());
+    } catch (err) {
+      res.json([]);
+    }
+  });
+
+  app.get("/api/admin/users", isSuperUser, async (_req, res) => {
+    try {
+      const users = await storage.getAllUsersAdmin();
+      res.json(users);
+    } catch (err) {
+      console.error("Admin users error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/live-tournaments", isSuperUser, async (_req, res) => {
+    try {
+      const liveTournaments = await storage.getLiveTournaments();
+      const result = await Promise.all(liveTournaments.map(async (t) => {
+        const owner = await storage.getUser(t.userId);
+        const allMatches = await storage.getMatchesByTournamentId(t.id);
+        const playersList = await storage.getPlayersByTournamentId(t.id);
+        return {
+          id: t.id,
+          name: t.name,
+          type: t.type,
+          ownerName: owner?.name || 'Unknown',
+          playerCount: playersList.length,
+          totalMatches: allMatches.length,
+          completedMatches: allMatches.filter(m => m.status === 'COMPLETED').length,
+          shareEnabled: t.shareEnabled,
+          shareToken: t.shareEnabled ? t.shareToken : null,
+        };
+      }));
+      res.json(result);
+    } catch (err) {
+      console.error("Admin live tournaments error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // === BETA FEEDBACK ===
   app.post("/api/beta-feedback", isAuthenticated, async (req, res) => {
     try {
@@ -2097,6 +2142,93 @@ export async function registerRoutes(
 
     const updated = await storage.updateTournament(tournamentId, { leagueId: leagueId || null });
     res.json(updated);
+  });
+
+  app.get("/api/leagues/:id/player-matches", isAuthenticated, async (req, res) => {
+    const userId = (req.user as any).id;
+    const leagueId = parseInt(req.params.id);
+    const league = await storage.getLeague(leagueId);
+    if (!league || league.userId !== userId) return res.status(404).json({ message: "League not found" });
+
+    const leagueTournaments = await storage.getTournamentsByLeagueId(leagueId);
+    const playerMatches: Record<string, Array<{
+      tournamentName: string;
+      tournamentId: number;
+      eventDate: string | null;
+      opponent: string;
+      scoreFor: number;
+      scoreAgainst: number;
+      won: boolean;
+      stage: string;
+      roundKey: string;
+      bestOf: number;
+      stats: {
+        threeDartAvg: string | null;
+        checkoutPct: string | null;
+        highestFinish: number | null;
+        highestVisit: number | null;
+        ton80s: number | null;
+        ton40s: number | null;
+        tons: number | null;
+      } | null;
+    }>> = {};
+
+    for (const t of leagueTournaments) {
+      const allMatches = await storage.getMatchesByTournamentId(t.id);
+      const playersList = await storage.getPlayersByTournamentId(t.id);
+      const completedMatches = allMatches.filter(m => m.status === 'COMPLETED');
+
+      const matchNoteMap: Record<number, any> = {};
+      for (const m of completedMatches) {
+        const note = await storage.getMatchNote(m.id);
+        if (note) matchNoteMap[m.id] = note;
+      }
+
+      for (const player of playersList) {
+        const key = player.name.replace(/\s+/g, ' ').toLowerCase().trim();
+        if (!playerMatches[key]) playerMatches[key] = [];
+
+        const pMatches = completedMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
+
+        pMatches.forEach(m => {
+          const isA = m.playerAId === player.id;
+          const opponent = isA ? m.playerB : m.playerA;
+          const note = matchNoteMap[m.id];
+          let stats = null;
+          if (note) {
+            const totalVisits = isA ? note.totalVisitsA : note.totalVisitsB;
+            const totalScored = isA ? note.totalScoredA : note.totalScoredB;
+            const checkoutAttempts = isA ? note.checkoutAttemptsA : note.checkoutAttemptsB;
+            const checkoutSuccess = isA ? note.checkoutSuccessA : note.checkoutSuccessB;
+            stats = {
+              threeDartAvg: totalVisits > 0 ? ((totalScored / totalVisits) * 3).toFixed(1) : null,
+              checkoutPct: checkoutAttempts > 0 ? ((checkoutSuccess / checkoutAttempts) * 100).toFixed(1) : null,
+              highestFinish: isA ? note.highestFinishA : note.highestFinishB,
+              highestVisit: isA ? note.highestVisitA : note.highestVisitB,
+              ton80s: isA ? note.ton80sA : note.ton80sB,
+              ton40s: isA ? note.ton40sA : note.ton40sB,
+              tons: isA ? note.tonsA : note.tonsB,
+            };
+          }
+
+          playerMatches[key].push({
+            tournamentName: t.name,
+            tournamentId: t.id,
+            eventDate: t.eventDate || null,
+            opponent: opponent?.name || 'Unknown',
+            scoreFor: isA ? (m.scoreA || 0) : (m.scoreB || 0),
+            scoreAgainst: isA ? (m.scoreB || 0) : (m.scoreA || 0),
+            won: m.winnerId === player.id,
+            stage: m.stage,
+            roundKey: m.roundKey,
+            bestOf: m.bestOf,
+            stats,
+          });
+        });
+      }
+    }
+
+    res.json(playerMatches);
   });
 
   // === PUBLIC LEAGUE ENDPOINT ===
