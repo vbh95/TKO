@@ -657,6 +657,14 @@ export default function TournamentDetail() {
                                 )}
                                 data-testid={`match-card-${match.id}`}
                               >
+                                <div className="mb-2 flex justify-center border-b border-dashed pb-2">
+                                  <InlineScorerEdit
+                                    matchId={match.id}
+                                    tournamentId={tournamentId}
+                                    currentName={match.scorerName || null}
+                                    isLegacy={tournament.isLegacy || false}
+                                  />
+                                </div>
                                 <div className="flex items-center justify-between">
                                   <div className="flex-1 space-y-1">
                                     <div className={cn(
@@ -687,13 +695,7 @@ export default function TournamentDetail() {
                                     </div>
                                   </div>
                                 </div>
-                                <div className="flex items-center justify-between gap-2">
-                                  <InlineScorerEdit
-                                    matchId={match.id}
-                                    tournamentId={tournament.id}
-                                    currentName={match.scorerName || null}
-                                    isLegacy={tournament.isLegacy || false}
-                                  />
+                                <div className="flex items-center justify-end gap-2">
                                   <div className="flex items-center gap-1 mt-2 pt-2 border-t border-dashed w-full justify-end">
                                     {match.status === 'COMPLETED' && !tournament.isLegacy && (
                                       <Button
@@ -786,6 +788,14 @@ export default function TournamentDetail() {
                     </div>
                   </div>
                   <CardContent className="p-0">
+                    <div className="px-4 py-2 flex justify-center border-b border-dashed">
+                      <InlineScorerEdit
+                        matchId={match.id}
+                        tournamentId={tournamentId}
+                        currentName={match.scorerName || null}
+                        isLegacy={tournament.isLegacy || false}
+                      />
+                    </div>
                     <div className="flex items-center justify-between px-4 py-3 border-b gap-2">
                       <div className="flex-1">
                         {isEditingThis ? (
@@ -849,14 +859,6 @@ export default function TournamentDetail() {
                       )}>
                         {match.scoreB || 0}
                       </div>
-                    </div>
-                    <div className="px-4 pb-2">
-                      <InlineScorerEdit
-                        matchId={match.id}
-                        tournamentId={tournament.id}
-                        currentName={match.scorerName || null}
-                        isLegacy={tournament.isLegacy || false}
-                      />
                     </div>
                     {match.status === 'COMPLETED' && (
                       <div className="px-4 pb-3">
