@@ -40,7 +40,8 @@ The project is a single-workspace monorepo with three main directories:
 - **Password Hashing**: Node.js native `crypto.scrypt` with random salt (not bcrypt/argon2)
 - **Sessions**: `express-session` with `connect-pg-simple` (PostgreSQL-backed persistent sessions in `user_sessions` table)
 - **Cookie Config**: httpOnly cookies, 1-week expiry, secure in production
-- **Auth Routes**: POST `/api/auth/signup`, POST `/api/auth/login`, POST `/api/auth/logout`, GET `/api/auth/me`
+- **Superuser Role**: `isSuperUser` boolean on users table. Superusers see "Beta Logs" nav item and access `/admin` dashboard with feedback, stats, and live user count. Admin API routes (`/api/admin/*`) are protected by `isSuperUser` middleware.
+- **Auth Routes**: POST `/api/auth/signup`, POST `/api/auth/login`, POST `/api/auth/logout`, GET `/api/auth/me` (includes `isSuperUser` flag)
 - **Signup**: Requires full name, email, password + password confirmation. Returns a one-time randomized recovery key (hashed in DB, shown once to user)
 - **Password Reset**: Supports two verification methods — memorable word or recovery key. Both are hashed and compared server-side. Rate-limited to 5 attempts per 15 minutes.
 - **Profile Completion**: After signup, users are redirected to a mandatory profile completion page requiring date of birth and memorable word. Phone and billing address are optional. Enforced via `ProtectedRoute` in `App.tsx`.

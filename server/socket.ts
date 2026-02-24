@@ -6,6 +6,11 @@ let io: SocketIOServer | null = null;
 
 const boardSocketCounts = new Map<string, number>();
 const liveScoringCache = new Map<number, any>();
+let connectedSocketCount = 0;
+
+export function getConnectedCount(): number {
+  return connectedSocketCount;
+}
 
 export function getIO(): SocketIOServer {
   if (!io) throw new Error("Socket.IO not initialized");
@@ -23,6 +28,7 @@ export function setupSocketIO(httpServer: Server): SocketIOServer {
   });
 
   io.on("connection", (socket) => {
+    connectedSocketCount++;
     socket.on("join:tournament", async (data: { tournamentId: number; userId?: number }) => {
       const tournamentId = typeof data === 'number' ? data : data.tournamentId;
       socket.join(`tournament:${tournamentId}`);
@@ -82,6 +88,7 @@ export function setupSocketIO(httpServer: Server): SocketIOServer {
     });
 
     socket.on("disconnect", () => {
+      connectedSocketCount = Math.max(0, connectedSocketCount - 1);
       const session = (socket as any).boardSession;
       if (session) {
         const key = `${session.tournamentId}:${session.boardNumber}`;

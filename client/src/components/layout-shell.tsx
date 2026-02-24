@@ -11,7 +11,8 @@ import {
   Sun,
   Moon,
   Trophy,
-  Medal
+  Medal,
+  Shield,
 } from "lucide-react";
 import tkoLogoDark from "@assets/Untitled-1-02_1771177331378.png";
 import tkoLogoWhite from "@assets/TKO_White-02_1771177730966.png";
@@ -33,10 +34,14 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
 
-  const navigation = [
+  const baseNav = [
     { name: 'My Tournaments', href: '/tournaments', icon: Trophy },
     { name: 'Create New', href: '/create', icon: Plus },
     { name: 'Leagues', href: '/leagues', icon: Medal },
+  ];
+  const navigation = [
+    ...baseNav,
+    ...(user?.isSuperUser ? [{ name: 'Beta Logs', href: '/admin', icon: Shield }] : []),
     { name: 'Profile', href: '/account', icon: User },
   ];
 

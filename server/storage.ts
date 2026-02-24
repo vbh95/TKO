@@ -1,4 +1,5 @@
 import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues, leagueManualResults, betaFeedback } from "@shared/schema";
+import { desc } from "drizzle-orm";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -392,6 +393,63 @@ export class DatabaseStorage implements IStorage {
   async createBetaFeedback(feedback: InsertBetaFeedback): Promise<BetaFeedback> {
     const [newFeedback] = await db.insert(betaFeedback).values(feedback).returning();
     return newFeedback;
+  }
+
+  async getAllBetaFeedback(): Promise<(BetaFeedback & { userName: string | null; userEmail: string | null })[]> {
+    const rows = await db
+      .select({
+        id: betaFeedback.id,
+        userId: betaFeedback.userId,
+        category: betaFeedback.category,
+        message: betaFeedback.message,
+        page: betaFeedback.page,
+        createdAt: betaFeedback.createdAt,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(betaFeedback)
+      .leftJoin(users, eq(betaFeedback.userId, users.id))
+      .orderBy(desc(betaFeedback.createdAt));
+    return rows;
+  }
+
+  async getAdminStats(): Promise<{
+    totalUsers: number;
+    totalTournaments: number;
+    tournamentsByStatus: Record<string, number>;
+    totalMatches: number;
+    totalFeedback: number;
+    feedbackByCategory: Record<string, number>;
+    recentSignups: number;
+    recentTournaments: number;
+  }> {
+    const allUsers = await db.select({ id: users.id, createdAt: users.createdAt }).from(users);
+    const allTournaments = await db.select({ id: tournaments.id, status: tournaments.status, createdAt: tournaments.createdAt }).from(tournaments);
+    const matchCount = await db.select({ id: matches.id }).from(matches);
+    const allFeedback = await db.select({ id: betaFeedback.id, category: betaFeedback.category }).from(betaFeedback);
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const tournamentsByStatus: Record<string, number> = {};
+    for (const t of allTournaments) {
+      tournamentsByStatus[t.status] = (tournamentsByStatus[t.status] || 0) + 1;
+    }
+
+    const feedbackByCategory: Record<string, number> = {};
+    for (const f of allFeedback) {
+      feedbackByCategory[f.category] = (feedbackByCategory[f.category] || 0) + 1;
+    }
+
+    return {
+      totalUsers: allUsers.length,
+      totalTournaments: allTournaments.length,
+      tournamentsByStatus,
+      totalMatches: matchCount.length,
+      totalFeedback: allFeedback.length,
+      feedbackByCategory,
+      recentSignups: allUsers.filter(u => u.createdAt && u.createdAt >= sevenDaysAgo).length,
+      recentTournaments: allTournaments.filter(t => t.createdAt && t.createdAt >= sevenDaysAgo).length,
+    };
   }
 
   async resetTournamentData(tournamentId: number): Promise<void> {

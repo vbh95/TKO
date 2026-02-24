@@ -21,6 +21,7 @@ import BoardView from "@/pages/board-view";
 import ScorerPage from "@/pages/scorer";
 import CompleteProfile from "@/pages/complete-profile";
 import PublicLeague from "@/pages/public-league";
+import AdminDashboard from "@/pages/admin-dashboard";
 
 function isProfileComplete(user: any): boolean {
   return !!user.dateOfBirth && !!user.hasMemorableWord;
@@ -70,6 +71,7 @@ function Router() {
       <Route path="/leagues" component={() => <ProtectedRoute component={LeaguesPage} />} />
       <Route path="/leagues/:id" component={() => <ProtectedRoute component={LeagueDetail} />} />
       <Route path="/account" component={() => <ProtectedRoute component={Account} />} />
+      <Route path="/admin" component={() => <ProtectedRoute component={AdminDashboard} />} />
 
       {/* Fallback */}
       <Route component={NotFound} />

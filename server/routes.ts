@@ -612,7 +612,43 @@ export async function registerRoutes(
   app.get(api.auth.me.path, isAuthenticated, (req, res) => {
     const user = req.user as any;
     const { password, memorableWord, recoveryKey, ...safeUser } = user;
-    res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
+    res.json({ ...safeUser, hasMemorableWord: !!memorableWord, isSuperUser: !!user.isSuperUser });
+  });
+
+  // === ADMIN / SUPERUSER ===
+  const isSuperUser = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    if (!(req.user as any).isSuperUser) return res.status(403).json({ message: "Forbidden" });
+    next();
+  };
+
+  app.get("/api/admin/feedback", isSuperUser, async (_req, res) => {
+    try {
+      const feedback = await storage.getAllBetaFeedback();
+      res.json(feedback);
+    } catch (err) {
+      console.error("Admin feedback error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/stats", isSuperUser, async (_req, res) => {
+    try {
+      const stats = await storage.getAdminStats();
+      res.json(stats);
+    } catch (err) {
+      console.error("Admin stats error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/live-stats", isSuperUser, async (_req, res) => {
+    try {
+      const { getConnectedCount } = await import("./socket");
+      res.json({ connectedUsers: getConnectedCount() });
+    } catch (err) {
+      res.json({ connectedUsers: 0 });
+    }
   });
 
   // === BETA FEEDBACK ===
