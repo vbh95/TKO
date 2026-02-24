@@ -1050,15 +1050,15 @@ export default function TournamentDetail() {
                       <Table>
                       <TableHeader className="bg-muted/50">
                         <TableRow>
-                          <TableHead className="w-[30px] px-0.5 text-center font-bold text-[10px]">#</TableHead>
-                          <TableHead className="px-1 font-bold text-[10px]">Player</TableHead>
-                          <TableHead className="w-[22px] px-0 text-center font-bold text-[10px]">P</TableHead>
-                          <TableHead className="w-[22px] px-0 text-center font-bold text-[10px]">W</TableHead>
-                          <TableHead className="w-[22px] px-0 text-center font-bold text-[10px]">L</TableHead>
-                          <TableHead className="w-[25px] px-0 text-center font-bold text-[10px]">LW</TableHead>
-                          <TableHead className="w-[25px] px-0 text-center font-bold text-[10px]">LL</TableHead>
-                          <TableHead className="w-[28px] px-0 text-center font-bold text-[10px]">+/-</TableHead>
-                          <TableHead className="w-[32px] px-0.5 text-right font-bold text-[10px] text-primary">Pts</TableHead>
+                          <TableHead className="w-[30px] px-0 text-center font-bold text-xs">#</TableHead>
+                          <TableHead className="px-1 font-bold text-xs">Player</TableHead>
+                          <TableHead className="w-[25px] px-0 text-center font-bold text-xs">P</TableHead>
+                          <TableHead className="w-[25px] px-0 text-center font-bold text-xs">W</TableHead>
+                          <TableHead className="w-[25px] px-0 text-center font-bold text-xs">L</TableHead>
+                          <TableHead className="w-[30px] px-0 text-center font-bold text-xs">LW</TableHead>
+                          <TableHead className="w-[30px] px-0 text-center font-bold text-xs">LL</TableHead>
+                          <TableHead className="w-[35px] px-0 text-center font-bold text-xs">+/-</TableHead>
+                          <TableHead className="w-[40px] px-0 text-right font-bold text-xs text-primary">Pts</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1069,25 +1069,25 @@ export default function TournamentDetail() {
                             qualifying ? "bg-green-50 dark:bg-green-950/30" : "",
                             "hover:bg-muted/40 transition-colors"
                           )}>
-                            <TableCell className="px-0.5 text-center font-medium text-muted-foreground text-[10px]">
+                            <TableCell className="px-0 text-center font-medium text-muted-foreground text-xs">
                               <div className="flex items-center justify-center gap-0.5">
                                 {idx + 1}
-                                {qualifying && <div className="w-1 h-1 rounded-full bg-green-500 shrink-0" />}
+                                {qualifying && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />}
                               </div>
                             </TableCell>
-                            <TableCell className={cn("px-1 font-bold text-[11px] truncate max-w-[80px]", qualifying && "text-green-700 dark:text-green-400")}>{s.name}</TableCell>
-                            <TableCell className="px-0 text-center tabular-nums text-[10px]">{s.played}</TableCell>
-                            <TableCell className="px-0 text-center tabular-nums text-green-600 dark:text-green-400 font-medium text-[10px]">{s.won}</TableCell>
-                            <TableCell className="px-0 text-center tabular-nums text-destructive font-medium text-[10px]">{s.lost}</TableCell>
-                            <TableCell className="px-0 text-center tabular-nums font-mono text-[10px]">{s.legsFor}</TableCell>
-                            <TableCell className="px-0 text-center tabular-nums font-mono text-[10px]">{s.legsAgainst}</TableCell>
+                            <TableCell className={cn("px-1 font-bold text-xs truncate max-w-[100px]", qualifying && "text-green-700 dark:text-green-400")}>{s.name}</TableCell>
+                            <TableCell className="px-0 text-center tabular-nums text-xs">{s.played}</TableCell>
+                            <TableCell className="px-0 text-center tabular-nums text-green-600 dark:text-green-400 font-medium text-xs">{s.won}</TableCell>
+                            <TableCell className="px-0 text-center tabular-nums text-destructive font-medium text-xs">{s.lost}</TableCell>
+                            <TableCell className="px-0 text-center tabular-nums font-mono text-xs">{s.legsFor}</TableCell>
+                            <TableCell className="px-0 text-center tabular-nums font-mono text-xs">{s.legsAgainst}</TableCell>
                             <TableCell className={cn(
-                              "px-0 text-center tabular-nums font-medium font-mono text-[10px]",
+                              "px-0 text-center tabular-nums font-medium font-mono text-xs",
                               s.diff > 0 ? "text-green-600" : s.diff < 0 ? "text-destructive" : ""
                             )}>
                               {s.diff > 0 ? `+${s.diff}` : s.diff}
                             </TableCell>
-                            <TableCell className="px-0.5 text-right font-bold text-primary text-[11px]">{s.pts}</TableCell>
+                            <TableCell className="px-0 text-right font-bold text-primary text-sm">{s.pts}</TableCell>
                           </TableRow>
                           );
                         })}
