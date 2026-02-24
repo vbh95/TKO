@@ -114,7 +114,7 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
       <div className="mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground" data-testid={`match-scorer-${matchId}`}>
         <div className="flex items-center gap-1">
           <ClipboardList className="w-3 h-3" />
-          Scorer: Not available
+          Scorer: N/A
         </div>
       </div>
     );
