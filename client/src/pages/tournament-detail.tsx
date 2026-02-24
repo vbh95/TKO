@@ -111,17 +111,17 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
 
   if (isLegacy) {
     return (
-      <div className="mt-2 pt-2 border-t border-dashed text-[10px] text-muted-foreground uppercase font-bold tracking-wider" data-testid={`match-scorer-${matchId}`}>
-        <div className="flex items-center gap-1">
-          <ClipboardList className="w-3 h-3" />
-          Scorer: N/A
+      <div className="mt-2 pt-2 border-t border-dashed text-[10px] text-muted-foreground uppercase font-bold tracking-wider truncate" data-testid={`match-scorer-${matchId}`}>
+        <div className="flex items-center gap-1 truncate">
+          <ClipboardList className="w-3 h-3 shrink-0" />
+          <span className="truncate">Scorer: N/A</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mt-2 pt-2 border-t border-dashed text-[10px] text-muted-foreground uppercase font-bold tracking-wider" data-testid={`match-scorer-${matchId}`}>
+    <div className="mt-2 pt-2 border-t border-dashed text-[10px] text-muted-foreground uppercase font-bold tracking-wider truncate" data-testid={`match-scorer-${matchId}`}>
       {editing ? (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <ClipboardList className="w-3 h-3 shrink-0" />
@@ -138,13 +138,13 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
         </div>
       ) : (
         <button
-          className="flex items-center gap-1 hover:text-foreground transition-colors"
+          className="flex items-center gap-1 hover:text-foreground transition-colors truncate w-full"
           onClick={(e) => { e.stopPropagation(); setEditing(true); }}
           data-testid={`button-edit-scorer-${matchId}`}
         >
-          <ClipboardList className="w-3 h-3" />
-          Scorer: {currentName || "None"}
-          <Pencil className="w-2.5 h-2.5 ml-0.5 opacity-50" />
+          <ClipboardList className="w-3 h-3 shrink-0" />
+          <span className="truncate">Scorer: {currentName || "None"}</span>
+          <Pencil className="w-2.5 h-2.5 ml-0.5 opacity-50 shrink-0" />
         </button>
       )}
     </div>
@@ -1038,7 +1038,7 @@ export default function TournamentDetail() {
                 <Trophy className="w-6 h-6 text-primary" />
                 <h2 className="text-2xl font-bold tracking-tight">Group Standings</h2>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 gap-8">
                 {groupStandings.map(({ group, standings }) => (
                   <Card key={group.name} className="shadow-md overflow-hidden">
                     <CardHeader className="bg-primary py-4">
