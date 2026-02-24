@@ -643,97 +643,86 @@ export default function TournamentDetail() {
                     Round {roundKey.replace("R", "")}
                   </span>
                 </div>
-                <CardContent className="p-3 space-y-2">
-                  {roundMatches.map((match: any) => {
-                    const playerA = getPlayer(match.playerAId);
-                    const playerB = getPlayer(match.playerBId);
-                    return (
-                      <div
-                        key={match.id}
-                        onClick={() => setSelectedMatch(match)}
-                        className={cn(
-                          "rounded-lg border p-3 cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
-                          match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
-                        )}
-                        data-testid={`match-card-${match.id}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 space-y-1">
-                            <div className={cn(
-                              "text-sm font-medium",
-                              match.status === 'COMPLETED' && match.winnerId === playerA?.id && "text-primary font-bold"
-                            )}>
-                              {playerA?.name || "TBD"}
-                            </div>
-                            <div className={cn(
-                              "text-sm font-medium",
-                              match.status === 'COMPLETED' && match.winnerId === playerB?.id && "text-primary font-bold"
-                            )}>
-                              {playerB?.name || "TBD"}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-center gap-1 ml-3">
-                            <div className={cn(
-                              "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
-                              match.status === 'COMPLETED' && match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
-                            )}>
-                              {match.scoreA || 0}
-                            </div>
-                            <div className={cn(
-                              "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
-                              match.status === 'COMPLETED' && match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
-                            )}>
-                              {match.scoreB || 0}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <InlineScorerEdit
-                            matchId={match.id}
-                            tournamentId={tournament.id}
-                            currentName={match.scorerName || null}
-                            isLegacy={tournament.isLegacy || false}
-                          />
-                          <div className="flex items-center gap-1 mt-2 pt-2 border-t border-dashed w-full justify-end">
-                            {match.status === 'COMPLETED' && !tournament.isLegacy && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setResetMatchTarget(match);
-                                }}
-                                data-testid={`button-reset-match-${match.id}`}
-                                title="Reset Match"
+                        <CardContent className="p-3 space-y-2">
+                          {roundMatches.map((match: any) => {
+                            const playerA = getPlayer(match.playerAId);
+                            const playerB = getPlayer(match.playerBId);
+                            return (
+                              <div
+                                key={match.id}
+                                onClick={() => setSelectedMatch(match)}
+                                className={cn(
+                                  "rounded-lg border p-3 cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
+                                  match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
+                                )}
+                                data-testid={`match-card-${match.id}`}
                               >
-                                <RefreshCw className="w-3.5 h-3.5" />
-                              </Button>
-                            )}
-                            {tournament.isLegacy && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                onClick={(e) => { e.stopPropagation(); handleDeleteMatch(match.id); }}
-                                data-testid={`button-delete-match-${match.id}`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {match.status === 'COMPLETED' && (
-                          <AdminMatchStats
-                            matchId={match.id}
-                            playerAName={playerA?.name || "TBD"}
-                            playerBName={playerB?.name || "TBD"}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </CardContent>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 space-y-1">
+                                    <div className={cn(
+                                      "text-sm font-medium",
+                                      match.status === 'COMPLETED' && match.winnerId === playerA?.id && "text-primary font-bold"
+                                    )}>
+                                      {playerA?.name || "TBD"}
+                                    </div>
+                                    <div className={cn(
+                                      "text-sm font-medium",
+                                      match.status === 'COMPLETED' && match.winnerId === playerB?.id && "text-primary font-bold"
+                                    )}>
+                                      {playerB?.name || "TBD"}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-center gap-1 ml-3">
+                                    <div className={cn(
+                                      "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                                      match.status === 'COMPLETED' && match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
+                                    )}>
+                                      {match.scoreA || 0}
+                                    </div>
+                                    <div className={cn(
+                                      "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                                      match.status === 'COMPLETED' && match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
+                                    )}>
+                                      {match.scoreB || 0}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <InlineScorerEdit
+                                    matchId={match.id}
+                                    tournamentId={tournament.id}
+                                    currentName={match.scorerName || null}
+                                    isLegacy={tournament.isLegacy || false}
+                                  />
+                                  <div className="flex items-center gap-1 mt-2 pt-2 border-t border-dashed w-full justify-end">
+                                    {match.status === 'COMPLETED' && !tournament.isLegacy && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setResetMatchTarget(match);
+                                        }}
+                                        data-testid={`button-reset-match-${match.id}`}
+                                        title="Reset Match"
+                                      >
+                                        <RefreshCw className="w-3.5 h-3.5" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                                {match.status === 'COMPLETED' && (
+                                  <AdminMatchStats
+                                    matchId={match.id}
+                                    playerAName={playerA?.name || "TBD"}
+                                    playerBName={playerB?.name || "TBD"}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </CardContent>
               </Card>
             ))}
           </div>
@@ -789,21 +778,6 @@ export default function TournamentDetail() {
                           title="Reset Match"
                         >
                           <RefreshCw className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {tournament.isLegacy && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-6 px-2 text-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingKnockoutMatchId(isEditingThis ? null : match.id);
-                          }}
-                          data-testid={`button-edit-knockout-${match.id}`}
-                        >
-                          <Pencil className="w-3 h-3 mr-1" />
-                          {isEditingThis ? "Done" : "Edit"}
                         </Button>
                       )}
                       {match.status === 'COMPLETED' && (
