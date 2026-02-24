@@ -161,7 +161,7 @@ export function TournamentCard({ tournament }: { tournament: Tournament & { isCo
 
         {ownerName && (
           <p className="text-xs text-muted-foreground -mt-2">
-            <span className="font-medium">{isCollaborator ? 'Owner:' : 'Run by:'}</span> {ownerName}
+            <span className="font-medium">Owner:</span> {ownerName}
           </p>
         )}
         <div className="flex items-center flex-wrap gap-2 py-2">

@@ -1716,7 +1716,7 @@ export default function TournamentDetail() {
             {isCollaborator && (
               <div className="mt-4 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/20 text-sm text-muted-foreground">
                 <UserCheck className="w-4 h-4 text-primary shrink-0" />
-                <span>You are a <span className="font-medium text-foreground">collaborator</span> on this tournament{ownerName ? <>, owned by <span className="font-medium text-foreground">{ownerName}</span></> : ''}.</span>
+                <span>You are a <span className="font-medium text-foreground">collaborator</span> on this tournament, owned by <span className="font-medium text-foreground">{ownerName}</span>.</span>
               </div>
             )}
               </TabsContent>
