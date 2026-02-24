@@ -261,6 +261,11 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
             </p>
           </div>
         </div>
+        {match.scorerName && (
+          <div className="pt-2 text-[11px] text-muted-foreground text-center" data-testid={`knockout-scorer-${match.id}`}>
+            Scorer: {match.scorerName}
+          </div>
+        )}
       </CardContent>
       {expanded && isCompleted && (
         <div className="border-t bg-muted/20 px-4 py-3">

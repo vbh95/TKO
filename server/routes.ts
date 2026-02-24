@@ -267,8 +267,24 @@ async function pickKnockoutScorer(tournamentId: number, excludePlayerIds: number
       if (km.playerBId) promotedIds.add(km.playerBId);
     }
 
-    const nonPromoted = playersList.filter(p => !promotedIds.has(p.id) && !excludePlayerIds.includes(p.id));
-    if (nonPromoted.length === 0) return null;
+    let candidates = playersList.filter(p => !promotedIds.has(p.id) && !excludePlayerIds.includes(p.id));
+
+    if (candidates.length === 0) {
+      const eliminatedIds = new Set<number>();
+      for (const km of knockoutMatches) {
+        if (km.status === 'COMPLETED' && km.winnerId) {
+          if (km.playerAId && km.playerAId !== km.winnerId) eliminatedIds.add(km.playerAId);
+          if (km.playerBId && km.playerBId !== km.winnerId) eliminatedIds.add(km.playerBId);
+        }
+      }
+      candidates = playersList.filter(p => eliminatedIds.has(p.id) && !excludePlayerIds.includes(p.id));
+    }
+
+    if (candidates.length === 0) {
+      candidates = playersList.filter(p => !excludePlayerIds.includes(p.id));
+    }
+
+    if (candidates.length === 0) return null;
 
     let lastScorerId: number | null = null;
     if (lastScorerMatchId) {
@@ -276,8 +292,8 @@ async function pickKnockoutScorer(tournamentId: number, excludePlayerIds: number
       if (completedMatch?.scorerId) lastScorerId = completedMatch.scorerId;
     }
 
-    let pool = nonPromoted.filter(p => p.id !== lastScorerId);
-    if (pool.length === 0) pool = [...nonPromoted];
+    let pool = candidates.filter(p => p.id !== lastScorerId);
+    if (pool.length === 0) pool = [...candidates];
     const chosen = pool[Math.floor(Math.random() * pool.length)];
     return { scorerId: chosen.id, scorerName: chosen.name };
   } catch {

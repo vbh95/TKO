@@ -1312,6 +1312,14 @@ export default function TournamentDetail() {
                                 {match.scoreB || 0}
                               </div>
                             </div>
+                            <div className="px-4 pb-2">
+                              <InlineScorerEdit
+                                matchId={match.id}
+                                tournamentId={tournament.id}
+                                currentName={match.scorerName || null}
+                                isLegacy={tournament.isLegacy || false}
+                              />
+                            </div>
                             {match.status === 'COMPLETED' && (
                               <div className="px-4 pb-3">
                                 <AdminMatchStats
