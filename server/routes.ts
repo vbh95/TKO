@@ -717,6 +717,79 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/admin/feedback/:id", isSuperUser, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status, severity, adminNote } = req.body;
+      const updated = await storage.updateFeedback(id, {
+        ...(status !== undefined ? { status } : {}),
+        ...(severity !== undefined ? { severity: severity || null } : {}),
+        ...(adminNote !== undefined ? { adminNote: adminNote || null } : {}),
+      });
+      res.json(updated);
+    } catch (err) {
+      console.error("Feedback update error:", err);
+      res.status(500).json({ message: "Failed to update feedback" });
+    }
+  });
+
+  app.post("/api/admin/feedback/:id/notify", isSuperUser, async (req, res) => {
+    try {
+      const feedbackId = parseInt(req.params.id);
+      const { notificationType, customMessage } = req.body;
+      if (!notificationType) return res.status(400).json({ message: "notificationType required" });
+
+      const allFeedback = await storage.getAllBetaFeedback();
+      const feedback = allFeedback.find(f => f.id === feedbackId);
+      if (!feedback || !feedback.userId) {
+        return res.status(400).json({ message: "Feedback has no associated user to notify" });
+      }
+
+      const notif = await storage.createFeedbackNotification({
+        feedbackId,
+        userId: feedback.userId,
+        notificationType,
+        customMessage: customMessage || null,
+      });
+      res.json(notif);
+    } catch (err) {
+      console.error("Notify user error:", err);
+      res.status(500).json({ message: "Failed to send notification" });
+    }
+  });
+
+  // === NOTIFICATION ROUTES ===
+  app.get("/api/notifications", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const notifications = await storage.getUserNotifications(userId);
+      res.json(notifications);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const id = parseInt(req.params.id);
+      await storage.markNotificationRead(id, userId);
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  app.post("/api/notifications/mark-all-read", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      await storage.markAllNotificationsRead(userId);
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to mark notifications as read" });
+    }
+  });
+
   // === ACCOUNT ROUTES ===
   app.put(api.account.updateProfile.path, isAuthenticated, async (req, res) => {
     try {

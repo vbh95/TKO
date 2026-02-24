@@ -295,12 +295,29 @@ export const betaFeedback = pgTable("beta_feedback", {
   category: text("category").notNull(),
   message: text("message").notNull(),
   page: text("page"),
+  status: text("status").notNull().default("active"),
+  severity: text("severity"),
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBetaFeedbackSchema = createInsertSchema(betaFeedback).omit({ id: true, createdAt: true, updatedAt: true, status: true, severity: true, adminNote: true });
+export type BetaFeedback = typeof betaFeedback.$inferSelect;
+export type InsertBetaFeedback = z.infer<typeof insertBetaFeedbackSchema>;
+
+// === FEEDBACK NOTIFICATIONS ===
+export const feedbackNotifications = pgTable("feedback_notifications", {
+  id: serial("id").primaryKey(),
+  feedbackId: integer("feedback_id").notNull().references(() => betaFeedback.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  notificationType: text("notification_type").notNull(),
+  customMessage: text("custom_message"),
+  isRead: boolean("is_read").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertBetaFeedbackSchema = createInsertSchema(betaFeedback).omit({ id: true, createdAt: true });
-export type BetaFeedback = typeof betaFeedback.$inferSelect;
-export type InsertBetaFeedback = z.infer<typeof insertBetaFeedbackSchema>;
+export type FeedbackNotification = typeof feedbackNotifications.$inferSelect;
 
 export type UpdateMatchScoreRequest = {
   scoreA: number;

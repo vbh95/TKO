@@ -2,17 +2,21 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useLogout } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   User, 
   LogOut, 
   Menu, 
-  X,
-  Plus,
   Sun,
   Moon,
   Trophy,
   Medal,
   Shield,
+  Bell,
+  Plus,
+  X,
+  CheckCheck,
 } from "lucide-react";
 import tkoLogoDark from "@assets/Untitled-1-02_1771177331378.png";
 import tkoLogoWhite from "@assets/TKO_White-02_1771177730966.png";
@@ -23,9 +27,119 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+
+interface Notification {
+  id: number;
+  feedbackId: number;
+  notificationType: string;
+  customMessage: string | null;
+  isRead: boolean;
+  createdAt: string;
+  feedbackMessage: string;
+  feedbackCategory: string;
+}
+
+const NOTIFICATION_LABELS: Record<string, { label: string; color: string }> = {
+  investigating: { label: "Being Investigated", color: "text-amber-600 dark:text-amber-400" },
+  resolved: { label: "Issue Resolved", color: "text-green-600 dark:text-green-400" },
+  update: { label: "Update", color: "text-blue-600 dark:text-blue-400" },
+};
+
+function NotificationBell() {
+  const { data: notifications } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+    refetchInterval: 30000,
+  });
+
+  const markAllRead = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/notifications/mark-all-read"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }),
+  });
+
+  const markRead = useMutation({
+    mutationFn: (id: number) => apiRequest("PATCH", `/api/notifications/${id}/read`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }),
+  });
+
+  const unread = (notifications || []).filter(n => !n.isRead);
+  const hasUnread = unread.length > 0;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className="flex items-center gap-3 px-4 py-2.5 w-full rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 relative"
+          data-testid="button-notifications"
+        >
+          <Bell className="w-5 h-5 shrink-0" />
+          <span>Notifications</span>
+          {hasUnread && (
+            <Badge className="ml-auto text-xs h-5 min-w-5 px-1 bg-primary text-primary-foreground">
+              {unread.length}
+            </Badge>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="start" side="right">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <h4 className="font-semibold text-sm">Notifications</h4>
+          {hasUnread && (
+            <button
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+              onClick={() => markAllRead.mutate()}
+              data-testid="button-mark-all-read"
+            >
+              <CheckCheck className="w-3.5 h-3.5" />
+              Mark all read
+            </button>
+          )}
+        </div>
+        <div className="max-h-80 overflow-y-auto">
+          {(!notifications || notifications.length === 0) ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">No notifications yet</div>
+          ) : (
+            notifications.map((n) => {
+              const typeInfo = NOTIFICATION_LABELS[n.notificationType] || { label: n.notificationType, color: "" };
+              return (
+                <div
+                  key={n.id}
+                  className={cn("px-4 py-3 border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors", !n.isRead && "bg-primary/5")}
+                  onClick={() => !n.isRead && markRead.mutate(n.id)}
+                  data-testid={`notification-${n.id}`}
+                >
+                  <div className="flex items-start gap-2">
+                    {!n.isRead && <span className="mt-1 w-2 h-2 bg-primary rounded-full shrink-0" />}
+                    <div className={cn("space-y-0.5", n.isRead && "pl-4")}>
+                      <p className={cn("text-xs font-semibold", typeInfo.color)}>{typeInfo.label}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        Re: "{n.feedbackMessage}"
+                      </p>
+                      {n.customMessage && (
+                        <p className="text-xs text-foreground italic">"{n.customMessage}"</p>
+                      )}
+                      <p className="text-xs text-muted-foreground/70">
+                        {n.createdAt ? format(new Date(n.createdAt), "dd MMM yyyy HH:mm") : ""}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export function LayoutShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -84,6 +198,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="p-4 border-t bg-muted/30 space-y-2">
+        <NotificationBell />
         <FeedbackDialog />
         <button
           onClick={toggleTheme}

@@ -1,4 +1,4 @@
-import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues, leagueManualResults, betaFeedback } from "@shared/schema";
+import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues, leagueManualResults, betaFeedback, feedbackNotifications } from "@shared/schema";
 import { desc } from "drizzle-orm";
 import type { 
   User, InsertUser, 
@@ -11,7 +11,8 @@ import type {
   BoardSession, InsertBoardSession,
   League, InsertLeague,
   LeagueManualResult, InsertLeagueManualResult,
-  BetaFeedback, InsertBetaFeedback
+  BetaFeedback, InsertBetaFeedback,
+  FeedbackNotification
 } from "@shared/schema";
 import { db } from "./db";
 import { pool } from "./db";
@@ -93,6 +94,13 @@ export interface IStorage {
 
   // Beta Feedback
   createBetaFeedback(feedback: InsertBetaFeedback): Promise<BetaFeedback>;
+  updateFeedback(id: number, data: { status?: string; severity?: string | null; adminNote?: string | null }): Promise<BetaFeedback>;
+
+  // Feedback Notifications
+  createFeedbackNotification(data: { feedbackId: number; userId: number; notificationType: string; customMessage?: string | null }): Promise<FeedbackNotification>;
+  getUserNotifications(userId: number): Promise<(FeedbackNotification & { feedbackMessage: string; feedbackCategory: string })[]>;
+  markNotificationRead(id: number, userId: number): Promise<void>;
+  markAllNotificationsRead(userId: number): Promise<void>;
 
   // Admin
   getAllUsersAdmin(): Promise<Array<{ id: number; name: string; email: string; createdAt: Date | null; isSuperUser: boolean }>>;
@@ -407,7 +415,11 @@ export class DatabaseStorage implements IStorage {
         category: betaFeedback.category,
         message: betaFeedback.message,
         page: betaFeedback.page,
+        status: betaFeedback.status,
+        severity: betaFeedback.severity,
+        adminNote: betaFeedback.adminNote,
         createdAt: betaFeedback.createdAt,
+        updatedAt: betaFeedback.updatedAt,
         userName: users.name,
         userEmail: users.email,
       })
@@ -415,6 +427,59 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(betaFeedback.userId, users.id))
       .orderBy(desc(betaFeedback.createdAt));
     return rows;
+  }
+
+  async updateFeedback(id: number, data: { status?: string; severity?: string | null; adminNote?: string | null }): Promise<BetaFeedback> {
+    const [updated] = await db
+      .update(betaFeedback)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(betaFeedback.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createFeedbackNotification(data: { feedbackId: number; userId: number; notificationType: string; customMessage?: string | null }): Promise<FeedbackNotification> {
+    const [notif] = await db.insert(feedbackNotifications).values({
+      feedbackId: data.feedbackId,
+      userId: data.userId,
+      notificationType: data.notificationType,
+      customMessage: data.customMessage ?? null,
+    }).returning();
+    return notif;
+  }
+
+  async getUserNotifications(userId: number): Promise<(FeedbackNotification & { feedbackMessage: string; feedbackCategory: string })[]> {
+    const rows = await db
+      .select({
+        id: feedbackNotifications.id,
+        feedbackId: feedbackNotifications.feedbackId,
+        userId: feedbackNotifications.userId,
+        notificationType: feedbackNotifications.notificationType,
+        customMessage: feedbackNotifications.customMessage,
+        isRead: feedbackNotifications.isRead,
+        createdAt: feedbackNotifications.createdAt,
+        feedbackMessage: betaFeedback.message,
+        feedbackCategory: betaFeedback.category,
+      })
+      .from(feedbackNotifications)
+      .leftJoin(betaFeedback, eq(feedbackNotifications.feedbackId, betaFeedback.id))
+      .where(eq(feedbackNotifications.userId, userId))
+      .orderBy(desc(feedbackNotifications.createdAt));
+    return rows as any;
+  }
+
+  async markNotificationRead(id: number, userId: number): Promise<void> {
+    await db
+      .update(feedbackNotifications)
+      .set({ isRead: true })
+      .where(and(eq(feedbackNotifications.id, id), eq(feedbackNotifications.userId, userId)));
+  }
+
+  async markAllNotificationsRead(userId: number): Promise<void> {
+    await db
+      .update(feedbackNotifications)
+      .set({ isRead: true })
+      .where(eq(feedbackNotifications.userId, userId));
   }
 
   async getAdminStats(): Promise<{
