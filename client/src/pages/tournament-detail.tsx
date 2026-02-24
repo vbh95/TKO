@@ -111,7 +111,7 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
 
   if (isLegacy) {
     return (
-      <div className="mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis" data-testid={`match-scorer-${matchId}`}>
+      <div className="mt-2 pt-2 border-t border-dashed text-[10px] text-muted-foreground uppercase font-bold tracking-wider" data-testid={`match-scorer-${matchId}`}>
         <div className="flex items-center gap-1">
           <ClipboardList className="w-3 h-3" />
           Scorer: N/A
@@ -121,7 +121,7 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
   }
 
   return (
-    <div className="mt-2 pt-2 border-t border-dashed text-xs text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis" data-testid={`match-scorer-${matchId}`}>
+    <div className="mt-2 pt-2 border-t border-dashed text-[10px] text-muted-foreground uppercase font-bold tracking-wider" data-testid={`match-scorer-${matchId}`}>
       {editing ? (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <ClipboardList className="w-3 h-3 shrink-0" />
@@ -1039,7 +1039,7 @@ export default function TournamentDetail() {
                   <CardHeader className="bg-primary py-4">
                     <CardTitle className="text-primary-foreground flex items-center gap-2">
                       <Trophy className="w-5 h-5" />
-                      {group.name} Standings
+                      {group.name}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
