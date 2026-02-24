@@ -274,6 +274,7 @@ export default function TournamentDetail() {
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isRecalcConfirmOpen, setIsRecalcConfirmOpen] = useState(false);
+  const [resetMatchTarget, setResetMatchTarget] = useState<any>(null);
   const [editingKnockoutMatchId, setEditingKnockoutMatchId] = useState<number | null>(null);
   const [liveScorings, setLiveScorings] = useState<Map<number, {
     matchId: number;
@@ -1242,6 +1243,21 @@ export default function TournamentDetail() {
                                   {isEditingThis ? "Done" : "Edit"}
                                 </Button>
                               )}
+                              {match.status === 'COMPLETED' && !tournament.isLegacy && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setResetMatchTarget(match);
+                                  }}
+                                  data-testid={`button-reset-knockout-${match.id}`}
+                                >
+                                  <RefreshCw className="w-3 h-3 mr-1" />
+                                  Reset
+                                </Button>
+                              )}
                               {match.status === 'COMPLETED' && (
                                 <Badge variant="secondary" className="text-xs">Completed</Badge>
                               )}
@@ -1777,6 +1793,37 @@ export default function TournamentDetail() {
           />
         )}
       </div>
+
+      <AlertDialog open={!!resetMatchTarget} onOpenChange={(open) => !open && setResetMatchTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Match</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reset this knockout match? This will clear the result and may also clear any downstream matches that depend on it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-reset-match">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-reset-match"
+              onClick={async () => {
+                if (!resetMatchTarget) return;
+                try {
+                  await apiRequest('PUT', `/api/matches/${resetMatchTarget.id}`, { scoreA: 0, scoreB: 0 });
+                  queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournamentId] });
+                  toast({ title: "Match reset", description: "The match and any downstream matches have been cleared." });
+                } catch (err: any) {
+                  toast({ title: "Error", description: err.message || "Failed to reset match", variant: "destructive" });
+                }
+                setResetMatchTarget(null);
+              }}
+            >
+              Reset Match
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deletePlayerTarget} onOpenChange={(open) => !open && setDeletePlayerTarget(null)}>
         <AlertDialogContent>

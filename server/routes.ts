@@ -260,7 +260,13 @@ async function pickKnockoutScorer(tournamentId: number, excludePlayerIds: number
     const playersList = await storage.getPlayersByTournamentId(tournamentId);
     const allMatches = await storage.getMatchesByTournamentId(tournamentId);
     const knockoutMatches = allMatches.filter(m => m.stage === 'KNOCKOUT');
-    const targetMatch = targetMatchId ? allMatches.find(m => m.id === targetMatchId) : null;
+    const targetMatch = targetMatchId ? knockoutMatches.find(m => m.id === targetMatchId) : null;
+
+    const sorted = [...knockoutMatches].sort((a: any, b: any) => a.order - b.order);
+    const roundKeys: string[] = [];
+    for (const m of sorted) {
+      if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
+    }
 
     const promotedIds = new Set<number>();
     for (const km of knockoutMatches) {
@@ -268,59 +274,63 @@ async function pickKnockoutScorer(tournamentId: number, excludePlayerIds: number
       if (km.playerBId) promotedIds.add(km.playerBId);
     }
 
+    const sameRoundScorerIds = new Set<number>();
+    if (targetMatch) {
+      const sameRoundMatches = knockoutMatches.filter(m => m.roundKey === targetMatch.roundKey && m.id !== targetMatch.id);
+      for (const m of sameRoundMatches) {
+        if (m.scorerId) sameRoundScorerIds.add(m.scorerId);
+      }
+    }
+
+    const isExcluded = (id: number) => excludePlayerIds.includes(id) || sameRoundScorerIds.has(id);
+
     let candidates: any[] = [];
 
-    // CUSTOM LOGIC FOR FINAL: Randomise from semi-finals (excluding final players)
     if (targetMatch) {
-      const sorted = [...knockoutMatches].sort((a: any, b: any) => a.order - b.order);
-      const roundKeys: string[] = [];
-      for (const m of sorted) {
-        if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
-      }
-      const isFinal = roundKeys.indexOf(targetMatch.roundKey) === roundKeys.length - 1;
-      
-      if (isFinal && roundKeys.length >= 2) {
-        const semiFinalKey = roundKeys[roundKeys.length - 2];
-        const semiFinalMatches = knockoutMatches.filter(m => m.roundKey === semiFinalKey);
-        const semiFinalPlayers = semiFinalMatches.flatMap(m => [m.playerAId, m.playerBId].filter(Boolean) as number[]);
-        const sfCandidates = semiFinalPlayers.filter(id => !excludePlayerIds.includes(id));
-        if (sfCandidates.length > 0) {
-          candidates = playersList.filter(p => sfCandidates.includes(p.id));
+      const targetRoundIdx = roundKeys.indexOf(targetMatch.roundKey);
+
+      if (targetRoundIdx === 0) {
+        candidates = playersList.filter(p => !promotedIds.has(p.id) && !isExcluded(p.id));
+      } else {
+        const prevRoundKey = roundKeys[targetRoundIdx - 1];
+        const prevRoundMatches = knockoutMatches.filter(m => m.roundKey === prevRoundKey);
+        const prevRoundLoserIds = new Set<number>();
+        for (const m of prevRoundMatches) {
+          if (m.status === 'COMPLETED' && m.winnerId) {
+            if (m.playerAId && m.playerAId !== m.winnerId) prevRoundLoserIds.add(m.playerAId);
+            if (m.playerBId && m.playerBId !== m.winnerId) prevRoundLoserIds.add(m.playerBId);
+          }
         }
+        candidates = playersList.filter(p => prevRoundLoserIds.has(p.id) && !isExcluded(p.id));
       }
     }
 
     if (candidates.length === 0) {
-      candidates = playersList.filter(p => !promotedIds.has(p.id) && !excludePlayerIds.includes(p.id));
+      candidates = playersList.filter(p => !promotedIds.has(p.id) && !isExcluded(p.id));
     }
 
     if (candidates.length === 0) {
-      const eliminatedIds = new Set<number>();
+      const allEliminatedIds = new Set<number>();
       for (const km of knockoutMatches) {
         if (km.status === 'COMPLETED' && km.winnerId) {
-          if (km.playerAId && km.playerAId !== km.winnerId) eliminatedIds.add(km.playerAId);
-          if (km.playerBId && km.playerBId !== km.winnerId) eliminatedIds.add(km.playerBId);
+          if (km.playerAId && km.playerAId !== km.winnerId) allEliminatedIds.add(km.playerAId);
+          if (km.playerBId && km.playerBId !== km.winnerId) allEliminatedIds.add(km.playerBId);
         }
       }
-      candidates = playersList.filter(p => eliminatedIds.has(p.id) && !excludePlayerIds.includes(p.id));
-      
-      // If still no candidates, fall back to any player not in the match
-      if (candidates.length === 0) {
-        candidates = playersList.filter(p => !excludePlayerIds.includes(p.id));
-      }
+      candidates = playersList.filter(p => allEliminatedIds.has(p.id) && !isExcluded(p.id));
+    }
+
+    if (candidates.length === 0) {
+      candidates = playersList.filter(p => !excludePlayerIds.includes(p.id) && !sameRoundScorerIds.has(p.id));
+    }
+
+    if (candidates.length === 0) {
+      candidates = playersList.filter(p => !excludePlayerIds.includes(p.id));
     }
 
     if (candidates.length === 0) return null;
 
-    let lastScorerId: number | null = null;
-    if (lastScorerMatchId) {
-      const completedMatch = allMatches.find(m => m.id === lastScorerMatchId);
-      if (completedMatch?.scorerId) lastScorerId = completedMatch.scorerId;
-    }
-
-    let pool = candidates.filter(p => p.id !== lastScorerId);
-    if (pool.length === 0) pool = [...candidates];
-    const chosen = pool[Math.floor(Math.random() * pool.length)];
+    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
     return { scorerId: chosen.id, scorerName: chosen.name };
   } catch {
     return null;
@@ -1151,6 +1161,10 @@ export async function registerRoutes(
           shareToken: tournamentData?.shareToken || null,
         });
       } else if (match.stage === 'KNOCKOUT') {
+        if (isReset) {
+          await storage.updateTournament(match.tournamentId, { status: "IN_PROGRESS" });
+        }
+
         const knockoutMatches = await storage.getMatchesByTournamentId(match.tournamentId);
         const koOnly = knockoutMatches.filter(m => m.stage === 'KNOCKOUT');
         const sorted = [...koOnly].sort((a: any, b: any) => a.order - b.order);
@@ -1176,20 +1190,26 @@ export async function registerRoutes(
               const currentVal = isTop ? nm.playerAId : nm.playerBId;
 
               if (currentVal !== mWinnerId) {
-                const nmUpdate: any = isTop ? { playerAId: mWinnerId } : { playerBId: mWinnerId };
+                const nmUpdate: any = isTop ? { playerAId: mWinnerId || null } : { playerBId: mWinnerId || null };
                 nmUpdate.winnerId = null;
                 nmUpdate.status = 'PENDING';
                 nmUpdate.scoreA = 0;
                 nmUpdate.scoreB = 0;
 
-                const exclude = [mWinnerId].filter(Boolean) as number[];
                 const otherPId = isTop ? nm.playerBId : nm.playerAId;
-                if (otherPId) exclude.push(otherPId);
-
-                const scorer = await pickKnockoutScorer(match.tournamentId, exclude, null, nm.id);
-                if (scorer) {
-                  nmUpdate.scorerId = scorer.scorerId;
-                  nmUpdate.scorerName = scorer.scorerName;
+                if (!mWinnerId && !otherPId) {
+                  nmUpdate.scorerId = null;
+                  nmUpdate.scorerName = null;
+                } else {
+                  const exclude = [mWinnerId, otherPId].filter(Boolean) as number[];
+                  const scorer = await pickKnockoutScorer(match.tournamentId, exclude, null, nm.id);
+                  if (scorer) {
+                    nmUpdate.scorerId = scorer.scorerId;
+                    nmUpdate.scorerName = scorer.scorerName;
+                  } else {
+                    nmUpdate.scorerId = null;
+                    nmUpdate.scorerName = null;
+                  }
                 }
 
                 const updatedNm = await storage.updateMatch(nm.id, nmUpdate);
@@ -1611,20 +1631,26 @@ export async function registerRoutes(
                   const currentVal = isTop ? nm.playerAId : nm.playerBId;
 
                   if (currentVal !== mWinnerId) {
-                    const nmUpdate: any = isTop ? { playerAId: mWinnerId } : { playerBId: mWinnerId };
+                    const nmUpdate: any = isTop ? { playerAId: mWinnerId || null } : { playerBId: mWinnerId || null };
                     nmUpdate.winnerId = null;
                     nmUpdate.status = 'PENDING';
                     nmUpdate.scoreA = 0;
                     nmUpdate.scoreB = 0;
 
-                    const exclude = [mWinnerId].filter(Boolean) as number[];
                     const otherPId = isTop ? nm.playerBId : nm.playerAId;
-                    if (otherPId) exclude.push(otherPId);
-
-                    const scorer = await pickKnockoutScorer(tournamentId, exclude, null, nm.id);
-                    if (scorer) {
-                      nmUpdate.scorerId = scorer.scorerId;
-                      nmUpdate.scorerName = scorer.scorerName;
+                    if (!mWinnerId && !otherPId) {
+                      nmUpdate.scorerId = null;
+                      nmUpdate.scorerName = null;
+                    } else {
+                      const exclude = [mWinnerId, otherPId].filter(Boolean) as number[];
+                      const scorer = await pickKnockoutScorer(tournamentId, exclude, null, nm.id);
+                      if (scorer) {
+                        nmUpdate.scorerId = scorer.scorerId;
+                        nmUpdate.scorerName = scorer.scorerName;
+                      } else {
+                        nmUpdate.scorerId = null;
+                        nmUpdate.scorerName = null;
+                      }
                     }
 
                     const updatedNm = await storage.updateMatch(nm.id, nmUpdate);
