@@ -317,11 +317,11 @@ export default function TournamentDetail() {
   });
 
   useEffect(() => {
-    if (tournament) {
-      setRenameName(tournament.name);
-      setSelectedLeagueId(tournament.leagueId?.toString() || "none");
+    if (data?.tournament) {
+      setRenameName(data.tournament.name);
+      setSelectedLeagueId(data.tournament.leagueId?.toString() || "none");
     }
-  }, [tournament]);
+  }, [data?.tournament]);
 
   const addCollaboratorMutation = useMutation({
     mutationFn: async (email: string) => {
@@ -403,7 +403,7 @@ export default function TournamentDetail() {
   const { tournament, players, matches, groups, groupMemberships = [], ownerName = '', isOwner = true, isCollaborator = false } = data as any;
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}/public/t/${tournament.shareToken}`;
+    const url = `${window.location.origin}/public/league/${tournament.shareToken}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
