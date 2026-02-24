@@ -1027,6 +1027,9 @@ export default function TournamentDetail() {
                             </div>
                           </>
                         )}
+                        <div className="px-4 py-1.5 border-t">
+                          <InlineScorerEdit matchId={match.id} tournamentId={tournamentId} currentName={match.scorerName} />
+                        </div>
                       </CardContent>
                     </Card>
                   );
