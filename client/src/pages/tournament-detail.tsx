@@ -106,7 +106,7 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
     if (trimmed === (currentName || '')) return;
     try {
       await apiRequest('PATCH', `/api/matches/${matchId}/scorer`, { scorerName: trimmed || null });
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournamentId] });
     } catch {}
   };
 
@@ -299,7 +299,7 @@ export default function TournamentDetail() {
 
   useEffect(() => {
     const cleanup1 = on("match:updated", () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournamentId] });
     });
     const cleanup2 = on("board:status", (status: { boardNumber: number; online: boolean }) => {
       setBoardStatuses(prev => ({ ...prev, [status.boardNumber]: status.online }));
@@ -311,7 +311,10 @@ export default function TournamentDetail() {
         return next;
       });
     });
-    return () => { cleanup1(); cleanup2(); cleanup3(); };
+    const cleanup4 = on("tournament:updated", () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournamentId] });
+    });
+    return () => { cleanup1(); cleanup2(); cleanup3(); cleanup4(); };
   }, [on, tournamentId]);
 
   if (isLoading || !data) {

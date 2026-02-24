@@ -255,6 +255,36 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
   } catch {}
 }
 
+async function pickKnockoutScorer(tournamentId: number, excludePlayerIds: number[], lastScorerMatchId: number | null): Promise<{ scorerId: number; scorerName: string } | null> {
+  try {
+    const playersList = await storage.getPlayersByTournamentId(tournamentId);
+    const allMatches = await storage.getMatchesByTournamentId(tournamentId);
+    const knockoutMatches = allMatches.filter(m => m.stage === 'KNOCKOUT');
+
+    const promotedIds = new Set<number>();
+    for (const km of knockoutMatches) {
+      if (km.playerAId) promotedIds.add(km.playerAId);
+      if (km.playerBId) promotedIds.add(km.playerBId);
+    }
+
+    const nonPromoted = playersList.filter(p => !promotedIds.has(p.id) && !excludePlayerIds.includes(p.id));
+    if (nonPromoted.length === 0) return null;
+
+    let lastScorerId: number | null = null;
+    if (lastScorerMatchId) {
+      const completedMatch = allMatches.find(m => m.id === lastScorerMatchId);
+      if (completedMatch?.scorerId) lastScorerId = completedMatch.scorerId;
+    }
+
+    let pool = nonPromoted.filter(p => p.id !== lastScorerId);
+    if (pool.length === 0) pool = [...nonPromoted];
+    const chosen = pool[Math.floor(Math.random() * pool.length)];
+    return { scorerId: chosen.id, scorerName: chosen.name };
+  } catch {
+    return null;
+  }
+}
+
 async function backfillKnockoutScorers() {
   try {
     const allTournaments = await storage.getAllTournaments();
@@ -1111,8 +1141,17 @@ export async function registerRoutes(
             if (!nextMatch.boardNumber && (match as any).boardNumber) {
               updateData.boardNumber = (match as any).boardNumber;
             }
+            if (!nextMatch.scorerId) {
+              const excludePlayers = [winnerId];
+              if (nextMatch.playerAId) excludePlayers.push(nextMatch.playerAId);
+              if (nextMatch.playerBId) excludePlayers.push(nextMatch.playerBId);
+              const scorer = await pickKnockoutScorer(match.tournamentId, excludePlayers, id);
+              if (scorer) {
+                updateData.scorerId = scorer.scorerId;
+                updateData.scorerName = scorer.scorerName;
+              }
+            }
             const updatedNextMatch = await storage.updateMatch(nextMatch.id, updateData);
-            // Emit update for the next-round match so boards/spectators see the new player
             try {
               const t = await storage.getTournament(match.tournamentId);
               emitMatchUpdate(match.tournamentId, t?.shareToken || null, updatedNextMatch);
@@ -1526,6 +1565,16 @@ export async function registerRoutes(
                 : { playerBId: winnerId };
               if (!nextMatch.boardNumber && (match as any).boardNumber) {
                 updateData.boardNumber = (match as any).boardNumber;
+              }
+              if (!nextMatch.scorerId) {
+                const excludePlayers = [winnerId];
+                if (nextMatch.playerAId) excludePlayers.push(nextMatch.playerAId);
+                if (nextMatch.playerBId) excludePlayers.push(nextMatch.playerBId);
+                const scorer = await pickKnockoutScorer(tournamentId, excludePlayers, matchId);
+                if (scorer) {
+                  updateData.scorerId = scorer.scorerId;
+                  updateData.scorerName = scorer.scorerName;
+                }
               }
               const updatedNextMatch = await storage.updateMatch(nextMatch.id, updateData);
               emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedNextMatch);

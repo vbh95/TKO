@@ -20,6 +20,7 @@ import {
   RotateCcw,
   Camera,
   ScanLine,
+  RefreshCw,
 } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import tkoLogoWhite from "@assets/TKO_White-04_1771796486840.png";
@@ -69,6 +70,7 @@ interface BoardData {
     roundKey: string | null;
     groupId: number | null;
     order: number;
+    stage: string;
   }>;
   accessToken?: string;
 }
@@ -1084,6 +1086,28 @@ export default function ScorerPage() {
   const bestOf = (tournament.settings as any)?.groupBestOf || 3;
   const legsToWin = Math.ceil(bestOf / 2);
 
+  const getMatchTypeLabel = (match: BoardData['matches'][0]) => {
+    if (match.groupId) return 'Group';
+    const rk = match.roundKey;
+    if (rk === 'F') return 'Final';
+    if (rk === 'SF') return 'Semi-Final';
+    if (rk === 'QF') return 'Quarter-Final';
+    if (rk === 'R16') return 'Round of 16';
+    if (rk === 'R32') return 'Round of 32';
+    if (rk?.startsWith('R')) return `Round ${rk.replace('R', '')}`;
+    return 'Knockout';
+  };
+
+  const getMatchRoundLabel = (match: BoardData['matches'][0]) => {
+    if (match.groupId) {
+      const groupPendingBefore = matches.filter(m => m.groupId === match.groupId && m.order < match.order).length;
+      const playersInGroup = players.length;
+      const roundNumber = playersInGroup > 0 ? Math.floor(groupPendingBefore / Math.max(1, Math.floor(playersInGroup / 2))) + 1 : match.order + 1;
+      return `Group - Round ${roundNumber}`;
+    }
+    return getMatchTypeLabel(match);
+  };
+
   const ptsWin = (tournament.settings as any)?.pointsForWin ?? 2;
   const ptsLoss = (tournament.settings as any)?.pointsForLoss ?? 0;
 
@@ -1270,6 +1294,7 @@ export default function ScorerPage() {
           </div>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center px-6 bg-[#020817]">
+          <p className="text-primary text-xs md:text-sm uppercase tracking-wider font-bold mb-2">{getMatchTypeLabel(activeMatch)} — Best of {matchBestOf}</p>
           <Target className="w-14 h-14 md:w-20 md:h-20 text-yellow-400 mb-4" />
           <h2 className="text-white text-2xl md:text-4xl font-bold mb-1">Throw for the Bull</h2>
           <p className="text-gray-400 text-sm md:text-lg mb-8">Select player to start</p>
@@ -1360,6 +1385,13 @@ export default function ScorerPage() {
             </div>
             <div className="ml-auto flex items-center gap-1.5 md:gap-3 z-10">
               <button
+                onClick={() => refetch()}
+                className="p-1 rounded hover:bg-white/10 transition-colors"
+                data-testid="button-refresh-scorer"
+              >
+                <RefreshCw className="w-3 h-3 text-primary-foreground" />
+              </button>
+              <button
                 onClick={toggleTheme}
                 className="p-1 rounded hover:bg-white/10 transition-colors"
                 data-testid="button-toggle-theme-scorer"
@@ -1393,6 +1425,9 @@ export default function ScorerPage() {
             </div>
           )}
           <div className="text-center py-0.5 md:py-1 shrink-0">
+            <p className="text-primary text-[10px] md:text-sm uppercase tracking-wider font-bold">
+              {getMatchRoundLabel(activeMatch)}
+            </p>
             <p className="text-gray-400 text-[9px] md:text-xs uppercase tracking-wider font-semibold">
               Leg {currentLeg} — Best of {matchBestOf}
             </p>
@@ -1430,14 +1465,14 @@ export default function ScorerPage() {
               >
                 {leftRemaining}
               </div>
-              <div className="mt-1 md:mt-3 lg:mt-4 grid grid-cols-2 gap-x-2 gap-y-0.5 md:gap-y-1 text-[8px] md:text-xs lg:text-sm border-t border-white/10 pt-1 md:pt-2">
+              <div className="mt-1 md:mt-3 lg:mt-4 grid grid-cols-2 gap-x-2 gap-y-0.5 md:gap-y-1 border-t border-white/10 pt-1 md:pt-2">
                 <div className="flex flex-col">
                   <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">3-dart avg</span>
-                  <span className="text-white font-bold tabular-nums">{leftAvg}</span>
+                  <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{leftAvg}</span>
                 </div>
                 <div className="flex flex-col items-end">
                   <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">Last score</span>
-                  <span className="text-white font-bold tabular-nums">{leftLastScore !== null ? leftLastScore : '-'}</span>
+                  <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{leftLastScore !== null ? leftLastScore : '-'}</span>
                 </div>
               </div>
             </div>
@@ -1468,14 +1503,14 @@ export default function ScorerPage() {
               >
                 {rightRemaining}
               </div>
-              <div className="mt-1 md:mt-3 lg:mt-4 grid grid-cols-2 gap-x-2 gap-y-0.5 md:gap-y-1 text-[8px] md:text-xs lg:text-sm border-t border-white/10 pt-1 md:pt-2">
+              <div className="mt-1 md:mt-3 lg:mt-4 grid grid-cols-2 gap-x-2 gap-y-0.5 md:gap-y-1 border-t border-white/10 pt-1 md:pt-2">
                 <div className="flex flex-col">
                   <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">3-dart avg</span>
-                  <span className="text-white font-bold tabular-nums">{rightAvg}</span>
+                  <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{rightAvg}</span>
                 </div>
                 <div className="flex flex-col items-end">
                   <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">Last score</span>
-                  <span className="text-white font-bold tabular-nums">{rightLastScore !== null ? rightLastScore : '-'}</span>
+                  <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{rightLastScore !== null ? rightLastScore : '-'}</span>
                 </div>
               </div>
             </div>
@@ -1586,15 +1621,17 @@ export default function ScorerPage() {
                   data-testid="text-input-value"
                 >
                   <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
-                  {inputValue && (
-                    <button
-                      className="ml-2 p-1 touch-manipulation active:scale-90 transition-transform"
-                      onClick={() => setInputValue(prev => prev.slice(0, -1))}
-                      data-testid="button-backspace"
-                    >
-                      <Delete className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
-                    </button>
-                  )}
+                  <button
+                    className={cn(
+                      "ml-1 p-2 md:p-3 rounded-lg touch-manipulation active:scale-90 active:bg-red-900/30 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center",
+                      inputValue ? "bg-red-900/20 border border-red-800/30" : "opacity-30 pointer-events-none"
+                    )}
+                    onClick={() => setInputValue(prev => prev.slice(0, -1))}
+                    disabled={!inputValue}
+                    data-testid="button-backspace"
+                  >
+                    <Delete className="w-5 h-5 md:w-7 md:h-7 text-red-400" />
+                  </button>
                 </div>
               </div>
 
@@ -1812,6 +1849,13 @@ export default function ScorerPage() {
             </div>
             <div className="flex items-center gap-2">
               <button
+                onClick={() => refetch()}
+                className="p-1.5 rounded hover:bg-white/10 transition-colors"
+                data-testid="button-refresh-scorer-list"
+              >
+                <RefreshCw className="w-4 h-4 text-primary-foreground" />
+              </button>
+              <button
                 onClick={toggleTheme}
                 className="p-1.5 rounded hover:bg-white/10 transition-colors"
                 data-testid="button-toggle-theme-scorer-list"
@@ -1846,6 +1890,7 @@ export default function ScorerPage() {
               <CardTitle className="text-lg flex items-center gap-2">
                 <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
                 Now Playing
+                <Badge variant="secondary" className="ml-auto text-xs">{getMatchTypeLabel(inProgressMatch)}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 pb-4">
@@ -1860,7 +1905,7 @@ export default function ScorerPage() {
                   <p className="text-3xl font-bold text-primary mt-2 tabular-nums">{inProgressMatch.scoreB || 0}</p>
                 </div>
               </div>
-              <p className="text-center text-sm text-muted-foreground mb-4">Best of {inProgressMatch.bestOf} (first to {legsToWin})</p>
+              <p className="text-center text-sm text-muted-foreground mb-4">Best of {inProgressMatch.bestOf} (first to {Math.ceil((inProgressMatch.bestOf || bestOf) / 2)})</p>
               <Button
                 className="w-full h-14 text-lg"
                 data-testid="button-resume-scoring"
@@ -1878,19 +1923,22 @@ export default function ScorerPage() {
               <CardTitle className="text-lg flex items-center gap-2">
                 <Play className="w-5 h-5 text-primary" />
                 Next Up
+                <Badge variant="secondary" className="ml-auto text-xs">{getMatchTypeLabel(pendingMatches[0])}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 pb-4">
               <div className="flex items-center justify-between text-center mb-4">
                 <div className="flex-1">
+                  <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">{getMatchTypeLabel(pendingMatches[0])}</p>
                   <p className="text-xl font-bold">{getPlayer(pendingMatches[0].playerAId)?.name || "TBD"}</p>
                 </div>
                 <div className="text-muted-foreground text-sm uppercase font-medium px-4">vs</div>
                 <div className="flex-1">
+                  <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">{getMatchTypeLabel(pendingMatches[0])}</p>
                   <p className="text-xl font-bold">{getPlayer(pendingMatches[0].playerBId)?.name || "TBD"}</p>
                 </div>
               </div>
-              <p className="text-center text-sm text-muted-foreground mb-4">Best of {pendingMatches[0].bestOf} (first to {legsToWin})</p>
+              <p className="text-center text-sm text-muted-foreground mb-4">Best of {pendingMatches[0].bestOf} (first to {Math.ceil((pendingMatches[0].bestOf || bestOf) / 2)})</p>
               <Button
                 className="w-full h-14 text-lg"
                 onClick={() => handleTapMatch(pendingMatches[0].id)}
@@ -1943,10 +1991,13 @@ export default function ScorerPage() {
                     disabled={!!inProgressMatch || startMatchMutation.isPending}
                     data-testid={`button-upcoming-match-${match.id}`}
                   >
-                    <div className="flex-1 flex items-center justify-center gap-3 text-center">
-                      <span className="flex-1 font-medium text-right">{getPlayer(match.playerAId)?.name || "TBD"}</span>
-                      <span className="text-muted-foreground text-sm shrink-0">vs</span>
-                      <span className="flex-1 font-medium text-left">{getPlayer(match.playerBId)?.name || "TBD"}</span>
+                    <div className="flex-1 flex flex-col items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground uppercase font-semibold">{getMatchTypeLabel(match)}</span>
+                      <div className="flex items-center justify-center gap-3 text-center w-full">
+                        <span className="flex-1 font-medium text-right">{getPlayer(match.playerAId)?.name || "TBD"}</span>
+                        <span className="text-muted-foreground text-sm shrink-0">vs</span>
+                        <span className="flex-1 font-medium text-left">{getPlayer(match.playerBId)?.name || "TBD"}</span>
+                      </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground ml-3 shrink-0" />
                   </button>
