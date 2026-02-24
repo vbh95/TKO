@@ -1151,14 +1151,10 @@ export async function registerRoutes(
                 updateData.scorerName = scorer.scorerName;
               }
             }
+            if (!updateData.boardNumber && !nextMatch.boardNumber) {
+              updateData.boardNumber = 1;
+            }
             const updatedNextMatch = await storage.updateMatch(nextMatch.id, updateData);
-            try {
-              const t = await storage.getTournament(match.tournamentId);
-              emitMatchUpdate(match.tournamentId, t?.shareToken || null, updatedNextMatch);
-              if ((updatedNextMatch as any).boardNumber) {
-                emitBoardMatchUpdate(match.tournamentId, (updatedNextMatch as any).boardNumber, updatedNextMatch);
-              }
-            } catch {}
           }
         }
       }
@@ -1186,19 +1182,25 @@ export async function registerRoutes(
       console.error("Auto-complete error (non-fatal):", completeError);
     }
 
-    // Emit real-time updates
+    // Emit real-time updates AFTER all progression/DB writes are complete
     try {
       const tournamentForEmit = await storage.getTournament(match.tournamentId);
       emitMatchUpdate(match.tournamentId, tournamentForEmit?.shareToken || null, updatedMatch);
-      if (match.groupId) {
-        const groupsList = await storage.getGroupsByTournamentId(match.tournamentId);
-        const sortedGroups = groupsList.sort((a, b) => a.name.localeCompare(b.name));
-        const boardIdx = sortedGroups.findIndex(g => g.id === match.groupId);
-        if (boardIdx >= 0) {
-          emitBoardMatchUpdate(match.tournamentId, boardIdx + 1, updatedMatch);
+      const allGroups = await storage.getGroupsByTournamentId(match.tournamentId);
+      if (updatedMatch.status === 'COMPLETED') {
+        for (let b = 1; b <= allGroups.length; b++) {
+          emitBoardMatchUpdate(match.tournamentId, b, updatedMatch);
         }
-      } else if ((updatedMatch as any).boardNumber) {
-        emitBoardMatchUpdate(match.tournamentId, (updatedMatch as any).boardNumber, updatedMatch);
+      } else {
+        if (match.groupId) {
+          const sortedGroups = allGroups.sort((a, b) => a.name.localeCompare(b.name));
+          const boardIdx = sortedGroups.findIndex(g => g.id === match.groupId);
+          if (boardIdx >= 0) {
+            emitBoardMatchUpdate(match.tournamentId, boardIdx + 1, updatedMatch);
+          }
+        } else if ((updatedMatch as any).boardNumber) {
+          emitBoardMatchUpdate(match.tournamentId, (updatedMatch as any).boardNumber, updatedMatch);
+        }
       }
     } catch (emitError) {
       console.error("WebSocket emit error (non-fatal):", emitError);
@@ -1576,11 +1578,10 @@ export async function registerRoutes(
                   updateData.scorerName = scorer.scorerName;
                 }
               }
-              const updatedNextMatch = await storage.updateMatch(nextMatch.id, updateData);
-              emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedNextMatch);
-              if ((updatedNextMatch as any).boardNumber) {
-                emitBoardMatchUpdate(tournamentId, (updatedNextMatch as any).boardNumber, updatedNextMatch);
+              if (!updateData.boardNumber && !nextMatch.boardNumber) {
+                updateData.boardNumber = 1;
               }
+              const updatedNextMatch = await storage.updateMatch(nextMatch.id, updateData);
             }
           }
         } catch (progressionError) {
@@ -1608,8 +1609,16 @@ export async function registerRoutes(
         }
       }
 
+      // Emit AFTER all progression/DB writes are complete — broadcast to ALL boards
       emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
-      emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
+      if (status === "COMPLETED") {
+        const allGroups = await storage.getGroupsByTournamentId(tournamentId);
+        for (let b = 1; b <= allGroups.length; b++) {
+          emitBoardMatchUpdate(tournamentId, b, updatedMatch);
+        }
+      } else {
+        emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
+      }
 
       res.json(updatedMatch);
     } catch (err) {
