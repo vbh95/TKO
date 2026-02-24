@@ -952,6 +952,15 @@ export default function TournamentDetail() {
               Tablet Scoring
             </Button>
             <Button
+              variant={tournament.shareEnabled ? "default" : "outline"}
+              className="w-full sm:w-auto gap-2 shadow-sm"
+              onClick={tournament.shareEnabled ? handleCopyLink : () => setIsSettingsDialogOpen(true)}
+              data-testid="button-share-public"
+            >
+              <Share2 className="w-4 h-4" />
+              Share Public Page
+            </Button>
+            <Button
               variant="outline"
               className="w-full sm:w-auto gap-2 shadow-sm"
               onClick={() => setIsSettingsDialogOpen(true)}
@@ -960,17 +969,6 @@ export default function TournamentDetail() {
               <Settings className="w-4 h-4" />
               Settings & Features
             </Button>
-            {tournament.shareEnabled && (
-              <Button
-                variant="default"
-                className="w-full sm:w-auto gap-2 shadow-md"
-                onClick={handleCopyLink}
-                data-testid="button-share-public"
-              >
-                <Share2 className="w-4 h-4" />
-                Share Public Page
-              </Button>
-            )}
           </div>
         </div>
 
