@@ -1471,6 +1471,8 @@ export default function TournamentDetail() {
           tournamentId={tournamentId}
           setLocation={setLocation}
           setIsDevicesDialogOpen={setIsDevicesDialogOpen}
+          enableShare={enableShare}
+          disableShare={disableShare}
           toast={toast}
         />
 
@@ -1515,7 +1517,7 @@ function TournamentSettingsDialog({
   renameName, setRenameName,
   collaborators, newCollabEmail, setNewCollabEmail,
   addCollaboratorMutation, removeCollaboratorMutation, deleteTournamentMutation,
-  tournamentId, setLocation, setIsDevicesDialogOpen, toast,
+  tournamentId, setLocation, setIsDevicesDialogOpen, enableShare, disableShare, toast,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -1537,11 +1539,14 @@ function TournamentSettingsDialog({
   tournamentId: number;
   setLocation: (path: string) => void;
   setIsDevicesDialogOpen: (open: boolean) => void;
+  enableShare: any;
+  disableShare: any;
   toast: any;
 }) {
   const [savingName, setSavingName] = useState(false);
   const [savingLeague, setSavingLeague] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [sharecopied, setShareCopied] = useState(false);
 
   const handleSaveName = async () => {
     if (!renameName.trim()) return;
@@ -1627,6 +1632,66 @@ function TournamentSettingsDialog({
                 </Select>
                 <Button size="sm" onClick={handleSaveLeague} disabled={savingLeague} data-testid="button-settings-save-league">
                   {savingLeague ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Public Sharing */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">Public Sharing</Label>
+            {tournament.shareEnabled && tournament.shareToken ? (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Your public spectator page is live. Share the link below.</p>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={`${window.location.origin}/public/t/${tournament.shareToken}`}
+                    className="text-xs h-8"
+                    data-testid="input-settings-share-url"
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/public/t/${tournament.shareToken}`);
+                      setShareCopied(true);
+                      setTimeout(() => setShareCopied(false), 2000);
+                      toast({ title: "Link copied!" });
+                    }}
+                    data-testid="button-settings-copy-share"
+                  >
+                    {sharecopied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 shrink-0 text-destructive border-destructive/30 hover:bg-destructive/10"
+                    onClick={() => disableShare.mutate()}
+                    disabled={disableShare.isPending}
+                    data-testid="button-settings-disable-share"
+                  >
+                    <Lock className="w-3 h-3 mr-1" />
+                    Disable
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Allow anyone with the link to view scores and standings in real time.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => enableShare.mutate()}
+                  disabled={enableShare.isPending}
+                  data-testid="button-settings-enable-share"
+                >
+                  {enableShare.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
+                  Enable Public Page
                 </Button>
               </div>
             )}
