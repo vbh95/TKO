@@ -1474,11 +1474,14 @@ export default function TournamentDetail() {
           toast={toast}
         />
 
-        <DevicesDialog
+        <BoardSessionsDialog
           open={isDevicesDialogOpen}
           onOpenChange={setIsDevicesDialogOpen}
-          tournamentId={tournamentId}
+          tournament={tournament}
+          groups={groups}
+          enableShare={enableShare}
           toast={toast}
+          boardStatuses={boardStatuses}
         />
 
         <AlertDialog open={!!resetMatchTarget} onOpenChange={(open) => !open && setResetMatchTarget(null)}>
