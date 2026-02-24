@@ -1,8 +1,9 @@
-import { users, tournaments, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues, leagueManualResults, betaFeedback, feedbackNotifications } from "@shared/schema";
+import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues, leagueManualResults, betaFeedback, feedbackNotifications } from "@shared/schema";
 import { desc } from "drizzle-orm";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
+  TournamentCollaborator,
   Player, InsertPlayer,
   Group, InsertGroup,
   GroupMembership, InsertGroupMembership,
@@ -91,6 +92,13 @@ export interface IStorage {
   getLeagueManualResults(leagueId: number): Promise<LeagueManualResult[]>;
   createLeagueManualResult(result: InsertLeagueManualResult): Promise<LeagueManualResult>;
   deleteLeagueManualResult(id: number): Promise<void>;
+
+  // Tournament Collaborators
+  getTournamentCollaborators(tournamentId: number): Promise<Array<TournamentCollaborator & { name: string; email: string }>>;
+  addTournamentCollaborator(tournamentId: number, userId: number, invitedByUserId: number): Promise<TournamentCollaborator>;
+  removeTournamentCollaborator(tournamentId: number, userId: number): Promise<void>;
+  isTournamentCollaborator(tournamentId: number, userId: number): Promise<boolean>;
+  getCollaboratedTournamentsByUserId(userId: number): Promise<Tournament[]>;
 
   // Beta Feedback
   createBetaFeedback(feedback: InsertBetaFeedback): Promise<BetaFeedback>;
@@ -540,6 +548,55 @@ export class DatabaseStorage implements IStorage {
     await db.delete(boardSessions).where(eq(boardSessions.tournamentId, tournamentId));
     await db.delete(matches).where(eq(matches.tournamentId, tournamentId));
     await db.delete(groups).where(eq(groups.tournamentId, tournamentId));
+  }
+
+  async getTournamentCollaborators(tournamentId: number): Promise<Array<TournamentCollaborator & { name: string; email: string }>> {
+    const rows = await db
+      .select({
+        id: tournamentCollaborators.id,
+        tournamentId: tournamentCollaborators.tournamentId,
+        userId: tournamentCollaborators.userId,
+        invitedByUserId: tournamentCollaborators.invitedByUserId,
+        createdAt: tournamentCollaborators.createdAt,
+        name: users.name,
+        email: users.email,
+      })
+      .from(tournamentCollaborators)
+      .innerJoin(users, eq(tournamentCollaborators.userId, users.id))
+      .where(eq(tournamentCollaborators.tournamentId, tournamentId));
+    return rows;
+  }
+
+  async addTournamentCollaborator(tournamentId: number, userId: number, invitedByUserId: number): Promise<TournamentCollaborator> {
+    const [row] = await db
+      .insert(tournamentCollaborators)
+      .values({ tournamentId, userId, invitedByUserId })
+      .returning();
+    return row;
+  }
+
+  async removeTournamentCollaborator(tournamentId: number, userId: number): Promise<void> {
+    await db
+      .delete(tournamentCollaborators)
+      .where(and(eq(tournamentCollaborators.tournamentId, tournamentId), eq(tournamentCollaborators.userId, userId)));
+  }
+
+  async isTournamentCollaborator(tournamentId: number, userId: number): Promise<boolean> {
+    const [row] = await db
+      .select({ id: tournamentCollaborators.id })
+      .from(tournamentCollaborators)
+      .where(and(eq(tournamentCollaborators.tournamentId, tournamentId), eq(tournamentCollaborators.userId, userId)));
+    return !!row;
+  }
+
+  async getCollaboratedTournamentsByUserId(userId: number): Promise<Tournament[]> {
+    const rows = await db
+      .select({ tournament: tournaments })
+      .from(tournamentCollaborators)
+      .innerJoin(tournaments, eq(tournamentCollaborators.tournamentId, tournaments.id))
+      .where(eq(tournamentCollaborators.userId, userId))
+      .orderBy(desc(tournaments.updatedAt));
+    return rows.map(r => r.tournament);
   }
 }
 

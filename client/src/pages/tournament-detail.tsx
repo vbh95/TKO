@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { QRCodeSVG } from "qrcode.react";
 import { useTournament, useTournamentShare, useBulkUpdatePlayers, useDeleteTournament } from "@/hooks/use-tournaments";
+import { useUser } from "@/hooks/use-auth";
 import { calcStandings } from "@/lib/standings";
 import { LayoutShell } from "@/components/layout-shell";
 import { MatchScoreInput } from "@/components/match-score-input";
@@ -29,7 +30,10 @@ import {
   Download,
   ClipboardList,
   Plus,
-  RefreshCw
+  RefreshCw,
+  UserPlus,
+  X,
+  UserCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -250,8 +254,11 @@ export default function TournamentDetail() {
     queryKey: ['/api/leagues'],
   });
 
+  const { data: currentUser } = useUser();
   const { joinTournament, on, socket } = useSocket();
   const [boardStatuses, setBoardStatuses] = useState<Record<number, boolean>>({});
+  const [newCollabEmail, setNewCollabEmail] = useState("");
+  const [addingCollab, setAddingCollab] = useState(false);
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [copied, setCopied] = useState(false);
@@ -293,6 +300,59 @@ export default function TournamentDetail() {
     lastScoreA: number | null;
     lastScoreB: number | null;
   }>>(new Map());
+
+  const { data: collaborators = [] } = useQuery<Array<{ id: number; userId: number; name: string; email: string; invitedByUserId: number | null; createdAt: string | null }>>({
+    queryKey: ['/api/tournaments/:id/collaborators', tournamentId],
+    queryFn: async () => {
+      const res = await fetch(`/api/tournaments/${tournamentId}/collaborators`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!tournamentId,
+  });
+
+  const addCollaboratorMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await fetch(`/api/tournaments/${tournamentId}/collaborators`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to add co-admin');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id/collaborators', tournamentId] });
+      setNewCollabEmail("");
+      toast({ title: "Co-admin added", description: "They can now manage this tournament." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not add co-admin", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const removeCollaboratorMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await fetch(`/api/tournaments/${tournamentId}/collaborators/${userId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to remove co-admin');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id/collaborators', tournamentId] });
+      toast({ title: "Co-admin removed" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not remove co-admin", description: err.message, variant: "destructive" });
+    },
+  });
 
   useEffect(() => {
     if (tournamentId) joinTournament(tournamentId);
@@ -1778,6 +1838,84 @@ export default function TournamentDetail() {
                 </Card>
               );
             })()}
+
+            {currentUser && tournament.userId === currentUser.id && (
+              <Card className="mt-4 border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-primary" />
+                    Co-Admins
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">Invite other TKO users to help run this tournament. Co-admins can manage players, score matches, and use tablets.</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {collaborators.length > 0 && (
+                    <div className="space-y-2">
+                      {collaborators.map((collab) => (
+                        <div key={collab.userId} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/40">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-xs font-bold text-primary">{collab.name.charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate" data-testid={`text-collab-name-${collab.userId}`}>{collab.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{collab.email}</p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                            onClick={() => removeCollaboratorMutation.mutate(collab.userId)}
+                            disabled={removeCollaboratorMutation.isPending}
+                            data-testid={`button-remove-collab-${collab.userId}`}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter their TKO email address..."
+                      value={newCollabEmail}
+                      onChange={(e) => setNewCollabEmail(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newCollabEmail.trim()) {
+                          addCollaboratorMutation.mutate(newCollabEmail.trim());
+                        }
+                      }}
+                      className="h-9 text-sm"
+                      data-testid="input-collab-email"
+                    />
+                    <Button
+                      size="sm"
+                      className="h-9 shrink-0"
+                      onClick={() => { if (newCollabEmail.trim()) addCollaboratorMutation.mutate(newCollabEmail.trim()); }}
+                      disabled={!newCollabEmail.trim() || addCollaboratorMutation.isPending}
+                      data-testid="button-add-collab"
+                    >
+                      {addCollaboratorMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4 mr-1.5" />
+                          Add
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {currentUser && tournament.userId !== currentUser.id && (
+              <div className="mt-4 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/20 text-sm text-muted-foreground">
+                <UserCheck className="w-4 h-4 text-primary shrink-0" />
+                <span>You are a <span className="font-medium text-foreground">co-admin</span> on this tournament.</span>
+              </div>
+            )}
               </TabsContent>
             </Tabs>
           );

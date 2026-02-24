@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Plus, Search, Trophy, ArrowUpDown, Calendar, ChevronRight, Trash2 } from "lucide-react";
+import { Plus, Search, Trophy, ArrowUpDown, Calendar, ChevronRight, Trash2, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -64,9 +64,10 @@ function sortTournaments(list: any[], sortBy: SortOption) {
   });
 }
 
-function TournamentListRow({ tournament }: { tournament: Tournament }) {
+function TournamentListRow({ tournament }: { tournament: Tournament & { isCollaborator?: boolean; isOwner?: boolean } }) {
   const { toast } = useToast();
   const deleteMutation = useDeleteTournament();
+  const isCollaborator = (tournament as any).isCollaborator === true;
   const dateStr = tournament.eventDate
     ? format(new Date(tournament.eventDate + 'T00:00:00'), 'MMM d, yyyy')
     : tournament.createdAt
@@ -100,6 +101,12 @@ function TournamentListRow({ tournament }: { tournament: Tournament }) {
         </div>
       </Link>
       <div className="flex items-center gap-2 shrink-0">
+        {isCollaborator && (
+          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 text-xs gap-1">
+            <UserCheck className="w-3 h-3" />
+            CO-ADMIN
+          </Badge>
+        )}
         {tournament.isLegacy && (
           <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 text-xs">
             LEGACY
@@ -110,37 +117,39 @@ function TournamentListRow({ tournament }: { tournament: Tournament }) {
             COMPLETED
           </Badge>
         )}
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-              data-testid={`button-delete-list-tournament-${tournament.id}`}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Tournament</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete "{tournament.name}"? This will permanently remove the tournament, all players, matches, and results. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                data-testid="button-confirm-delete"
-                disabled={deleteMutation.isPending}
+        {!isCollaborator && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                data-testid={`button-delete-list-tournament-${tournament.id}`}
               >
-                {deleteMutation.isPending ? "Deleting..." : "Delete"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Tournament</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete "{tournament.name}"? This will permanently remove the tournament, all players, matches, and results. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  data-testid="button-confirm-delete"
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
         <Link href={`/tournaments/${tournament.id}`}>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>

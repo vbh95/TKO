@@ -76,6 +76,19 @@ export const insertTournamentSchema = createInsertSchema(tournaments).omit({
   updatedAt: true 
 });
 
+// === TOURNAMENT COLLABORATORS ===
+export const tournamentCollaborators = pgTable("tournament_collaborators", {
+  id: serial("id").primaryKey(),
+  tournamentId: integer("tournament_id").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  invitedByUserId: integer("invited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTournamentCollaboratorSchema = createInsertSchema(tournamentCollaborators).omit({ id: true, createdAt: true });
+export type TournamentCollaborator = typeof tournamentCollaborators.$inferSelect;
+export type InsertTournamentCollaborator = z.infer<typeof insertTournamentCollaboratorSchema>;
+
 // === PLAYERS ===
 export const players = pgTable("players", {
   id: serial("id").primaryKey(),
@@ -191,6 +204,13 @@ export const tournamentsRelations = relations(tournaments, ({ one, many }) => ({
   groups: many(groups),
   matches: many(matches),
   boardSessions: many(boardSessions),
+  collaborators: many(tournamentCollaborators),
+}));
+
+export const tournamentCollaboratorsRelations = relations(tournamentCollaborators, ({ one }) => ({
+  tournament: one(tournaments, { fields: [tournamentCollaborators.tournamentId], references: [tournaments.id] }),
+  user: one(users, { fields: [tournamentCollaborators.userId], references: [users.id] }),
+  invitedBy: one(users, { fields: [tournamentCollaborators.invitedByUserId], references: [users.id], relationName: "invitedBy" }),
 }));
 
 export const groupsRelations = relations(groups, ({ one, many }) => ({

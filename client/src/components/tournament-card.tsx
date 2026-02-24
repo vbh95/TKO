@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Trophy, Calendar, Users, ArrowRight, Trash2, Settings, Loader2, AlertTriangle, Medal } from "lucide-react";
+import { Trophy, Calendar, Users, ArrowRight, Trash2, Settings, Loader2, AlertTriangle, Medal, UserCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,11 +34,12 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Tournament } from "@shared/schema";
 
-export function TournamentCard({ tournament }: { tournament: Tournament }) {
+export function TournamentCard({ tournament }: { tournament: Tournament & { isCollaborator?: boolean; isOwner?: boolean } }) {
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const deleteMutation = useDeleteTournament();
   const { toast } = useToast();
+  const isCollaborator = (tournament as any).isCollaborator === true;
 
   const { data: leaguesList = [] } = useQuery<Array<{ id: number; name: string }>>({
     queryKey: ['/api/leagues'],
@@ -94,6 +95,12 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {isCollaborator && (
+              <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 gap-1 text-xs">
+                <UserCheck className="w-3 h-3" />
+                CO-ADMIN
+              </Badge>
+            )}
             {tournament.isLegacy ? (
               <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
                 LEGACY
@@ -112,38 +119,40 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
             >
               <Settings className="w-4 h-4" />
             </Button>
-            <AlertDialog open={open} onOpenChange={setOpen}>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  data-testid={`button-delete-tournament-${tournament.id}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Tournament</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete "{tournament.name}"? This will permanently remove the tournament, all players, matches, and results. This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    data-testid="button-confirm-delete"
-                    disabled={deleteMutation.isPending}
+            {!isCollaborator && (
+              <AlertDialog open={open} onOpenChange={setOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    data-testid={`button-delete-tournament-${tournament.id}`}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {deleteMutation.isPending ? "Deleting..." : "Delete"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Tournament</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete "{tournament.name}"? This will permanently remove the tournament, all players, matches, and results. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      data-testid="button-confirm-delete"
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
 
