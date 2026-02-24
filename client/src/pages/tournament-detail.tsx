@@ -1033,17 +1033,21 @@ export default function TournamentDetail() {
           </TabsContent>
 
           <TabsContent value="standings" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {groupStandings.map(({ group, standings }) => (
-                <Card key={group.name} className="shadow-md overflow-hidden">
-                  <CardHeader className="bg-primary py-4">
-                    <CardTitle className="text-primary-foreground flex items-center gap-2">
-                      <Trophy className="w-5 h-5" />
-                      {group.name}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <Table>
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center gap-2 px-1">
+                <Trophy className="w-6 h-6 text-primary" />
+                <h2 className="text-2xl font-bold tracking-tight">Group Standings</h2>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {groupStandings.map(({ group, standings }) => (
+                  <Card key={group.name} className="shadow-md overflow-hidden">
+                    <CardHeader className="bg-primary py-4">
+                      <CardTitle className="text-primary-foreground flex items-center gap-2 text-lg">
+                        {group.name}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
                       <TableHeader className="bg-muted/50">
                         <TableRow>
                           <TableHead className="w-[50px]">#</TableHead>
@@ -1092,6 +1096,7 @@ export default function TournamentDetail() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
             </div>
           </TabsContent>
 
