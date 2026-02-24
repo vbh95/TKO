@@ -33,7 +33,11 @@ import {
   RefreshCw,
   UserPlus,
   X,
-  UserCheck
+  UserCheck,
+  Calendar,
+  Lock,
+  Unlock,
+  Link as LinkIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +60,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -303,6 +315,13 @@ export default function TournamentDetail() {
     },
     enabled: !!tournamentId,
   });
+
+  useEffect(() => {
+    if (tournament) {
+      setRenameName(tournament.name);
+      setSelectedLeagueId(tournament.leagueId?.toString() || "none");
+    }
+  }, [tournament]);
 
   const addCollaboratorMutation = useMutation({
     mutationFn: async (email: string) => {
@@ -922,6 +941,37 @@ export default function TournamentDetail() {
               </div>
             )}
           </div>
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto gap-2 shadow-sm"
+              onClick={() => setIsDevicesDialogOpen(true)}
+              data-testid="button-tablet-scoring"
+            >
+              <TabletSmartphone className="w-4 h-4" />
+              Tablet Scoring
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto gap-2 shadow-sm"
+              onClick={() => setIsSettingsDialogOpen(true)}
+              data-testid="button-tournament-settings"
+            >
+              <Settings className="w-4 h-4" />
+              Settings & Features
+            </Button>
+            {tournament.shareEnabled && (
+              <Button
+                variant="default"
+                className="w-full sm:w-auto gap-2 shadow-md"
+                onClick={handleCopyLink}
+                data-testid="button-share-public"
+              >
+                <Share2 className="w-4 h-4" />
+                Share Public Page
+              </Button>
+            )}
+          </div>
         </div>
 
         <Tabs defaultValue="live" className="space-y-6">
@@ -1400,6 +1450,37 @@ export default function TournamentDetail() {
           />
         )}
 
+        <TournamentSettingsDialog
+          open={isSettingsDialogOpen}
+          onOpenChange={setIsSettingsDialogOpen}
+          tournament={tournament}
+          isOwner={isOwner}
+          isCollaborator={isCollaborator}
+          ownerName={ownerName}
+          leaguesList={leaguesList}
+          selectedLeagueId={selectedLeagueId}
+          setSelectedLeagueId={setSelectedLeagueId}
+          renameName={renameName}
+          setRenameName={setRenameName}
+          collaborators={collaborators}
+          newCollabEmail={newCollabEmail}
+          setNewCollabEmail={setNewCollabEmail}
+          addCollaboratorMutation={addCollaboratorMutation}
+          removeCollaboratorMutation={removeCollaboratorMutation}
+          deleteTournamentMutation={deleteTournamentMutation}
+          tournamentId={tournamentId}
+          setLocation={setLocation}
+          setIsDevicesDialogOpen={setIsDevicesDialogOpen}
+          toast={toast}
+        />
+
+        <DevicesDialog
+          open={isDevicesDialogOpen}
+          onOpenChange={setIsDevicesDialogOpen}
+          tournamentId={tournamentId}
+          toast={toast}
+        />
+
         <AlertDialog open={!!resetMatchTarget} onOpenChange={(open) => !open && setResetMatchTarget(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -1422,5 +1503,429 @@ export default function TournamentDetail() {
         </AlertDialog>
       </div>
     </LayoutShell>
+  );
+}
+
+function TournamentSettingsDialog({
+  open, onOpenChange, tournament, isOwner, isCollaborator, ownerName,
+  leaguesList, selectedLeagueId, setSelectedLeagueId,
+  renameName, setRenameName,
+  collaborators, newCollabEmail, setNewCollabEmail,
+  addCollaboratorMutation, removeCollaboratorMutation, deleteTournamentMutation,
+  tournamentId, setLocation, setIsDevicesDialogOpen, toast,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  tournament: any;
+  isOwner: boolean;
+  isCollaborator: boolean;
+  ownerName: string;
+  leaguesList: Array<{ id: number; name: string }>;
+  selectedLeagueId: string;
+  setSelectedLeagueId: (v: string) => void;
+  renameName: string;
+  setRenameName: (v: string) => void;
+  collaborators: Array<{ id: number; userId: number; name: string; email: string }>;
+  newCollabEmail: string;
+  setNewCollabEmail: (v: string) => void;
+  addCollaboratorMutation: any;
+  removeCollaboratorMutation: any;
+  deleteTournamentMutation: any;
+  tournamentId: number;
+  setLocation: (path: string) => void;
+  setIsDevicesDialogOpen: (open: boolean) => void;
+  toast: any;
+}) {
+  const [savingName, setSavingName] = useState(false);
+  const [savingLeague, setSavingLeague] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleSaveName = async () => {
+    if (!renameName.trim()) return;
+    setSavingName(true);
+    try {
+      await apiRequest('PUT', `/api/tournaments/${tournamentId}`, { name: renameName.trim() });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournamentId] });
+      toast({ title: "Tournament renamed" });
+    } catch {
+      toast({ title: "Error", description: "Failed to rename.", variant: "destructive" });
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const handleSaveLeague = async () => {
+    setSavingLeague(true);
+    try {
+      const lid = selectedLeagueId === "none" ? null : parseInt(selectedLeagueId);
+      await apiRequest('PUT', `/api/tournaments/${tournamentId}/league`, { leagueId: lid });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
+      toast({ title: lid ? "Tournament added to league" : "Tournament removed from league" });
+    } catch {
+      toast({ title: "Error", description: "Failed to update league.", variant: "destructive" });
+    } finally {
+      setSavingLeague(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); setShowDeleteConfirm(false); }}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Tournament Settings
+          </DialogTitle>
+          <DialogDescription>
+            {ownerName ? <>Owner: <span className="font-medium text-foreground">{ownerName}</span></> : "Manage tournament settings and collaborators."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-2">
+          {/* Rename */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">Tournament Name</Label>
+            <div className="flex gap-2">
+              <Input
+                data-testid="input-settings-rename"
+                value={renameName}
+                onChange={(e) => setRenameName(e.target.value)}
+                placeholder="Tournament name"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); }}
+              />
+              <Button size="sm" onClick={handleSaveName} disabled={savingName || !renameName.trim()} data-testid="button-settings-save-name">
+                {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* League */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">League</Label>
+            {leaguesList.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No leagues yet. Create one from the Leagues page first.</p>
+            ) : (
+              <div className="flex gap-2">
+                <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
+                  <SelectTrigger data-testid="select-settings-league" className="flex-1">
+                    <SelectValue placeholder="Select league" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No league</SelectItem>
+                    {leaguesList.map((l: any) => (
+                      <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={handleSaveLeague} disabled={savingLeague} data-testid="button-settings-save-league">
+                  {savingLeague ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {!tournament.isLegacy && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Tablet Scoring</Label>
+                <p className="text-xs text-muted-foreground">Pair scorer tablets to boards for live scoring.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  data-testid="button-settings-tablet-scoring"
+                  onClick={() => { onOpenChange(false); setIsDevicesDialogOpen(true); }}
+                >
+                  <TabletSmartphone className="w-4 h-4" />
+                  Manage Tablets
+                </Button>
+              </div>
+            </>
+          )}
+
+          {isOwner && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold">Collaborators</Label>
+                <p className="text-xs text-muted-foreground">Invite other TKO users to help run this tournament. They can manage players, score matches, and use tablets.</p>
+                {collaborators.length > 0 && (
+                  <div className="space-y-2">
+                    {collaborators.map((collab) => (
+                      <div key={collab.userId} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/40">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-primary">{collab.name.charAt(0).toUpperCase()}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate" data-testid={`text-collab-name-${collab.userId}`}>{collab.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{collab.email}</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => removeCollaboratorMutation.mutate(collab.userId)}
+                          disabled={removeCollaboratorMutation.isPending}
+                          data-testid={`button-remove-collab-${collab.userId}`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter their TKO email address..."
+                    value={newCollabEmail}
+                    onChange={(e) => setNewCollabEmail(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && newCollabEmail.trim()) addCollaboratorMutation.mutate(newCollabEmail.trim()); }}
+                    className="h-9 text-sm"
+                    data-testid="input-settings-collab-email"
+                  />
+                  <Button
+                    size="sm"
+                    className="h-9 shrink-0"
+                    onClick={() => { if (newCollabEmail.trim()) addCollaboratorMutation.mutate(newCollabEmail.trim()); }}
+                    disabled={!newCollabEmail.trim() || addCollaboratorMutation.isPending}
+                    data-testid="button-settings-add-collab"
+                  >
+                    {addCollaboratorMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><UserPlus className="w-4 h-4 mr-1" />Add</>}
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-destructive">Danger Zone</Label>
+                {!showDeleteConfirm ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-2"
+                    data-testid="button-settings-delete"
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Tournament
+                  </Button>
+                ) : (
+                  <div className="space-y-2 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+                    <p className="text-sm text-destructive font-medium">Are you sure? This permanently deletes "{tournament.name}" and all its data.</p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={deleteTournamentMutation.isPending}
+                        data-testid="button-settings-confirm-delete"
+                        onClick={() => {
+                          deleteTournamentMutation.mutate(tournamentId, {
+                            onSuccess: () => {
+                              toast({ title: "Tournament deleted", description: `"${tournament.name}" has been removed.` });
+                              setLocation("/tournaments");
+                            },
+                            onError: () => toast({ title: "Error", description: "Failed to delete tournament.", variant: "destructive" }),
+                          });
+                        }}
+                      >
+                        {deleteTournamentMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                        Yes, Delete Tournament
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BoardSessionsDialog({ open, onOpenChange, tournament, groups, enableShare, toast, boardStatuses }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  tournament: any;
+  groups: any[];
+  enableShare: any;
+  toast: any;
+  boardStatuses: Record<number, boolean>;
+}) {
+  const { data: boardSessions = [], refetch: refetchSessions } = useQuery<BoardSession[]>({
+    queryKey: ['/api/tournaments', tournament.id, 'board-sessions'],
+    queryFn: async () => {
+      const res = await fetch(`/api/tournaments/${tournament.id}/board-sessions`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  const createSession = useMutation({
+    mutationFn: async (boardNumber: number) => {
+      const res = await apiRequest("POST", `/api/tournaments/${tournament.id}/board-sessions`, { boardNumber });
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchSessions();
+      toast({ title: "Scorer tablet session created" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create session", variant: "destructive" });
+    },
+  });
+
+  const deleteSession = useMutation({
+    mutationFn: async (sessionId: number) => {
+      await apiRequest("DELETE", `/api/board-sessions/${sessionId}`);
+    },
+    onSuccess: () => {
+      refetchSessions();
+      toast({ title: "Session removed" });
+    },
+  });
+
+  const sortedGroups = [...groups].sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto" data-testid="dialog-connected-devices">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <TabletSmartphone className="w-5 h-5 text-primary" />
+            Tablet Scoring
+          </DialogTitle>
+          <DialogDescription>
+            Create scorer tablet sessions for each board. Scan the QR code on a tablet to pair it as a scorer.
+          </DialogDescription>
+        </DialogHeader>
+
+        {groups.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-sm text-muted-foreground">No groups found. Start the tournament to generate boards.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {sortedGroups.map((group: any, idx: number) => {
+              const boardNumber = idx + 1;
+              const session = boardSessions.find((s: any) => s.boardNumber === boardNumber);
+              const isPaired = session?.pairedAt != null;
+              const pairUrl = session ? `${window.location.origin}/pair?token=${session.pairingToken}` : null;
+              const spectatorUrl = tournament.shareEnabled && tournament.shareToken
+                ? `${window.location.origin}/public/t/${tournament.shareToken}/board/${boardNumber}`
+                : null;
+
+              return (
+                <div key={group.id} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${boardNumber}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-sm">Board {boardNumber}</h3>
+                      <p className="text-xs text-muted-foreground">{group.name}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isPaired && boardStatuses[boardNumber] && (
+                        <Badge variant="outline" className="text-xs text-green-600 border-green-300 gap-1">
+                          <Wifi className="w-3 h-3" /> Online
+                        </Badge>
+                      )}
+                      {isPaired && !boardStatuses[boardNumber] && (
+                        <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 gap-1">
+                          <WifiOff className="w-3 h-3" /> Paired
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs">
+                        <Target className="w-3 h-3 mr-1" />
+                        Board {boardNumber}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {session && pairUrl ? (
+                    <div className="space-y-3">
+                      <div className="flex justify-center bg-white rounded-lg p-4">
+                        <QRCodeSVG value={pairUrl} size={160} level="M" />
+                      </div>
+                      <p className="text-xs text-center text-muted-foreground">
+                        {isPaired ? "Tablet is paired. Scan again to re-pair a new device." : "Scan this QR code on the scorer tablet to pair it."}
+                      </p>
+                      <div className="flex gap-2">
+                        <Input readOnly value={pairUrl} className="text-xs h-8" data-testid={`input-pair-url-${boardNumber}`} />
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => {
+                            navigator.clipboard.writeText(pairUrl);
+                            toast({ title: `Pairing link copied!` });
+                          }}
+                          data-testid={`button-copy-pair-${boardNumber}`}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-8 w-8 shrink-0 text-destructive"
+                          onClick={() => deleteSession.mutate(session.id)}
+                          data-testid={`button-delete-session-${boardNumber}`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+
+                      {spectatorUrl && (
+                        <div className="pt-2 border-t">
+                          <p className="text-xs text-muted-foreground mb-1">Spectator view (read-only):</p>
+                          <div className="flex gap-2">
+                            <Input readOnly value={spectatorUrl} className="text-xs h-8" data-testid={`input-spectator-url-${boardNumber}`} />
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => {
+                                navigator.clipboard.writeText(spectatorUrl);
+                                toast({ title: `Spectator link copied!` });
+                              }}
+                              data-testid={`button-copy-spectator-${boardNumber}`}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => createSession.mutate(boardNumber)}
+                      disabled={createSession.isPending}
+                      data-testid={`button-create-scorer-${boardNumber}`}
+                    >
+                      {createSession.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <QrCode className="w-4 h-4 mr-2" />
+                      )}
+                      Create Scorer Tablet for Board {boardNumber}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
