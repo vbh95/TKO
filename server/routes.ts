@@ -239,6 +239,8 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     await storage.updateMatch(km.id, { boardNumber: assignedBoard } as any);
   }
 
+  await deduplicateRoundScorers(tournamentId, shareToken);
+
   try {
     const updatedKnockouts = await storage.getMatchesByTournamentId(tournamentId);
     const koMatches = updatedKnockouts.filter(m => m.stage === 'KNOCKOUT');
@@ -334,6 +336,43 @@ async function pickKnockoutScorer(tournamentId: number, excludePlayerIds: number
     return { scorerId: chosen.id, scorerName: chosen.name };
   } catch {
     return null;
+  }
+}
+
+async function deduplicateRoundScorers(tournamentId: number, shareToken: string | null) {
+  try {
+    const allMatches = await storage.getMatchesByTournamentId(tournamentId);
+    const koMatches = allMatches.filter(m => m.stage === 'KNOCKOUT');
+    const sorted = [...koMatches].sort((a: any, b: any) => a.order - b.order);
+    const roundKeys: string[] = [];
+    for (const m of sorted) {
+      if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
+    }
+
+    for (const roundKey of roundKeys) {
+      const roundMatches = sorted.filter(m => m.roundKey === roundKey);
+      if (roundMatches.length <= 1) continue;
+
+      const usedScorerIds = new Set<number>();
+      for (const rm of roundMatches) {
+        if (rm.scorerId && usedScorerIds.has(rm.scorerId)) {
+          const exclude: number[] = [rm.playerAId, rm.playerBId].filter(Boolean) as number[];
+          const scorer = await pickKnockoutScorer(tournamentId, exclude, null, rm.id);
+          if (scorer && !usedScorerIds.has(scorer.scorerId)) {
+            await storage.updateMatch(rm.id, { scorerId: scorer.scorerId, scorerName: scorer.scorerName });
+            usedScorerIds.add(scorer.scorerId);
+            emitMatchUpdate(tournamentId, shareToken, { ...rm, scorerId: scorer.scorerId, scorerName: scorer.scorerName });
+          } else {
+            await storage.updateMatch(rm.id, { scorerId: null, scorerName: null });
+            emitMatchUpdate(tournamentId, shareToken, { ...rm, scorerId: null, scorerName: null });
+          }
+        } else if (rm.scorerId) {
+          usedScorerIds.add(rm.scorerId);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Dedup round scorers error:", err);
   }
 }
 
@@ -1224,6 +1263,8 @@ export async function registerRoutes(
             }
           }
         }
+
+        await deduplicateRoundScorers(match.tournamentId, tournamentData?.shareToken || null);
       }
     } catch (progressionError) {
       console.error("Progression error:", progressionError);
@@ -1666,6 +1707,8 @@ export async function registerRoutes(
               }
             }
           }
+
+          await deduplicateRoundScorers(tournamentId, tournament?.shareToken || null);
         } catch (progressionError) {
           console.error("Progression error:", progressionError);
         }
