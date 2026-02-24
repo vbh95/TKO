@@ -1046,39 +1046,47 @@ export default function TournamentDetail() {
                     <Table>
                       <TableHeader className="bg-muted/50">
                         <TableRow>
-                          <TableHead className="w-12 text-center font-bold">#</TableHead>
-                          <TableHead className="font-bold">Player</TableHead>
-                          <TableHead className="text-center font-bold">P</TableHead>
-                          <TableHead className="text-center font-bold">W</TableHead>
-                          <TableHead className="text-center font-bold">L</TableHead>
-                          <TableHead className="text-center font-bold">LF</TableHead>
-                          <TableHead className="text-center font-bold">LA</TableHead>
-                          <TableHead className="text-center font-bold">+/-</TableHead>
-                          <TableHead className="text-center font-bold text-primary">Pts</TableHead>
+                          <TableHead className="w-[50px]">#</TableHead>
+                          <TableHead>Player</TableHead>
+                          <TableHead className="text-center">P</TableHead>
+                          <TableHead className="text-center">W</TableHead>
+                          <TableHead className="text-center">L</TableHead>
+                          <TableHead className="text-center hidden md:table-cell">LW</TableHead>
+                          <TableHead className="text-center hidden md:table-cell">LL</TableHead>
+                          <TableHead className="text-center hidden md:table-cell">+/-</TableHead>
+                          <TableHead className="text-right font-bold">Pts</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {standings.map((s: any, idx: number) => (
-                          <TableRow key={s.playerId} className={cn(
-                            idx === 0 && "bg-primary/5",
+                        {standings.map((s: any, idx: number) => {
+                          const qualifying = idx < 2;
+                          return (
+                          <TableRow key={s.id} className={cn(
+                            qualifying ? "bg-green-50 dark:bg-green-950/30" : "",
                             "hover:bg-muted/40 transition-colors"
                           )}>
-                            <TableCell className="text-center font-black text-muted-foreground/50">{idx + 1}</TableCell>
-                            <TableCell className="font-bold">{s.playerName}</TableCell>
+                            <TableCell className="font-medium text-muted-foreground">
+                              <div className="flex items-center gap-1.5">
+                                {idx + 1}
+                                {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
+                              </div>
+                            </TableCell>
+                            <TableCell className={cn("font-bold", qualifying && "text-green-700 dark:text-green-400")}>{s.name}</TableCell>
                             <TableCell className="text-center tabular-nums">{s.played}</TableCell>
                             <TableCell className="text-center tabular-nums text-green-600 dark:text-green-400 font-medium">{s.won}</TableCell>
                             <TableCell className="text-center tabular-nums text-destructive font-medium">{s.lost}</TableCell>
-                            <TableCell className="text-center tabular-nums">{s.legsFor}</TableCell>
-                            <TableCell className="text-center tabular-nums">{s.legsAgainst}</TableCell>
+                            <TableCell className="text-center tabular-nums hidden md:table-cell font-mono">{s.legsFor}</TableCell>
+                            <TableCell className="text-center tabular-nums hidden md:table-cell font-mono">{s.legsAgainst}</TableCell>
                             <TableCell className={cn(
-                              "text-center tabular-nums font-medium",
-                              s.legDiff > 0 ? "text-green-600" : s.legDiff < 0 ? "text-destructive" : ""
+                              "text-center tabular-nums font-medium hidden md:table-cell font-mono",
+                              s.diff > 0 ? "text-green-600" : s.diff < 0 ? "text-destructive" : ""
                             )}>
-                              {s.legDiff > 0 ? `+${s.legDiff}` : s.legDiff}
+                              {s.diff > 0 ? `+${s.diff}` : s.diff}
                             </TableCell>
-                            <TableCell className="text-center tabular-nums font-black text-primary text-base">{s.points}</TableCell>
+                            <TableCell className="text-right font-bold text-primary text-lg">{s.pts}</TableCell>
                           </TableRow>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -1087,61 +1095,313 @@ export default function TournamentDetail() {
             </div>
           </TabsContent>
 
-          <TabsContent value="players" className="space-y-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-bold">Tournament Players ({players.length})</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setIsBulkDialogOpen(true)} data-testid="button-bulk-edit">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Bulk Add
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {players.map((player: any) => (
-                    <div key={player.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:border-primary/50 transition-colors group">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                          {player.name.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="font-medium">{player.name}</span>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                          onClick={() => {
-                            setEditingPlayerId(player.id);
-                            setEditingPlayerName(player.name);
-                          }}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => setDeletePlayerTarget({ id: player.id, name: player.name })}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
+          <TabsContent value="players">
+            {(() => {
+              const getPlayerBestRound = (playerId: number) => {
+                const roundPriority: Record<string, number> = { 'F': 5, 'SF': 4, 'QF': 3, 'R16': 2, 'R32': 1, 'group': 0 };
+                let bestRound = 'group';
+                let bestPriority = 0;
+                let wonFinal = false;
+                const allPlayerMatches = matches.filter(
+                  (m: any) => m.playerAId === playerId || m.playerBId === playerId
+                );
+                for (const m of allPlayerMatches) {
+                  if (m.stage === 'KNOCKOUT') {
+                    const priority = roundPriority[m.roundKey] || 0;
+                    if (priority > bestPriority) {
+                      bestPriority = priority;
+                      bestRound = m.roundKey;
+                    }
+                  }
+                  if (m.roundKey === 'F' && m.status === 'COMPLETED' && m.winnerId === playerId) {
+                    wonFinal = true;
+                  }
+                }
+                return { bestRound, wonFinal };
+              };
+
+              const getPositionLabel = (bestRound: string, wonFinal: boolean) => {
+                if (bestRound === 'F') return wonFinal ? 'Champion' : 'Runner-Up';
+                if (bestRound === 'SF') return 'Semi-Finalist';
+                if (bestRound === 'QF') return 'Quarter-Finalist';
+                if (bestRound === 'R16') return 'R16';
+                if (bestRound === 'R32') return 'R32';
+                return 'Group Stage';
+              };
+
+              const getPositionBadgeColor = (bestRound: string, wonFinal: boolean) => {
+                if (bestRound === 'F' && wonFinal) return 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
+                if (bestRound === 'F') return 'bg-gray-200/50 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300 border-gray-400/30';
+                if (bestRound === 'SF') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-400/30';
+                if (bestRound === 'QF') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-400/30';
+                if (bestRound === 'R16') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-400/30';
+                if (bestRound === 'R32') return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border-teal-400/30';
+                return 'bg-muted text-muted-foreground border-border';
+              };
+
+              const getPoints = (bestRound: string, wonFinal: boolean) => {
+                if (bestRound === 'F' && wonFinal) return 40;
+                if (bestRound === 'F') return 30;
+                if (bestRound === 'SF') return 20;
+                if (bestRound === 'QF') return 10;
+                if (bestRound === 'R16') return 8;
+                if (bestRound === 'R32') return 6;
+                return 5;
+              };
+
+              const getTotalLegsWon = (playerId: number) => {
+                let total = 0;
+                for (const m of matches) {
+                  if (m.status !== 'COMPLETED') continue;
+                  if (m.playerAId === playerId) total += (m.scoreA || 0);
+                  if (m.playerBId === playerId) total += (m.scoreB || 0);
+                }
+                return total;
+              };
+
+              const playerResults = players.map((p: Player) => {
+                const { bestRound, wonFinal } = getPlayerBestRound(p.id);
+                return {
+                  ...p,
+                  bestRound,
+                  wonFinal,
+                  positionLabel: getPositionLabel(bestRound, wonFinal),
+                  points: getPoints(bestRound, wonFinal),
+                  legsWon: getTotalLegsWon(p.id),
+                };
+              }).sort((a: any, b: any) => b.points - a.points || b.legsWon - a.legsWon);
+
+              const handleSavePlayerName = async (playerId: number) => {
+                if (!editingPlayerName.trim()) return;
+                try {
+                  await apiRequest("PATCH", `/api/tournaments/${tournamentId}/players/${playerId}`, { name: editingPlayerName.trim() });
+                  queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+                  toast({ title: "Player Updated", description: "Player name has been updated." });
+                  setEditingPlayerId(null);
+                } catch {
+                  toast({ title: "Error", description: "Failed to update player name.", variant: "destructive" });
+                }
+              };
+
+              const hasGroups = groups && groups.length > 0;
+              const getPlayerGroup = (playerId: number) => {
+                const membership = groupMemberships.find((m: any) => m.playerId === playerId);
+                if (!membership) return null;
+                return groups.find((g: any) => g.id === membership.groupId) || null;
+              };
+
+              const handleGroupReassign = async (playerId: number, newGroupId: number) => {
+                try {
+                  await apiRequest("PATCH", `/api/tournaments/${tournamentId}/players/${playerId}/group`, { groupId: newGroupId });
+                  queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+                  toast({ title: "Group Updated", description: "Player has been moved to a new group." });
+                } catch {
+                  toast({ title: "Error", description: "Failed to reassign group.", variant: "destructive" });
+                }
+              };
+
+              return (
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+                    <CardTitle>Tournament Results</CardTitle>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {tournament.isLegacy && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setIsRecalcConfirmOpen(true)}
+                            disabled={isRecalculating}
+                            data-testid="button-recalculate-matches"
+                          >
+                            <RefreshCw className={cn("w-4 h-4", isRecalculating && "animate-spin")} />
+                            {isRecalculating ? "Recalculating..." : "Recalculate Matches"}
+                          </Button>
+                          <Dialog open={isRecalcConfirmOpen} onOpenChange={setIsRecalcConfirmOpen}>
+                            <DialogContent className="sm:max-w-[425px]">
+                              <DialogHeader>
+                                <DialogTitle>Recalculate Matches?</DialogTitle>
+                                <DialogDescription>
+                                  This will reset all group stage matches and regenerate them based on current group assignments. All existing group match scores will be lost. This action cannot be undone.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <DialogFooter>
+                                <Button variant="ghost" onClick={() => setIsRecalcConfirmOpen(false)}>Cancel</Button>
+                                <Button
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setIsRecalcConfirmOpen(false);
+                                    handleRecalculateMatches();
+                                  }}
+                                  data-testid="button-confirm-recalculate"
+                                >
+                                  Recalculate
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </>
+                      )}
+                      <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-2" onClick={() => setBulkInput(players.map((p: Player) => p.name).join("\n"))}>
+                            <Users className="w-4 h-4" />
+                            Bulk Edit
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[500px]">
+                          <DialogHeader>
+                            <DialogTitle>Bulk Edit Players</DialogTitle>
+                            <DialogDescription>
+                              Edit player names below. Enter one name per line.
+                              {tournament.isLegacy && ` You can remove names to delete players. Maximum: ${players.length + 10} players.`}
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="py-4">
+                            <Textarea
+                              value={bulkInput}
+                              onChange={(e) => setBulkInput(e.target.value)}
+                              className="min-h-[300px] font-mono"
+                              placeholder="Enter player names..."
+                            />
+                          </div>
+                          <DialogFooter>
+                            <Button variant="ghost" onClick={() => setIsBulkDialogOpen(false)}>Cancel</Button>
+                            <Button onClick={() => { bulkUpdate(bulkInput); setIsBulkDialogOpen(false); }} disabled={isUpdatingPlayers}>
+                              {isUpdatingPlayers && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              Save Changes
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[50px]">#</TableHead>
+                            <TableHead>Player</TableHead>
+                            {hasGroups && <TableHead className="text-center">Group</TableHead>}
+                            <TableHead className="text-center">Position</TableHead>
+                            <TableHead className="text-center">Legs Won</TableHead>
+                            <TableHead className="text-right font-bold">Points</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {playerResults.map((player: any, idx: number) => {
+                            const playerGroup = hasGroups ? getPlayerGroup(player.id) : null;
+                            return (
+                            <TableRow key={player.id} data-testid={`player-result-row-${player.id}`}>
+                              <TableCell className="font-medium text-muted-foreground">
+                                <div className="flex items-center gap-1.5">
+                                  {idx + 1}
+                                  {player.wonFinal && <Trophy className="w-4 h-4 text-yellow-500" />}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {editingPlayerId === player.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      value={editingPlayerName}
+                                      onChange={(e) => setEditingPlayerName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSavePlayerName(player.id);
+                                        if (e.key === 'Escape') setEditingPlayerId(null);
+                                      }}
+                                      className="h-8 w-40"
+                                      autoFocus
+                                      data-testid={`input-player-name-${player.id}`}
+                                    />
+                                    <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => handleSavePlayerName(player.id)} data-testid={`button-save-player-${player.id}`}>
+                                      <Check className="w-4 h-4 text-green-600" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingPlayerId(null)}>
+                                      &times;
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold">{player.name}</span>
+                                    <button
+                                      onClick={() => { setEditingPlayerId(player.id); setEditingPlayerName(player.name); }}
+                                      className="text-muted-foreground hover:text-foreground transition-colors"
+                                      data-testid={`button-edit-player-${player.id}`}
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    {tournament.isLegacy && (
+                                      <button
+                                        onClick={() => setDeletePlayerTarget({ id: player.id, name: player.name })}
+                                        className="text-muted-foreground hover:text-destructive transition-colors"
+                                        data-testid={`button-delete-player-${player.id}`}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </TableCell>
+                              {hasGroups && (
+                                <TableCell className="text-center">
+                                  {tournament.isLegacy ? (
+                                    <Select
+                                      value={playerGroup?.id?.toString() || ""}
+                                      onValueChange={(val) => handleGroupReassign(player.id, parseInt(val))}
+                                    >
+                                      <SelectTrigger className="h-8 w-28" data-testid={`select-group-${player.id}`}>
+                                        <SelectValue placeholder="No group" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {groups.map((g: any) => (
+                                          <SelectItem key={g.id} value={g.id.toString()}>
+                                            {g.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Badge variant="outline">{playerGroup?.name || "—"}</Badge>
+                                  )}
+                                </TableCell>
+                              )}
+                              <TableCell className="text-center">
+                                <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border", getPositionBadgeColor(player.bestRound, player.wonFinal))}>
+                                  {player.positionLabel}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center font-mono">{player.legsWon}</TableCell>
+                              <TableCell className="text-right font-bold text-primary text-lg">{player.points}</TableCell>
+                            </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
+
+            {isCollaborator && (
+              <div className="mt-4 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/20 text-sm text-muted-foreground">
+                <UserCheck className="w-4 h-4 text-primary shrink-0" />
+                <span>You are a <span className="font-medium text-foreground">collaborator</span> on this tournament, owned by <span className="font-medium text-foreground">{ownerName}</span>.</span>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 
         {selectedMatch && (
           <MatchScoreInput
             match={selectedMatch}
-            tournament={tournament}
+            playerA={getPlayer(selectedMatch.playerAId)}
+            playerB={getPlayer(selectedMatch.playerBId)}
+            isOpen={!!selectedMatch}
             onClose={() => setSelectedMatch(null)}
+            tournamentId={tournamentId}
           />
         )}
 
