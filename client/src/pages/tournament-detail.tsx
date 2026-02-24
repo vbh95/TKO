@@ -111,20 +111,20 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
 
   if (isLegacy) {
     return (
-      <div className="mt-2 pt-2 border-t border-muted/50 text-xs text-muted-foreground" data-testid={`match-scorer-${matchId}`}>
-        <div className="flex items-center gap-1.5">
-          <ClipboardList className="w-3.5 h-3.5" />
-          Scorer: Not available
+      <div className="mt-2 pt-2 border-t border-dashed text-[10px] text-muted-foreground uppercase font-bold tracking-wider truncate" data-testid={`match-scorer-${matchId}`}>
+        <div className="flex items-center gap-1 truncate">
+          <ClipboardList className="w-3 h-3 shrink-0" />
+          <span className="truncate">Scorer: N/A</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mt-2 pt-2 border-t border-muted/50 text-xs text-muted-foreground" data-testid={`match-scorer-${matchId}`}>
+    <div className="mt-2 pt-2 border-t border-dashed text-[10px] text-muted-foreground uppercase font-bold tracking-wider truncate" data-testid={`match-scorer-${matchId}`}>
       {editing ? (
-        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <ClipboardList className="w-3.5 h-3.5 shrink-0" />
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <ClipboardList className="w-3 h-3 shrink-0" />
           <span className="shrink-0">Scorer:</span>
           <input
             ref={inputRef}
@@ -138,13 +138,13 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
         </div>
       ) : (
         <button
-          className="flex items-center gap-1.5 hover:text-foreground transition-colors group"
+          className="flex items-center gap-1 hover:text-foreground transition-colors truncate w-full"
           onClick={(e) => { e.stopPropagation(); setEditing(true); }}
           data-testid={`button-edit-scorer-${matchId}`}
         >
-          <ClipboardList className="w-3.5 h-3.5 shrink-0" />
-          <span>Scorer: {currentName || "Not available"}</span>
-          <Pencil className="w-2.5 h-2.5 ml-0.5 opacity-0 group-hover:opacity-50 shrink-0 transition-opacity" />
+          <ClipboardList className="w-3 h-3 shrink-0" />
+          <span className="truncate">Scorer: {currentName || "None"}</span>
+          <Pencil className="w-2.5 h-2.5 ml-0.5 opacity-50 shrink-0" />
         </button>
       )}
     </div>
@@ -1050,15 +1050,15 @@ export default function TournamentDetail() {
                       <Table>
                       <TableHeader className="bg-muted/50">
                         <TableRow>
-                          <TableHead className="w-[30px] px-0 text-center font-bold text-xs">#</TableHead>
-                          <TableHead className="px-1 font-bold text-xs">Player</TableHead>
-                          <TableHead className="w-[25px] px-0 text-center font-bold text-xs">P</TableHead>
-                          <TableHead className="w-[25px] px-0 text-center font-bold text-xs">W</TableHead>
-                          <TableHead className="w-[25px] px-0 text-center font-bold text-xs">L</TableHead>
-                          <TableHead className="w-[30px] px-0 text-center font-bold text-xs">LW</TableHead>
-                          <TableHead className="w-[30px] px-0 text-center font-bold text-xs">LL</TableHead>
-                          <TableHead className="w-[35px] px-0 text-center font-bold text-xs">+/-</TableHead>
-                          <TableHead className="w-[40px] px-0 text-right font-bold text-xs text-primary">Pts</TableHead>
+                          <TableHead className="w-[50px]">#</TableHead>
+                          <TableHead>Player</TableHead>
+                          <TableHead className="text-center">P</TableHead>
+                          <TableHead className="text-center">W</TableHead>
+                          <TableHead className="text-center">L</TableHead>
+                          <TableHead className="text-center hidden md:table-cell">LW</TableHead>
+                          <TableHead className="text-center hidden md:table-cell">LL</TableHead>
+                          <TableHead className="text-center hidden md:table-cell">+/-</TableHead>
+                          <TableHead className="text-right font-bold">Pts</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1069,25 +1069,25 @@ export default function TournamentDetail() {
                             qualifying ? "bg-green-50 dark:bg-green-950/30" : "",
                             "hover:bg-muted/40 transition-colors"
                           )}>
-                            <TableCell className="px-0 text-center font-medium text-muted-foreground text-xs">
-                              <div className="flex items-center justify-center gap-0.5">
+                            <TableCell className="font-medium text-muted-foreground">
+                              <div className="flex items-center gap-1.5">
                                 {idx + 1}
-                                {qualifying && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />}
+                                {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
                               </div>
                             </TableCell>
-                            <TableCell className={cn("px-1 font-bold text-xs truncate max-w-[100px]", qualifying && "text-green-700 dark:text-green-400")}>{s.name}</TableCell>
-                            <TableCell className="px-0 text-center tabular-nums text-xs">{s.played}</TableCell>
-                            <TableCell className="px-0 text-center tabular-nums text-green-600 dark:text-green-400 font-medium text-xs">{s.won}</TableCell>
-                            <TableCell className="px-0 text-center tabular-nums text-destructive font-medium text-xs">{s.lost}</TableCell>
-                            <TableCell className="px-0 text-center tabular-nums font-mono text-xs">{s.legsFor}</TableCell>
-                            <TableCell className="px-0 text-center tabular-nums font-mono text-xs">{s.legsAgainst}</TableCell>
+                            <TableCell className={cn("font-bold", qualifying && "text-green-700 dark:text-green-400")}>{s.name}</TableCell>
+                            <TableCell className="text-center tabular-nums">{s.played}</TableCell>
+                            <TableCell className="text-center tabular-nums text-green-600 dark:text-green-400 font-medium">{s.won}</TableCell>
+                            <TableCell className="text-center tabular-nums text-destructive font-medium">{s.lost}</TableCell>
+                            <TableCell className="text-center tabular-nums hidden md:table-cell font-mono">{s.legsFor}</TableCell>
+                            <TableCell className="text-center tabular-nums hidden md:table-cell font-mono">{s.legsAgainst}</TableCell>
                             <TableCell className={cn(
-                              "px-0 text-center tabular-nums font-medium font-mono text-xs",
+                              "text-center tabular-nums font-medium hidden md:table-cell font-mono",
                               s.diff > 0 ? "text-green-600" : s.diff < 0 ? "text-destructive" : ""
                             )}>
                               {s.diff > 0 ? `+${s.diff}` : s.diff}
                             </TableCell>
-                            <TableCell className="px-0 text-right font-bold text-primary text-sm">{s.pts}</TableCell>
+                            <TableCell className="text-right font-bold text-primary text-lg">{s.pts}</TableCell>
                           </TableRow>
                           );
                         })}
