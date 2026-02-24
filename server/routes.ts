@@ -242,12 +242,16 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
   try {
     const updatedKnockouts = await storage.getMatchesByTournamentId(tournamentId);
     const koMatches = updatedKnockouts.filter(m => m.stage === 'KNOCKOUT');
+    const boardsToNotify = new Set<number>();
     for (const km of koMatches) {
       emitMatchUpdate(tournamentId, shareToken, km);
       if ((km as any).boardNumber) {
-        emitBoardMatchUpdate(tournamentId, (km as any).boardNumber, km);
+        boardsToNotify.add((km as any).boardNumber);
       }
     }
+    Array.from(boardsToNotify).forEach(bn => {
+      emitBoardMatchUpdate(tournamentId, bn, { type: 'knockout_update' });
+    });
   } catch {}
 }
 
@@ -1471,8 +1475,6 @@ export async function registerRoutes(
       }
 
       const tournament = await storage.getTournament(tournamentId);
-      emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
-      emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
 
       if (status === "COMPLETED" && match.stage === 'GROUP' && match.groupId) {
         try {
@@ -1556,6 +1558,9 @@ export async function registerRoutes(
           console.error("Scorer auto-complete error (non-fatal):", completeError);
         }
       }
+
+      emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
+      emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
 
       res.json(updatedMatch);
     } catch (err) {

@@ -576,6 +576,7 @@ export default function ScorerPage() {
       }
       return res.json();
     },
+    refetchInterval: 10000,
   });
 
   useEffect(() => {
