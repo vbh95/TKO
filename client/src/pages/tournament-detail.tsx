@@ -560,6 +560,359 @@ export default function TournamentDetail() {
       })
     : [{ group: { name: "All Players" }, standings: computeStandings(players, matches) }];
 
+  const handleResetMatch = async (matchId: number) => {
+    try {
+      await apiRequest("POST", `/api/tournaments/${tournamentId}/matches/${matchId}/reset`);
+      queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+      setResetMatchTarget(null);
+      toast({ title: "Match Reset", description: "The match result has been cleared." });
+    } catch {
+      toast({ title: "Error", description: "Failed to reset match.", variant: "destructive" });
+    }
+  };
+
+  const handleCreateMatch = async () => {
+    if (!newMatchPlayerA || !newMatchPlayerB) {
+      toast({ title: "Error", description: "Both players must be selected", variant: "destructive" });
+      return;
+    }
+    setIsCreatingMatch(true);
+    try {
+      await apiRequest("POST", `/api/tournaments/${tournamentId}/matches`, {
+        playerAId: parseInt(newMatchPlayerA),
+        playerBId: parseInt(newMatchPlayerB),
+        stage: newMatchStage,
+        groupId: newMatchGroupId ? parseInt(newMatchGroupId) : null,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+      toast({ title: "Match Created", description: "The manual match has been added." });
+      setIsCreateMatchOpen(false);
+      setNewMatchPlayerA("");
+      setNewMatchPlayerB("");
+    } catch {
+      toast({ title: "Error", description: "Failed to create match.", variant: "destructive" });
+    } finally {
+      setIsCreatingMatch(false);
+    }
+  };
+
+  const handleDeleteMatch = async (matchId: number) => {
+    try {
+      await apiRequest("DELETE", `/api/tournaments/${tournamentId}/matches/${matchId}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+      toast({ title: "Match Deleted", description: "Match has been removed." });
+    } catch {
+      toast({ title: "Error", description: "Failed to delete match.", variant: "destructive" });
+    }
+  };
+
+  const handleRecalculateMatches = async () => {
+    setIsRecalculating(true);
+    try {
+      await apiRequest("POST", `/api/tournaments/${tournamentId}/matches/recalculate`);
+      queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+      toast({ title: "Matches Recalculated", description: "Group matches have been regenerated based on current group assignments." });
+    } catch {
+      toast({ title: "Error", description: "Failed to recalculate matches.", variant: "destructive" });
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
+  const handleUpdateMatchPlayer = async (matchId: number, slot: 'A' | 'B', playerId: number) => {
+    try {
+      const body = slot === 'A' ? { playerAId: playerId } : { playerBId: playerId };
+      await apiRequest("PATCH", `/api/tournaments/${tournamentId}/matches/${matchId}/players`, body);
+      queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+      toast({ title: "Player Updated", description: "Match player has been changed." });
+    } catch {
+      toast({ title: "Error", description: "Failed to update match player.", variant: "destructive" });
+    }
+  };
+
+  const renderGroupMatches = () => (
+    <div className="space-y-8">
+      {groupMatchData.byGroup.map(({ group, rounds }) => (
+        <div key={group.id} className="space-y-4">
+          <h2 className="text-xl font-bold text-primary" data-testid={`group-header-${group.id}`}>{group.name}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {rounds.map(({ roundKey, matches: roundMatches }) => (
+              <Card key={roundKey} className="overflow-hidden" data-testid={`round-card-${group.id}-${roundKey}`}>
+                <div className="bg-primary px-4 py-2 flex items-center justify-between">
+                  <span className="text-primary-foreground font-bold text-sm">
+                    Round {roundKey.replace("R", "")}
+                  </span>
+                </div>
+                <CardContent className="p-3 space-y-2">
+                  {roundMatches.map((match: any) => {
+                    const playerA = getPlayer(match.playerAId);
+                    const playerB = getPlayer(match.playerBId);
+                    return (
+                      <div
+                        key={match.id}
+                        onClick={() => setSelectedMatch(match)}
+                        className={cn(
+                          "rounded-lg border p-3 cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
+                          match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
+                        )}
+                        data-testid={`match-card-${match.id}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 space-y-1">
+                            <div className={cn(
+                              "text-sm font-medium",
+                              match.status === 'COMPLETED' && match.winnerId === playerA?.id && "text-primary font-bold"
+                            )}>
+                              {playerA?.name || "TBD"}
+                            </div>
+                            <div className={cn(
+                              "text-sm font-medium",
+                              match.status === 'COMPLETED' && match.winnerId === playerB?.id && "text-primary font-bold"
+                            )}>
+                              {playerB?.name || "TBD"}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-center gap-1 ml-3">
+                            <div className={cn(
+                              "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                              match.status === 'COMPLETED' && match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
+                            )}>
+                              {match.scoreA || 0}
+                            </div>
+                            <div className={cn(
+                              "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                              match.status === 'COMPLETED' && match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
+                            )}>
+                              {match.scoreB || 0}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <InlineScorerEdit
+                            matchId={match.id}
+                            tournamentId={tournament.id}
+                            currentName={match.scorerName || null}
+                            isLegacy={tournament.isLegacy || false}
+                          />
+                          <div className="flex items-center gap-1 mt-2 pt-2 border-t border-dashed w-full justify-end">
+                            {match.status === 'COMPLETED' && !tournament.isLegacy && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setResetMatchTarget(match);
+                                }}
+                                data-testid={`button-reset-match-${match.id}`}
+                                title="Reset Match"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                            {tournament.isLegacy && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => { e.stopPropagation(); handleDeleteMatch(match.id); }}
+                                data-testid={`button-delete-match-${match.id}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {match.status === 'COMPLETED' && (
+                          <AdminMatchStats
+                            matchId={match.id}
+                            playerAName={playerA?.name || "TBD"}
+                            playerBName={playerB?.name || "TBD"}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderKnockoutMatches = () => (
+    <div className="space-y-8">
+      {groupMatchData.nonGroupRounds.map(({ roundKey, matches: roundMatches }, roundIdx) => (
+        <div key={roundKey} className="space-y-4">
+          <h2 className="text-xl font-bold text-primary" data-testid={`knockout-round-header-${roundKey}`}>
+            {getRoundDisplayName(roundKey)}
+          </h2>
+          <div className={cn(
+            "grid gap-4",
+            roundMatches.length === 1 ? "grid-cols-1 max-w-md mx-auto" : "grid-cols-1 md:grid-cols-2"
+          )}>
+            {roundMatches.map((match: any, matchIdx: number) => {
+              const playerA = getPlayer(match.playerAId);
+              const playerB = getPlayer(match.playerBId);
+              const slotLabel = knockoutSlotLabels[match.id];
+              const labelA = playerA?.name || slotLabel?.a || 'TBD';
+              const labelB = playerB?.name || slotLabel?.b || 'TBD';
+              const isEditingThis = editingKnockoutMatchId === match.id && tournament.isLegacy;
+
+              return (
+                <Card
+                  key={match.id}
+                  onClick={() => { if (!isEditingThis) setSelectedMatch(match); }}
+                  className={cn(
+                    "overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
+                    match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
+                  )}
+                  data-testid={`match-card-${match.id}`}
+                >
+                  <div className="bg-primary px-4 py-2 flex items-center justify-between gap-2">
+                    <span className="text-primary-foreground font-bold text-sm">
+                      {roundKey === 'F' ? 'Final' : `${getRoundDisplayName(roundKey)} ${matchIdx + 1}`}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {match.status === 'COMPLETED' && !tournament.isLegacy && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setResetMatchTarget(match);
+                          }}
+                          data-testid={`button-reset-knockout-${match.id}`}
+                          title="Reset Match"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {tournament.isLegacy && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-6 px-2 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingKnockoutMatchId(isEditingThis ? null : match.id);
+                          }}
+                          data-testid={`button-edit-knockout-${match.id}`}
+                        >
+                          <Pencil className="w-3 h-3 mr-1" />
+                          {isEditingThis ? "Done" : "Edit"}
+                        </Button>
+                      )}
+                      {match.status === 'COMPLETED' && (
+                        <Badge variant="secondary" className="text-xs">Completed</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <CardContent className="p-0">
+                    <div className="flex items-center justify-between px-4 py-3 border-b gap-2">
+                      <div className="flex-1">
+                        {isEditingThis ? (
+                          <Select
+                            value={match.playerAId?.toString() || ""}
+                            onValueChange={(val) => handleUpdateMatchPlayer(match.id, 'A', parseInt(val))}
+                          >
+                            <SelectTrigger className="h-8" onClick={(e) => e.stopPropagation()} data-testid={`select-knockout-player-a-${match.id}`}>
+                              <SelectValue placeholder="Select player" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {players.map((p: Player) => (
+                                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className={cn(
+                            "text-sm font-medium",
+                            match.status === 'COMPLETED' && match.winnerId === match.playerAId && match.playerAId && "text-primary font-bold"
+                          )}>
+                            {labelA}
+                          </span>
+                        )}
+                      </div>
+                      <div className={cn(
+                        "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                        match.status === 'COMPLETED' && match.scoreA > match.scoreB ? "bg-primary text-primary-foreground" : "bg-muted"
+                      )}>
+                        {match.scoreA || 0}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3 gap-2">
+                      <div className="flex-1">
+                        {isEditingThis ? (
+                          <Select
+                            value={match.playerBId?.toString() || ""}
+                            onValueChange={(val) => handleUpdateMatchPlayer(match.id, 'B', parseInt(val))}
+                          >
+                            <SelectTrigger className="h-8" onClick={(e) => e.stopPropagation()} data-testid={`select-knockout-player-b-${match.id}`}>
+                              <SelectValue placeholder="Select player" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {players.map((p: Player) => (
+                                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className={cn(
+                            "text-sm font-medium",
+                            match.status === 'COMPLETED' && match.winnerId === match.playerBId && match.playerBId && "text-primary font-bold"
+                          )}>
+                            {labelB}
+                          </span>
+                        )}
+                      </div>
+                      <div className={cn(
+                        "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                        match.status === 'COMPLETED' && match.scoreB > match.scoreA ? "bg-primary text-primary-foreground" : "bg-muted"
+                      )}>
+                        {match.scoreB || 0}
+                      </div>
+                    </div>
+                    <div className="px-4 pb-2">
+                      <InlineScorerEdit
+                        matchId={match.id}
+                        tournamentId={tournament.id}
+                        currentName={match.scorerName || null}
+                        isLegacy={tournament.isLegacy || false}
+                      />
+                    </div>
+                    {match.status === 'COMPLETED' && (
+                      <div className="px-4 pb-3">
+                        <AdminMatchStats
+                          matchId={match.id}
+                          playerAName={labelA}
+                          playerBName={labelB}
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      {groupMatchData.nonGroupRounds.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          <p className="text-lg font-medium">Knockout stage not yet generated</p>
+          <p className="text-sm mt-1">Complete the group stage to advance players to the knockout rounds.</p>
+        </div>
+      )}
+    </div>
+  );
+
+  const isMultiStage = tournament.type === 'MULTI_STAGE';
+  const liveMatches = matches.filter((m: any) => m.status === 'IN_PROGRESS');
+  const tabCount = 4 + (isMultiStage ? 1 : 0);
+
   return (
     <LayoutShell>
       <div className="space-y-8">
@@ -586,1638 +939,259 @@ export default function TournamentDetail() {
                 </p>
               ) : null;
             })()}
-            <p className="text-muted-foreground mt-0.5 text-sm">
-              Created on {new Date(tournament.createdAt!).toLocaleDateString()}
-            </p>
-          </div>
-          
-          <div className="flex gap-2">
-            {!tournament.isLegacy && (
-              <Button 
-                variant="outline" 
-                className="gap-2"
-                onClick={() => setIsDevicesDialogOpen(true)}
-                data-testid="button-tablet-scoring"
-              >
-                <TabletSmartphone className="w-4 h-4" />
-                Tablet Scoring
-              </Button>
-            )}
-            {!tournament.isLegacy && <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <Share2 className="w-4 h-4" />
-                  Share Public Page
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Share Tournament</DialogTitle>
-                  <DialogDescription>
-                    Anyone with the link can view live scores and standings.
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4 py-4">
-                  {!tournament.shareEnabled ? (
-                    <div className="text-center py-6">
-                      <p className="text-sm text-muted-foreground mb-4">Public sharing is currently disabled.</p>
-                      <Button onClick={() => enableShare.mutate()} disabled={enableShare.isPending}>
-                        Generate Public Link
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex flex-col items-center py-2" data-testid="section-share-qr">
-                        <div className="bg-white p-3 rounded-lg" id="share-qr-container">
-                          <QRCodeSVG 
-                            value={`${window.location.origin}/public/t/${tournament.shareToken}`} 
-                            size={200} 
-                            level="H"
-                            includeMargin={false}
-                          />
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="mt-2 text-xs"
-                          data-testid="button-download-qr"
-                          onClick={() => {
-                            const svg = document.querySelector('#share-qr-container svg');
-                            if (!svg) return;
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            const svgData = new XMLSerializer().serializeToString(svg);
-                            const img = new Image();
-                            img.onload = () => {
-                              canvas.width = 600;
-                              canvas.height = 600;
-                              ctx!.fillStyle = '#ffffff';
-                              ctx!.fillRect(0, 0, 600, 600);
-                              ctx!.drawImage(img, 0, 0, 600, 600);
-                              const link = document.createElement('a');
-                              link.download = `${tournament.name.replace(/[^a-zA-Z0-9]/g, '_')}_QR.png`;
-                              link.href = canvas.toDataURL('image/png');
-                              link.click();
-                            };
-                            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
-                          }}
-                        >
-                          <Download className="w-3 h-3 mr-1" /> Download QR Code
-                        </Button>
-                      </div>
-                      <div className="flex gap-2">
-                        <Input 
-                          readOnly 
-                          value={`${window.location.origin}/public/t/${tournament.shareToken}`} 
-                          data-testid="input-share-link"
-                        />
-                        <Button size="icon" onClick={handleCopyLink} data-testid="button-copy-share-link">
-                          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        </Button>
-                      </div>
-                      <div className="flex justify-between">
-                        <Button variant="ghost" asChild className="px-0">
-                          <a href={`/public/t/${tournament.shareToken}`} target="_blank" rel="noopener noreferrer" data-testid="link-open-public-view">
-                            Open Public View <ExternalLink className="w-3 h-3 ml-1" />
-                          </a>
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          className="text-destructive hover:text-destructive/90"
-                          onClick={() => disableShare.mutate()}
-                          data-testid="button-disable-sharing"
-                        >
-                          Disable Sharing
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>}
-            
-            <Button variant="outline" size="icon" data-testid="button-settings-menu" onClick={() => { setRenameName(tournament.name); setSelectedLeagueId(tournament.leagueId?.toString() ?? "none"); setIsSettingsDialogOpen(true); }}>
-              <Settings className="w-4 h-4" />
-            </Button>
-
-            <BoardSessionsDialog
-              open={isDevicesDialogOpen}
-              onOpenChange={setIsDevicesDialogOpen}
-              tournament={tournament}
-              groups={groups}
-              enableShare={enableShare}
-              toast={toast}
-              boardStatuses={boardStatuses}
-            />
-
-            {/* Unified Settings Dialog */}
-            <TournamentSettingsDialog
-              open={isSettingsDialogOpen}
-              onOpenChange={setIsSettingsDialogOpen}
-              tournament={tournament}
-              isOwner={isOwner}
-              isCollaborator={isCollaborator}
-              ownerName={ownerName}
-              leaguesList={leaguesList}
-              selectedLeagueId={selectedLeagueId}
-              setSelectedLeagueId={setSelectedLeagueId}
-              renameName={renameName}
-              setRenameName={setRenameName}
-              collaborators={collaborators}
-              newCollabEmail={newCollabEmail}
-              setNewCollabEmail={setNewCollabEmail}
-              addCollaboratorMutation={addCollaboratorMutation}
-              removeCollaboratorMutation={removeCollaboratorMutation}
-              deleteTournamentMutation={deleteTournamentMutation}
-              tournamentId={tournamentId}
-              setLocation={setLocation}
-              setIsDevicesDialogOpen={setIsDevicesDialogOpen}
-              toast={toast}
-            />
-          </div>
-        </div>
-
-        {/* Content Tabs */}
-        {(() => {
-          const isMultiStage = tournament.type === "MULTI_STAGE";
-          const hasKnockout = groupMatchData.nonGroupRounds.length > 0;
-          const hasGroups = groupMatchData.byGroup.length > 0;
-          const baseTabCount = isMultiStage ? (hasGroups && hasKnockout ? 4 : 3) : 3;
-          const tabCount = baseTabCount + 1;
-
-          const liveMatches = matches.filter((m: any) => m.status === 'IN_PROGRESS');
-          const pendingMatches = matches.filter((m: any) => m.status === 'PENDING');
-
-          const getGroupForMatch = (match: any) => {
-            if (!match.groupId) return null;
-            return groups.find((g: any) => g.id === match.groupId) || null;
-          };
-
-          const renderLiveTab = () => {
-            const sortedGroups = [...groups].sort((a: any, b: any) => a.name.localeCompare(b.name));
-            const groupStageMatches = matches.filter((m: any) => m.stage === 'GROUP');
-            const knockoutStageMatches = matches.filter((m: any) => m.stage !== 'GROUP');
-            const groupsFinished = groupStageMatches.length > 0 && groupStageMatches.every((m: any) => m.status === 'COMPLETED');
-
-            const boardMatches: { group: any; match: any; isLive: boolean; label: string }[] = [];
-
-            if (!groupsFinished) {
-              for (const group of sortedGroups) {
-                const inProgress = liveMatches.find((m: any) => m.groupId === group.id);
-                if (inProgress) {
-                  boardMatches.push({ group, match: inProgress, isLive: true, label: `${group.name} — Board ${sortedGroups.indexOf(group) + 1}` });
-                } else {
-                  const nextPending = pendingMatches.find((m: any) => m.groupId === group.id);
-                  if (nextPending) {
-                    boardMatches.push({ group, match: nextPending, isLive: false, label: `${group.name} — Board ${sortedGroups.indexOf(group) + 1}` });
-                  }
-                }
-              }
-            } else if (knockoutStageMatches.length > 0) {
-              const knockoutRounds = Array.from(new Set(knockoutStageMatches.map((m: any) => m.roundKey))) as string[];
-              knockoutRounds.sort((a: string, b: string) => {
-                const order: Record<string, number> = { QF: 1, SF: 2, F: 3 };
-                return (order[a] || 0) - (order[b] || 0);
-              });
-
-              let currentRoundKey: string | null = null;
-              for (const rk of knockoutRounds) {
-                const roundMatches = knockoutStageMatches.filter((m: any) => m.roundKey === rk);
-                const allDone = roundMatches.every((m: any) => m.status === 'COMPLETED');
-                if (!allDone) {
-                  currentRoundKey = rk;
-                  break;
-                }
-              }
-
-              if (currentRoundKey) {
-                const currentRoundMatches = knockoutStageMatches.filter((m: any) => m.roundKey === currentRoundKey);
-                currentRoundMatches.forEach((match: any, i: number) => {
-                  const isLive = match.status === 'IN_PROGRESS';
-                  const isPending = match.status === 'PENDING';
-                  const isCompleted = match.status === 'COMPLETED';
-                  if (isLive || isPending || isCompleted) {
-                    const slotLabel = knockoutSlotLabels[match.id];
-                    const playerA = getPlayer(match.playerAId);
-                    const playerB = getPlayer(match.playerBId);
-                    boardMatches.push({
-                      group: null,
-                      match: {
-                        ...match,
-                        _labelA: playerA?.name || slotLabel?.a || 'TBD',
-                        _labelB: playerB?.name || slotLabel?.b || 'TBD',
-                      },
-                      isLive,
-                      label: `${getRoundDisplayName(currentRoundKey!)}${currentRoundMatches.length > 1 ? ` ${i + 1}` : ''}`
-                    });
-                  }
-                });
-              }
-            }
-
-            if (boardMatches.length === 0) {
-              return (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Radio className="w-12 h-12 mx-auto mb-4 opacity-40" />
-                  <p className="text-lg font-medium">No active matches</p>
-                  <p className="text-sm mt-1">All matches have been completed or none have started yet.</p>
-                </div>
-              );
-            }
-
-            return (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {boardMatches.map(({ group, match, isLive, label }, idx) => {
-                  const playerA = getPlayer(match.playerAId);
-                  const playerB = getPlayer(match.playerBId);
-                  const nameA = match._labelA || playerA?.name || "TBD";
-                  const nameB = match._labelB || playerB?.name || "TBD";
-                  const isCompleted = match.status === 'COMPLETED';
-                  const ls = isLive ? liveScorings.get(match.id) : undefined;
-
-                  return (
-                    <Card
-                      key={match.id}
-                      onClick={() => setSelectedMatch(match)}
-                      className={cn(
-                        "overflow-hidden cursor-pointer transition-all hover:shadow-md",
-                        isLive ? "border-2 border-green-500/50" : isCompleted ? "bg-muted/30" : "border-dashed"
-                      )}
-                      data-testid={`live-board-card-${idx + 1}`}
-                    >
-                      <div className={cn(
-                        "px-4 py-2 flex items-center justify-between",
-                        isLive ? "bg-green-600 dark:bg-green-700" : "bg-muted"
-                      )}>
-                        <span className={cn(
-                          "font-bold text-sm flex items-center gap-2",
-                          isLive ? "text-white" : "text-muted-foreground"
-                        )}>
-                          {isLive && <span className="w-2 h-2 bg-white rounded-full animate-pulse" />}
-                          {label}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {isLive && ls && (
-                            <span className={cn("text-xs", isLive ? "text-white/70" : "text-muted-foreground")}>
-                              Leg {(ls.legsWonA + ls.legsWonB + 1)} / Best of {ls.bestOf}
-                            </span>
-                          )}
-                          {isLive ? (
-                            <Badge className="bg-white/20 text-white text-xs">Live</Badge>
-                          ) : isCompleted ? (
-                            <Badge variant="secondary" className="text-xs">Completed</Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">Up Next</Badge>
-                          )}
-                        </div>
-                      </div>
-                      <CardContent className="p-0">
-                        {isLive && ls ? (
-                          <div className="p-3">
-                            <div className="text-center mb-2">
-                              <div className="flex items-center justify-center gap-3 tabular-nums">
-                                <span className={cn("text-2xl font-bold", ls.legsWonA >= ls.legsWonB ? "text-primary" : "text-muted-foreground")}>{ls.legsWonA}</span>
-                                <span className="text-muted-foreground text-sm">-</span>
-                                <span className={cn("text-2xl font-bold", ls.legsWonB >= ls.legsWonA ? "text-primary" : "text-muted-foreground")}>{ls.legsWonB}</span>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className={cn(
-                                "rounded-lg p-3 transition-all",
-                                ls.currentThrower === 'A'
-                                  ? "bg-red-600/15 ring-2 ring-red-500/50"
-                                  : "bg-green-600/15 ring-2 ring-green-500/50"
-                              )}>
-                                <div className="h-3.5 mb-0.5">
-                                  {ls.currentThrower === 'A' && (
-                                    <div className="flex items-center gap-1">
-                                      <Eye className="w-3 h-3 text-red-500" />
-                                      <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <p className="text-xs font-bold truncate">{nameA}</p>
-                                <p className="text-3xl font-bold tabular-nums leading-none mt-1">{ls.remainingA}</p>
-                                <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                                  <div className="flex justify-between"><span>Avg</span><span className="font-medium tabular-nums text-foreground">{ls.avgA}</span></div>
-                                  <div className="flex justify-between"><span>Last</span><span className="font-medium tabular-nums text-foreground">{ls.lastScoreA !== null ? ls.lastScoreA : '-'}</span></div>
-                                  <div className="flex justify-between"><span>Darts</span><span className="font-medium tabular-nums text-foreground">{ls.dartsA}</span></div>
-                                </div>
-                              </div>
-                              <div className={cn(
-                                "rounded-lg p-3 transition-all",
-                                ls.currentThrower === 'B'
-                                  ? "bg-red-600/15 ring-2 ring-red-500/50"
-                                  : "bg-green-600/15 ring-2 ring-green-500/50"
-                              )}>
-                                <div className="h-3.5 mb-0.5">
-                                  {ls.currentThrower === 'B' && (
-                                    <div className="flex items-center gap-1">
-                                      <Eye className="w-3 h-3 text-red-500" />
-                                      <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <p className="text-xs font-bold truncate">{nameB}</p>
-                                <p className="text-3xl font-bold tabular-nums leading-none mt-1">{ls.remainingB}</p>
-                                <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                                  <div className="flex justify-between"><span>Avg</span><span className="font-medium tabular-nums text-foreground">{ls.avgB}</span></div>
-                                  <div className="flex justify-between"><span>Last</span><span className="font-medium tabular-nums text-foreground">{ls.lastScoreB !== null ? ls.lastScoreB : '-'}</span></div>
-                                  <div className="flex justify-between"><span>Darts</span><span className="font-medium tabular-nums text-foreground">{ls.dartsB}</span></div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex items-center justify-between px-4 py-3 border-b">
-                              <span className={cn(
-                                "text-sm font-medium flex-1",
-                                (isLive || isCompleted) && match.winnerId === match.playerAId && match.playerAId && "text-primary font-bold"
-                              )}>
-                                {nameA}
-                              </span>
-                              <div className={cn(
-                                "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
-                                (isLive || isCompleted) && (match.scoreA || 0) > (match.scoreB || 0) ? "bg-primary text-primary-foreground" : "bg-muted"
-                              )}>
-                                {isLive || isCompleted ? (match.scoreA || 0) : "-"}
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between px-4 py-3">
-                              <span className={cn(
-                                "text-sm font-medium flex-1",
-                                (isLive || isCompleted) && match.winnerId === match.playerBId && match.playerBId && "text-primary font-bold"
-                              )}>
-                                {nameB}
-                              </span>
-                              <div className={cn(
-                                "w-8 h-8 flex items-center justify-center rounded text-sm font-bold",
-                                (isLive || isCompleted) && (match.scoreB || 0) > (match.scoreA || 0) ? "bg-primary text-primary-foreground" : "bg-muted"
-                              )}>
-                                {isLive || isCompleted ? (match.scoreB || 0) : "-"}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                        <div className="px-4 py-1.5 border-t">
-                          <InlineScorerEdit matchId={match.id} tournamentId={tournamentId} currentName={match.scorerName} />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            );
-          };
-
-          const handleCreateManualMatch = async () => {
-            if (!newMatchPlayerA || !newMatchPlayerB) return;
-            if (newMatchPlayerA === newMatchPlayerB) {
-              toast({ title: "Error", description: "Cannot match a player against themselves.", variant: "destructive" });
-              return;
-            }
-            setIsCreatingMatch(true);
-            try {
-              await apiRequest("POST", `/api/tournaments/${tournamentId}/matches/manual`, {
-                playerAId: parseInt(newMatchPlayerA),
-                playerBId: parseInt(newMatchPlayerB),
-                stage: newMatchStage,
-                roundKey: newMatchStage === "GROUP" ? "group" : newMatchStage === "KNOCKOUT" ? "QF" : newMatchStage.toLowerCase(),
-                groupId: newMatchGroupId ? parseInt(newMatchGroupId) : null,
-                bestOf: (tournament.settings as any)?.matchFormat || 3,
-              });
-              queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
-              toast({ title: "Match Created", description: "New match has been added." });
-              setIsCreateMatchOpen(false);
-              setNewMatchPlayerA("");
-              setNewMatchPlayerB("");
-              setNewMatchGroupId("");
-            } catch {
-              toast({ title: "Error", description: "Failed to create match.", variant: "destructive" });
-            } finally {
-              setIsCreatingMatch(false);
-            }
-          };
-
-          const handleDeleteMatch = async (matchId: number) => {
-            try {
-              await apiRequest("DELETE", `/api/tournaments/${tournamentId}/matches/${matchId}`);
-              queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
-              toast({ title: "Match Deleted", description: "Match has been removed." });
-            } catch {
-              toast({ title: "Error", description: "Failed to delete match.", variant: "destructive" });
-            }
-          };
-
-          const handleRecalculateMatches = async () => {
-            setIsRecalculating(true);
-            try {
-              await apiRequest("POST", `/api/tournaments/${tournamentId}/matches/recalculate`);
-              queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
-              toast({ title: "Matches Recalculated", description: "Group matches have been regenerated based on current group assignments." });
-            } catch {
-              toast({ title: "Error", description: "Failed to recalculate matches.", variant: "destructive" });
-            } finally {
-              setIsRecalculating(false);
-            }
-          };
-
-
-          const renderGroupMatches = () => (
-            <div className="space-y-8">
-              {groupMatchData.byGroup.map(({ group, rounds }) => (
-                <div key={group.id} className="space-y-4">
-                  <h2 className="text-xl font-bold text-primary" data-testid={`group-header-${group.id}`}>{group.name}</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {rounds.map(({ roundKey, matches: roundMatches }) => (
-                      <Card key={roundKey} className="overflow-hidden" data-testid={`round-card-${group.id}-${roundKey}`}>
-                        <div className="bg-primary px-4 py-2 flex items-center justify-between">
-                          <span className="text-primary-foreground font-bold text-sm">
-                            Round {roundKey.replace("R", "")}
-                          </span>
-                        </div>
-                        <CardContent className="p-3 space-y-2">
-                          {roundMatches.map((match: any) => {
-                            const playerA = getPlayer(match.playerAId);
-                            const playerB = getPlayer(match.playerBId);
-                            return (
-                              <div
-                                key={match.id}
-                                onClick={() => setSelectedMatch(match)}
-                                className={cn(
-                                  "rounded-lg border p-3 cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
-                                  match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
-                                )}
-                                data-testid={`match-card-${match.id}`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1 space-y-1">
-                                    <div className={cn(
-                                      "text-sm font-medium",
-                                      match.status === 'COMPLETED' && match.winnerId === playerA?.id && "text-primary font-bold"
-                                    )}>
-                                      {playerA?.name || "TBD"}
-                                    </div>
-                                    <div className={cn(
-                                      "text-sm font-medium",
-                                      match.status === 'COMPLETED' && match.winnerId === playerB?.id && "text-primary font-bold"
-                                    )}>
-                                      {playerB?.name || "TBD"}
-                                    </div>
-                                  </div>
-                                  <div className="flex flex-col items-center gap-1 ml-3">
-                                    <div className={cn(
-                                      "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
-                                      match.status === 'COMPLETED' && match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
-                                    )}>
-                                      {match.scoreA || 0}
-                                    </div>
-                                    <div className={cn(
-                                      "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
-                                      match.status === 'COMPLETED' && match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
-                                    )}>
-                                      {match.scoreB || 0}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center justify-between gap-2">
-                                  <InlineScorerEdit
-                                    matchId={match.id}
-                                    tournamentId={tournament.id}
-                                    currentName={match.scorerName || null}
-                                    isLegacy={tournament.isLegacy || false}
-                                  />
-                                  {tournament.isLegacy && (
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="text-muted-foreground hover:text-destructive"
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteMatch(match.id); }}
-                                      data-testid={`button-delete-match-${match.id}`}
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                  )}
-                                </div>
-                                {match.status === 'COMPLETED' && (
-                                  <AdminMatchStats
-                                    matchId={match.id}
-                                    playerAName={playerA?.name || "TBD"}
-                                    playerBName={playerB?.name || "TBD"}
-                                  />
-                                )}
-                              </div>
-                            );
-                          })}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          );
-
-          const handleUpdateMatchPlayer = async (matchId: number, slot: 'A' | 'B', playerId: number) => {
-            try {
-              const body = slot === 'A' ? { playerAId: playerId } : { playerBId: playerId };
-              await apiRequest("PATCH", `/api/tournaments/${tournamentId}/matches/${matchId}/players`, body);
-              queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
-              toast({ title: "Player Updated", description: "Match player has been changed." });
-            } catch {
-              toast({ title: "Error", description: "Failed to update match player.", variant: "destructive" });
-            }
-          };
-
-          const renderKnockoutMatches = () => (
-            <div className="space-y-8">
-              {groupMatchData.nonGroupRounds.map(({ roundKey, matches: roundMatches }, roundIdx) => (
-                <div key={roundKey} className="space-y-4">
-                  <h2 className="text-xl font-bold text-primary" data-testid={`knockout-round-header-${roundKey}`}>
-                    {getRoundDisplayName(roundKey)}
-                  </h2>
-                  <div className={cn(
-                    "grid gap-4",
-                    roundMatches.length === 1 ? "grid-cols-1 max-w-md mx-auto" : "grid-cols-1 md:grid-cols-2"
-                  )}>
-                    {roundMatches.map((match: any, matchIdx: number) => {
-                      const playerA = getPlayer(match.playerAId);
-                      const playerB = getPlayer(match.playerBId);
-                      const slotLabel = knockoutSlotLabels[match.id];
-                      const labelA = playerA?.name || slotLabel?.a || 'TBD';
-                      const labelB = playerB?.name || slotLabel?.b || 'TBD';
-                      const isEditingThis = editingKnockoutMatchId === match.id && tournament.isLegacy;
-
-                      return (
-                        <Card
-                          key={match.id}
-                          onClick={() => { if (!isEditingThis) setSelectedMatch(match); }}
-                          className={cn(
-                            "overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
-                            match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
-                          )}
-                          data-testid={`match-card-${match.id}`}
-                        >
-                          <div className="bg-primary px-4 py-2 flex items-center justify-between gap-2">
-                            <span className="text-primary-foreground font-bold text-sm">
-                              {roundKey === 'F' ? 'Final' : `${getRoundDisplayName(roundKey)} ${matchIdx + 1}`}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              {tournament.isLegacy && (
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  className="h-6 px-2 text-xs"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingKnockoutMatchId(isEditingThis ? null : match.id);
-                                  }}
-                                  data-testid={`button-edit-knockout-${match.id}`}
-                                >
-                                  <Pencil className="w-3 h-3 mr-1" />
-                                  {isEditingThis ? "Done" : "Edit"}
-                                </Button>
-                              )}
-                              {match.status === 'COMPLETED' && !tournament.isLegacy && (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="h-6 px-2 text-xs"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setResetMatchTarget(match);
-                                  }}
-                                  data-testid={`button-reset-knockout-${match.id}`}
-                                >
-                                  <RefreshCw className="w-3 h-3 mr-1" />
-                                  Reset
-                                </Button>
-                              )}
-                              {match.status === 'COMPLETED' && (
-                                <Badge variant="secondary" className="text-xs">Completed</Badge>
-                              )}
-                            </div>
-                          </div>
-                          <CardContent className="p-0">
-                            <div className="flex items-center justify-between px-4 py-3 border-b gap-2">
-                              <div className="flex-1">
-                                {isEditingThis ? (
-                                  <Select
-                                    value={match.playerAId?.toString() || ""}
-                                    onValueChange={(val) => handleUpdateMatchPlayer(match.id, 'A', parseInt(val))}
-                                  >
-                                    <SelectTrigger className="h-8" onClick={(e) => e.stopPropagation()} data-testid={`select-knockout-player-a-${match.id}`}>
-                                      <SelectValue placeholder="Select player" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {players.map((p: Player) => (
-                                        <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <span className={cn(
-                                    "text-sm font-medium",
-                                    match.status === 'COMPLETED' && match.winnerId === match.playerAId && match.playerAId && "text-primary font-bold"
-                                  )}>
-                                    {labelA}
-                                  </span>
-                                )}
-                              </div>
-                              <div className={cn(
-                                "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
-                                match.status === 'COMPLETED' && match.scoreA > match.scoreB ? "bg-primary text-primary-foreground" : "bg-muted"
-                              )}>
-                                {match.scoreA || 0}
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between px-4 py-3 gap-2">
-                              <div className="flex-1">
-                                {isEditingThis ? (
-                                  <Select
-                                    value={match.playerBId?.toString() || ""}
-                                    onValueChange={(val) => handleUpdateMatchPlayer(match.id, 'B', parseInt(val))}
-                                  >
-                                    <SelectTrigger className="h-8" onClick={(e) => e.stopPropagation()} data-testid={`select-knockout-player-b-${match.id}`}>
-                                      <SelectValue placeholder="Select player" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {players.map((p: Player) => (
-                                        <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <span className={cn(
-                                    "text-sm font-medium",
-                                    match.status === 'COMPLETED' && match.winnerId === match.playerBId && match.playerBId && "text-primary font-bold"
-                                  )}>
-                                    {labelB}
-                                  </span>
-                                )}
-                              </div>
-                              <div className={cn(
-                                "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
-                                match.status === 'COMPLETED' && match.scoreB > match.scoreA ? "bg-primary text-primary-foreground" : "bg-muted"
-                              )}>
-                                {match.scoreB || 0}
-                              </div>
-                            </div>
-                            <div className="px-4 pb-2">
-                              <InlineScorerEdit
-                                matchId={match.id}
-                                tournamentId={tournament.id}
-                                currentName={match.scorerName || null}
-                                isLegacy={tournament.isLegacy || false}
-                              />
-                            </div>
-                            {match.status === 'COMPLETED' && (
-                              <div className="px-4 pb-3">
-                                <AdminMatchStats
-                                  matchId={match.id}
-                                  playerAName={labelA}
-                                  playerBName={labelB}
-                                />
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-              {groupMatchData.nonGroupRounds.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p className="text-lg font-medium">Knockout stage not yet generated</p>
-                  <p className="text-sm mt-1">Complete the group stage to advance players to the knockout rounds.</p>
-                </div>
-              )}
-            </div>
-          );
-
-          return (
-            <Tabs defaultValue="live" className="space-y-6">
-              <TabsList className={cn("grid w-full lg:w-[600px]", tabCount === 5 ? "grid-cols-5" : "grid-cols-4")}>
-                <TabsTrigger value="live" data-testid="tab-live" className="gap-1.5">
-                  <Radio className="w-3.5 h-3.5" />
-                  Live
-                  {liveMatches.length > 0 && (
-                    <span className="ml-1 w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold">
-                      {liveMatches.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                {isMultiStage ? (
-                  <>
-                    <TabsTrigger value="group-stage" data-testid="tab-group-stage">Groups</TabsTrigger>
-                    <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
-                    <TabsTrigger value="knockout" data-testid="tab-knockout">Knockout</TabsTrigger>
-                  </>
-                ) : (
-                  <>
-                    <TabsTrigger value="matches" data-testid="tab-matches">Matches</TabsTrigger>
-                    <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
-                  </>
-                )}
-                <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="live" className="space-y-6" data-testid="content-live">
-                {renderLiveTab()}
-              </TabsContent>
-
-              {isMultiStage ? (
-                <>
-                  <TabsContent value="group-stage" className="space-y-8" data-testid="content-group-stage">
-                    {renderGroupMatches()}
-                  </TabsContent>
-                </>
-              ) : (
-                <TabsContent value="matches" className="space-y-8">
-                  {renderGroupMatches()}
-                  {renderKnockoutMatches()}
-                </TabsContent>
-              )}
-
-              <TabsContent value="standings" className="space-y-6">
-            {groupStandings.map(({ group, standings }: any, gIdx: number) => (
-              <Card key={gIdx} data-testid={`standings-group-${gIdx}`}>
-                <CardHeader>
-                  <CardTitle>{group.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[50px]">#</TableHead>
-                          <TableHead>Player</TableHead>
-                          <TableHead className="text-center">P</TableHead>
-                          <TableHead className="text-center">W</TableHead>
-                          <TableHead className="text-center">L</TableHead>
-                          <TableHead className="text-center hidden md:table-cell">LW</TableHead>
-                          <TableHead className="text-center hidden md:table-cell">LL</TableHead>
-                          <TableHead className="text-center hidden md:table-cell">+/-</TableHead>
-                          <TableHead className="text-right font-bold">Pts</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {standings.map((player: any, idx: number) => {
-                          const qualifying = idx < 2;
-                          return (
-                          <TableRow key={player.id} className={qualifying ? "bg-green-50 dark:bg-green-950/30" : ""}>
-                            <TableCell className="font-medium text-muted-foreground">
-                              <div className="flex items-center gap-1.5">
-                                {idx + 1}
-                                {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
-                              </div>
-                            </TableCell>
-                            <TableCell className={cn("font-bold", qualifying && "text-green-700 dark:text-green-400")}>{player.name}</TableCell>
-                            <TableCell className="text-center">{player.played}</TableCell>
-                            <TableCell className="text-center text-green-600">{player.won}</TableCell>
-                            <TableCell className="text-center text-red-500">{player.lost}</TableCell>
-                            <TableCell className="text-center hidden md:table-cell font-mono">{player.legsFor}</TableCell>
-                            <TableCell className="text-center hidden md:table-cell font-mono">{player.legsAgainst}</TableCell>
-                            <TableCell className="text-center hidden md:table-cell font-mono">
-                              {player.diff > 0 ? `+${player.diff}` : player.diff}
-                            </TableCell>
-                            <TableCell className="text-right font-bold text-primary text-lg">{player.pts}</TableCell>
-                          </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            <Card data-testid="standings-criteria">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Standings Criteria</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  Group standings are determined by the following criteria, applied in order:
-                </p>
-                <ol className="list-decimal list-inside space-y-1.5 pl-1">
-                  <li><span className="font-medium text-foreground">Points</span> — {ptsWin} for a win{ptsLoss !== 0 ? `, ${ptsLoss} for a loss` : ''}. The player with the most points is ranked highest.</li>
-                  <li><span className="font-medium text-foreground">Leg Difference</span> — If tied on points, the player with the better leg difference (legs won minus legs lost) is ranked higher.</li>
-                  <li><span className="font-medium text-foreground">Legs Won</span> — If still tied, the player with the most legs won is ranked higher.</li>
-                  <li><span className="font-medium text-foreground">Head-to-Head</span> — If still tied, the result between the tied players is used. The same criteria (points, leg difference, legs won) are applied to only the matches played between the tied players.</li>
-                </ol>
-                <p className="text-xs text-muted-foreground/70 pt-1">
-                  If players remain tied after all criteria, they share the same effective position.
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-              {isMultiStage && (
-                <TabsContent value="knockout" className="space-y-6" data-testid="content-knockout">
-                  {renderKnockoutMatches()}
-                </TabsContent>
-              )}
-          
-          <TabsContent value="players">
-            {(() => {
-              const getPlayerBestRound = (playerId: number) => {
-                const roundPriority: Record<string, number> = { 'F': 5, 'SF': 4, 'QF': 3, 'R16': 2, 'R32': 1, 'group': 0 };
-                let bestRound = 'group';
-                let bestPriority = 0;
-                let wonFinal = false;
-
-                const allPlayerMatches = matches.filter(
-                  (m: any) => m.playerAId === playerId || m.playerBId === playerId
-                );
-                for (const m of allPlayerMatches) {
-                  if (m.stage === 'KNOCKOUT') {
-                    const priority = roundPriority[m.roundKey] || 0;
-                    if (priority > bestPriority) {
-                      bestPriority = priority;
-                      bestRound = m.roundKey;
-                    }
-                  }
-                  if (m.roundKey === 'F' && m.status === 'COMPLETED' && m.winnerId === playerId) {
-                    wonFinal = true;
-                  }
-                }
-                return { bestRound, wonFinal };
-              };
-
-              const getPositionLabel = (bestRound: string, wonFinal: boolean) => {
-                if (bestRound === 'F') return wonFinal ? 'Champion' : 'Runner-Up';
-                if (bestRound === 'SF') return 'Semi-Finalist';
-                if (bestRound === 'QF') return 'Quarter-Finalist';
-                if (bestRound === 'R16') return 'R16';
-                if (bestRound === 'R32') return 'R32';
-                return 'Group';
-              };
-
-              const getPositionBadgeColor = (bestRound: string, wonFinal: boolean) => {
-                if (bestRound === 'F' && wonFinal) return 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
-                if (bestRound === 'F') return 'bg-gray-200/50 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300 border-gray-400/30';
-                if (bestRound === 'SF') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-400/30';
-                if (bestRound === 'QF') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-400/30';
-                if (bestRound === 'R16') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-400/30';
-                if (bestRound === 'R32') return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border-teal-400/30';
-                return 'bg-muted text-muted-foreground border-border';
-              };
-
-              const getPoints = (bestRound: string, wonFinal: boolean) => {
-                if (bestRound === 'F' && wonFinal) return 40;
-                if (bestRound === 'F') return 30;
-                if (bestRound === 'SF') return 20;
-                if (bestRound === 'QF') return 10;
-                if (bestRound === 'R16') return 8;
-                if (bestRound === 'R32') return 6;
-                return 5;
-              };
-
-              const getTotalLegsWon = (playerId: number) => {
-                let total = 0;
-                for (const m of matches) {
-                  if (m.status !== 'COMPLETED') continue;
-                  if (m.playerAId === playerId) total += (m.scoreA || 0);
-                  if (m.playerBId === playerId) total += (m.scoreB || 0);
-                }
-                return total;
-              };
-
-              const playerResults = players.map((p: Player) => {
-                const { bestRound, wonFinal } = getPlayerBestRound(p.id);
-                return {
-                  ...p,
-                  bestRound,
-                  wonFinal,
-                  positionLabel: getPositionLabel(bestRound, wonFinal),
-                  points: getPoints(bestRound, wonFinal),
-                  legsWon: getTotalLegsWon(p.id),
-                };
-              }).sort((a: any, b: any) => b.points - a.points || b.legsWon - a.legsWon);
-
-              const handleSavePlayerName = async (playerId: number) => {
-                if (!editingPlayerName.trim()) return;
-                try {
-                  await apiRequest("PATCH", `/api/tournaments/${tournamentId}/players/${playerId}`, { name: editingPlayerName.trim() });
-                  queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
-                  toast({ title: "Player Updated", description: "Player name has been updated." });
-                  setEditingPlayerId(null);
-                } catch {
-                  toast({ title: "Error", description: "Failed to update player name.", variant: "destructive" });
-                }
-              };
-
-              const hasGroups = groups && groups.length > 0;
-              const getPlayerGroup = (playerId: number) => {
-                const membership = groupMemberships.find((m: any) => m.playerId === playerId);
-                if (!membership) return null;
-                return groups.find((g: any) => g.id === membership.groupId) || null;
-              };
-
-              const handleGroupReassign = async (playerId: number, newGroupId: number) => {
-                try {
-                  await apiRequest("PATCH", `/api/tournaments/${tournamentId}/players/${playerId}/group`, { groupId: newGroupId });
-                  queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
-                  toast({ title: "Group Updated", description: "Player has been moved to a new group." });
-                } catch {
-                  toast({ title: "Error", description: "Failed to reassign group.", variant: "destructive" });
-                }
-              };
-
-              return (
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
-                    <CardTitle>Tournament Results</CardTitle>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {tournament.isLegacy && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={() => setIsRecalcConfirmOpen(true)}
-                            disabled={isRecalculating}
-                            data-testid="button-recalculate-matches"
-                          >
-                            <RefreshCw className={cn("w-4 h-4", isRecalculating && "animate-spin")} />
-                            {isRecalculating ? "Recalculating..." : "Recalculate Matches"}
-                          </Button>
-                          <Dialog open={isRecalcConfirmOpen} onOpenChange={setIsRecalcConfirmOpen}>
-                            <DialogContent className="sm:max-w-[425px]">
-                              <DialogHeader>
-                                <DialogTitle>Recalculate Matches?</DialogTitle>
-                                <DialogDescription>
-                                  This will reset all group stage matches and regenerate them based on current group assignments. All existing group match scores will be lost. This action cannot be undone.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <DialogFooter>
-                                <Button variant="ghost" onClick={() => setIsRecalcConfirmOpen(false)}>Cancel</Button>
-                                <Button
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setIsRecalcConfirmOpen(false);
-                                    handleRecalculateMatches();
-                                  }}
-                                  data-testid="button-confirm-recalculate"
-                                >
-                                  Recalculate
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-                        </>
-                      )}
-                    <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-2" onClick={() => setBulkInput(players.map((p: Player) => p.name).join("\n"))}>
-                          <Users className="w-4 h-4" />
-                          Bulk Edit
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[500px]">
-                        <DialogHeader>
-                          <DialogTitle>Bulk Edit Players</DialogTitle>
-                          <DialogDescription>
-                            Edit player names below. Enter one name per line.
-                            {tournament.isLegacy && ` You can remove names to delete players. Maximum: ${maxPlayers} players.`}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                          <Textarea 
-                            value={bulkInput} 
-                            onChange={(e) => setBulkInput(e.target.value)} 
-                            className="min-h-[300px] font-mono"
-                            placeholder="Enter player names..."
-                          />
-                        </div>
-                        <DialogFooter>
-                          <Button variant="ghost" onClick={() => setIsBulkDialogOpen(false)}>Cancel</Button>
-                          <Button onClick={handleBulkUpdate} disabled={isUpdatingPlayers}>
-                            {isUpdatingPlayers && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Save Changes
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[50px]">#</TableHead>
-                            <TableHead>Player</TableHead>
-                            {hasGroups && <TableHead className="text-center">Group</TableHead>}
-                            <TableHead className="text-center">Position</TableHead>
-                            <TableHead className="text-center">Legs Won</TableHead>
-                            <TableHead className="text-right font-bold">Points</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {playerResults.map((player: any, idx: number) => {
-                            const playerGroup = hasGroups ? getPlayerGroup(player.id) : null;
-                            return (
-                            <TableRow key={player.id} data-testid={`player-result-row-${player.id}`}>
-                              <TableCell className="font-medium text-muted-foreground">
-                                <div className="flex items-center gap-1.5">
-                                  {idx + 1}
-                                  {player.wonFinal && <Trophy className="w-4 h-4 text-yellow-500" />}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {editingPlayerId === player.id ? (
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      value={editingPlayerName}
-                                      onChange={(e) => setEditingPlayerName(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSavePlayerName(player.id);
-                                        if (e.key === 'Escape') setEditingPlayerId(null);
-                                      }}
-                                      className="h-8 w-40"
-                                      autoFocus
-                                      data-testid={`input-player-name-${player.id}`}
-                                    />
-                                    <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => handleSavePlayerName(player.id)} data-testid={`button-save-player-${player.id}`}>
-                                      <Check className="w-4 h-4 text-green-600" />
-                                    </Button>
-                                    <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingPlayerId(null)}>
-                                      &times;
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold">{player.name}</span>
-                                    <button
-                                      onClick={() => { setEditingPlayerId(player.id); setEditingPlayerName(player.name); }}
-                                      className="text-muted-foreground hover:text-foreground transition-colors"
-                                      data-testid={`button-edit-player-${player.id}`}
-                                    >
-                                      <Pencil className="w-3.5 h-3.5" />
-                                    </button>
-                                    {tournament.isLegacy && (
-                                      <button
-                                        onClick={() => setDeletePlayerTarget({ id: player.id, name: player.name })}
-                                        className="text-muted-foreground hover:text-destructive transition-colors"
-                                        data-testid={`button-delete-player-${player.id}`}
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </TableCell>
-                              {hasGroups && (
-                                <TableCell className="text-center">
-                                  {tournament.isLegacy ? (
-                                    <Select
-                                      value={playerGroup?.id?.toString() || ""}
-                                      onValueChange={(val) => handleGroupReassign(player.id, parseInt(val))}
-                                    >
-                                      <SelectTrigger className="h-8 w-28" data-testid={`select-group-${player.id}`}>
-                                        <SelectValue placeholder="No group" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {groups.map((g: any) => (
-                                          <SelectItem key={g.id} value={g.id.toString()}>
-                                            {g.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <Badge variant="outline">{playerGroup?.name || "—"}</Badge>
-                                  )}
-                                </TableCell>
-                              )}
-                              <TableCell className="text-center">
-                                <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border", getPositionBadgeColor(player.bestRound, player.wonFinal))}>
-                                  {player.positionLabel}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-center font-mono">{player.legsWon}</TableCell>
-                              <TableCell className="text-right font-bold text-primary text-lg">{player.points}</TableCell>
-                            </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })()}
-
             {isCollaborator && (
               <div className="mt-4 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/20 text-sm text-muted-foreground">
                 <UserCheck className="w-4 h-4 text-primary shrink-0" />
                 <span>You are a <span className="font-medium text-foreground">collaborator</span> on this tournament, owned by <span className="font-medium text-foreground">{ownerName}</span>.</span>
               </div>
             )}
-              </TabsContent>
-            </Tabs>
-          );
-        })()}
+          </div>
+        </div>
 
-        {/* Score Dialog */}
+        <Tabs defaultValue="live" className="space-y-6">
+          <TabsList className={cn("grid w-full lg:w-[600px]", tabCount === 5 ? "grid-cols-5" : "grid-cols-4")}>
+            <TabsTrigger value="live" data-testid="tab-live" className="gap-1.5">
+              <Radio className="w-3.5 h-3.5" />
+              Live
+              {liveMatches.length > 0 && (
+                <span className="ml-1 w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold">
+                  {liveMatches.length}
+                </span>
+              )}
+            </TabsTrigger>
+            {isMultiStage ? (
+              <>
+                <TabsTrigger value="groups" data-testid="tab-groups">Groups</TabsTrigger>
+                <TabsTrigger value="knockout" data-testid="tab-knockout">Knockout</TabsTrigger>
+              </>
+            ) : tournament.type === 'ROUND_ROBIN' ? (
+              <TabsTrigger value="groups" data-testid="tab-groups">Matches</TabsTrigger>
+            ) : (
+              <TabsTrigger value="knockout" data-testid="tab-knockout">Matches</TabsTrigger>
+            )}
+            <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
+            <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="live" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {liveMatches.map((match: any) => {
+                const live = liveScorings.get(match.id);
+                const playerA = getPlayer(match.playerAId);
+                const playerB = getPlayer(match.playerBId);
+                return (
+                  <Card key={match.id} className="overflow-hidden border-2 border-primary/20 bg-primary/5">
+                    <CardHeader className="p-4 bg-primary text-primary-foreground flex flex-row items-center justify-between space-y-0">
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                        </span>
+                        {match.stage === 'GROUP' ? 'Group Match' : 'Knockout'}
+                      </CardTitle>
+                      {live && <Badge variant="secondary" className="text-[10px] h-5">BO{live.bestOf}</Badge>}
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-4">
+                      <div className="flex flex-col gap-3">
+                        <div className={cn(
+                          "flex items-center justify-between p-2.5 rounded-lg border transition-all",
+                          live?.currentThrower === 'A' ? "bg-primary/10 border-primary/40 shadow-sm" : "bg-muted/30 border-transparent"
+                        )}>
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-8 h-8 rounded-full flex items-center justify-center font-bold",
+                              live?.currentThrower === 'A' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                            )}>
+                              {live?.legsWonA || 0}
+                            </div>
+                            <span className="font-bold truncate max-w-[120px]">{playerA?.name || "Player A"}</span>
+                          </div>
+                          <span className="text-2xl font-display font-black tracking-tighter tabular-nums">
+                            {live?.remainingA ?? 501}
+                          </span>
+                        </div>
+                        <div className={cn(
+                          "flex items-center justify-between p-2.5 rounded-lg border transition-all",
+                          live?.currentThrower === 'B' ? "bg-primary/10 border-primary/40 shadow-sm" : "bg-muted/30 border-transparent"
+                        )}>
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-8 h-8 rounded-full flex items-center justify-center font-bold",
+                              live?.currentThrower === 'B' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                            )}>
+                              {live?.legsWonB || 0}
+                            </div>
+                            <span className="font-bold truncate max-w-[120px]">{playerB?.name || "Player B"}</span>
+                          </div>
+                          <span className="text-2xl font-display font-black tracking-tighter tabular-nums">
+                            {live?.remainingB ?? 501}
+                          </span>
+                        </div>
+                      </div>
+                      <Button className="w-full h-11 font-bold shadow-lg" onClick={() => setSelectedMatch(match)}>
+                        <Target className="w-4 h-4 mr-2" />
+                        Scorer Panel
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {liveMatches.length === 0 && (
+                <div className="col-span-full py-20 text-center bg-muted/20 border-2 border-dashed rounded-xl">
+                  <div className="flex flex-col items-center gap-3">
+                    <Radio className="w-10 h-10 text-muted-foreground/40 animate-pulse" />
+                    <p className="text-muted-foreground font-medium">No live matches in progress</p>
+                    <p className="text-xs text-muted-foreground/60 max-w-xs mx-auto">
+                      Head to the Matches tab and select a match to start scoring.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="groups" className="space-y-6">
+            {renderGroupMatches()}
+          </TabsContent>
+
+          <TabsContent value="knockout" className="space-y-6">
+            {renderKnockoutMatches()}
+          </TabsContent>
+
+          <TabsContent value="standings" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {groupStandings.map(({ group, standings }) => (
+                <Card key={group.name} className="shadow-md overflow-hidden">
+                  <CardHeader className="bg-primary py-4">
+                    <CardTitle className="text-primary-foreground flex items-center gap-2">
+                      <Trophy className="w-5 h-5" />
+                      {group.name} Standings
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead className="w-12 text-center font-bold">#</TableHead>
+                          <TableHead className="font-bold">Player</TableHead>
+                          <TableHead className="text-center font-bold">P</TableHead>
+                          <TableHead className="text-center font-bold">W</TableHead>
+                          <TableHead className="text-center font-bold">L</TableHead>
+                          <TableHead className="text-center font-bold">LF</TableHead>
+                          <TableHead className="text-center font-bold">LA</TableHead>
+                          <TableHead className="text-center font-bold">+/-</TableHead>
+                          <TableHead className="text-center font-bold text-primary">Pts</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {standings.map((s: any, idx: number) => (
+                          <TableRow key={s.playerId} className={cn(
+                            idx === 0 && "bg-primary/5",
+                            "hover:bg-muted/40 transition-colors"
+                          )}>
+                            <TableCell className="text-center font-black text-muted-foreground/50">{idx + 1}</TableCell>
+                            <TableCell className="font-bold">{s.playerName}</TableCell>
+                            <TableCell className="text-center tabular-nums">{s.played}</TableCell>
+                            <TableCell className="text-center tabular-nums text-green-600 dark:text-green-400 font-medium">{s.won}</TableCell>
+                            <TableCell className="text-center tabular-nums text-destructive font-medium">{s.lost}</TableCell>
+                            <TableCell className="text-center tabular-nums">{s.legsFor}</TableCell>
+                            <TableCell className="text-center tabular-nums">{s.legsAgainst}</TableCell>
+                            <TableCell className={cn(
+                              "text-center tabular-nums font-medium",
+                              s.legDiff > 0 ? "text-green-600" : s.legDiff < 0 ? "text-destructive" : ""
+                            )}>
+                              {s.legDiff > 0 ? `+${s.legDiff}` : s.legDiff}
+                            </TableCell>
+                            <TableCell className="text-center tabular-nums font-black text-primary text-base">{s.points}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="players" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-lg font-bold">Tournament Players ({players.length})</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsBulkDialogOpen(true)} data-testid="button-bulk-edit">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Bulk Add
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {players.map((player: any) => (
+                    <div key={player.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:border-primary/50 transition-colors group">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                          {player.name.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-medium">{player.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            setEditingPlayerId(player.id);
+                            setEditingPlayerName(player.name);
+                          }}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeletePlayerTarget({ id: player.id, name: player.name })}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
         {selectedMatch && (
-          <MatchScoreInput 
-            key={selectedMatch.id}
+          <MatchScoreInput
             match={selectedMatch}
-            playerA={getPlayer(selectedMatch.playerAId)}
-            playerB={getPlayer(selectedMatch.playerBId)}
-            isOpen={!!selectedMatch}
+            tournament={tournament}
             onClose={() => setSelectedMatch(null)}
-            tournamentId={tournamentId}
           />
         )}
+
+        <AlertDialog open={!!resetMatchTarget} onOpenChange={(open) => !open && setResetMatchTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reset Match</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to reset this match? This will delete all match data, clear the result, and start the match again from scratch. This may also clear any downstream matches that depend on it.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-reset-match">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => handleResetMatch(resetMatchTarget.id)}
+                data-testid="button-confirm-reset-match"
+              >
+                Reset Match
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
-
-      <AlertDialog open={!!resetMatchTarget} onOpenChange={(open) => !open && setResetMatchTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reset Match</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to reset this knockout match? This will clear the result and may also clear any downstream matches that depend on it.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-reset-match">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-reset-match"
-              onClick={async () => {
-                if (!resetMatchTarget) return;
-                try {
-                  await apiRequest('PUT', `/api/matches/${resetMatchTarget.id}`, { scoreA: 0, scoreB: 0 });
-                  queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournamentId] });
-                  toast({ title: "Match reset", description: "The match and any downstream matches have been cleared." });
-                } catch (err: any) {
-                  toast({ title: "Error", description: err.message || "Failed to reset match", variant: "destructive" });
-                }
-                setResetMatchTarget(null);
-              }}
-            >
-              Reset Match
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!deletePlayerTarget} onOpenChange={(open) => !open && setDeletePlayerTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Player</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove "{deletePlayerTarget?.name}" from this tournament? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete-player">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete-player"
-              onClick={() => {
-                if (deletePlayerTarget) {
-                  handleDeletePlayer(deletePlayerTarget.id);
-                  setDeletePlayerTarget(null);
-                }
-              }}
-            >
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </LayoutShell>
-  );
-}
-
-function TournamentSettingsDialog({
-  open, onOpenChange, tournament, isOwner, isCollaborator, ownerName,
-  leaguesList, selectedLeagueId, setSelectedLeagueId,
-  renameName, setRenameName,
-  collaborators, newCollabEmail, setNewCollabEmail,
-  addCollaboratorMutation, removeCollaboratorMutation, deleteTournamentMutation,
-  tournamentId, setLocation, setIsDevicesDialogOpen, toast,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  tournament: any;
-  isOwner: boolean;
-  isCollaborator: boolean;
-  ownerName: string;
-  leaguesList: Array<{ id: number; name: string }>;
-  selectedLeagueId: string;
-  setSelectedLeagueId: (v: string) => void;
-  renameName: string;
-  setRenameName: (v: string) => void;
-  collaborators: Array<{ id: number; userId: number; name: string; email: string }>;
-  newCollabEmail: string;
-  setNewCollabEmail: (v: string) => void;
-  addCollaboratorMutation: any;
-  removeCollaboratorMutation: any;
-  deleteTournamentMutation: any;
-  tournamentId: number;
-  setLocation: (path: string) => void;
-  setIsDevicesDialogOpen: (open: boolean) => void;
-  toast: any;
-}) {
-  const [savingName, setSavingName] = useState(false);
-  const [savingLeague, setSavingLeague] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const handleSaveName = async () => {
-    if (!renameName.trim()) return;
-    setSavingName(true);
-    try {
-      await apiRequest('PUT', `/api/tournaments/${tournamentId}`, { name: renameName.trim() });
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournamentId] });
-      toast({ title: "Tournament renamed" });
-    } catch {
-      toast({ title: "Error", description: "Failed to rename.", variant: "destructive" });
-    } finally {
-      setSavingName(false);
-    }
-  };
-
-  const handleSaveLeague = async () => {
-    setSavingLeague(true);
-    try {
-      const lid = selectedLeagueId === "none" ? null : parseInt(selectedLeagueId);
-      await apiRequest('PUT', `/api/tournaments/${tournamentId}/league`, { leagueId: lid });
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournamentId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
-      toast({ title: lid ? "Tournament added to league" : "Tournament removed from league" });
-    } catch {
-      toast({ title: "Error", description: "Failed to update league.", variant: "destructive" });
-    } finally {
-      setSavingLeague(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); setShowDeleteConfirm(false); }}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            Tournament Settings
-          </DialogTitle>
-          <DialogDescription>
-            {ownerName ? <>Owner: <span className="font-medium text-foreground">{ownerName}</span></> : "Manage tournament settings and collaborators."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6 py-2">
-          {/* Rename */}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">Tournament Name</Label>
-            <div className="flex gap-2">
-              <Input
-                data-testid="input-settings-rename"
-                value={renameName}
-                onChange={(e) => setRenameName(e.target.value)}
-                placeholder="Tournament name"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); }}
-              />
-              <Button size="sm" onClick={handleSaveName} disabled={savingName || !renameName.trim()} data-testid="button-settings-save-name">
-                {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
-              </Button>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* League */}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">League</Label>
-            {leaguesList.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No leagues yet. Create one from the Leagues page first.</p>
-            ) : (
-              <div className="flex gap-2">
-                <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
-                  <SelectTrigger data-testid="select-settings-league" className="flex-1">
-                    <SelectValue placeholder="Select league" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No league</SelectItem>
-                    {leaguesList.map((l: any) => (
-                      <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button size="sm" onClick={handleSaveLeague} disabled={savingLeague} data-testid="button-settings-save-league">
-                  {savingLeague ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {!tournament.isLegacy && (
-            <>
-              <Separator />
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">Tablet Scoring</Label>
-                <p className="text-xs text-muted-foreground">Pair scorer tablets to boards for live scoring.</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  data-testid="button-settings-tablet-scoring"
-                  onClick={() => { onOpenChange(false); setIsDevicesDialogOpen(true); }}
-                >
-                  <TabletSmartphone className="w-4 h-4" />
-                  Manage Tablets
-                </Button>
-              </div>
-            </>
-          )}
-
-          {isOwner && (
-            <>
-              <Separator />
-              <div className="space-y-3">
-                <Label className="text-sm font-semibold">Collaborators</Label>
-                <p className="text-xs text-muted-foreground">Invite other TKO users to help run this tournament. They can manage players, score matches, and use tablets.</p>
-                {collaborators.length > 0 && (
-                  <div className="space-y-2">
-                    {collaborators.map((collab) => (
-                      <div key={collab.userId} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/40">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-xs font-bold text-primary">{collab.name.charAt(0).toUpperCase()}</span>
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate" data-testid={`text-collab-name-${collab.userId}`}>{collab.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{collab.email}</p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                          onClick={() => removeCollaboratorMutation.mutate(collab.userId)}
-                          disabled={removeCollaboratorMutation.isPending}
-                          data-testid={`button-remove-collab-${collab.userId}`}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Enter their TKO email address..."
-                    value={newCollabEmail}
-                    onChange={(e) => setNewCollabEmail(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && newCollabEmail.trim()) addCollaboratorMutation.mutate(newCollabEmail.trim()); }}
-                    className="h-9 text-sm"
-                    data-testid="input-settings-collab-email"
-                  />
-                  <Button
-                    size="sm"
-                    className="h-9 shrink-0"
-                    onClick={() => { if (newCollabEmail.trim()) addCollaboratorMutation.mutate(newCollabEmail.trim()); }}
-                    disabled={!newCollabEmail.trim() || addCollaboratorMutation.isPending}
-                    data-testid="button-settings-add-collab"
-                  >
-                    {addCollaboratorMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><UserPlus className="w-4 h-4 mr-1" />Add</>}
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-destructive">Danger Zone</Label>
-                {!showDeleteConfirm ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-2"
-                    data-testid="button-settings-delete"
-                    onClick={() => setShowDeleteConfirm(true)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Tournament
-                  </Button>
-                ) : (
-                  <div className="space-y-2 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
-                    <p className="text-sm text-destructive font-medium">Are you sure? This permanently deletes "{tournament.name}" and all its data.</p>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={deleteTournamentMutation.isPending}
-                        data-testid="button-settings-confirm-delete"
-                        onClick={() => {
-                          deleteTournamentMutation.mutate(tournamentId, {
-                            onSuccess: () => {
-                              toast({ title: "Tournament deleted", description: `"${tournament.name}" has been removed.` });
-                              setLocation("/tournaments");
-                            },
-                            onError: () => toast({ title: "Error", description: "Failed to delete tournament.", variant: "destructive" }),
-                          });
-                        }}
-                      >
-                        {deleteTournamentMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                        Yes, Delete Tournament
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function BoardSessionsDialog({ open, onOpenChange, tournament, groups, enableShare, toast, boardStatuses }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  tournament: any;
-  groups: any[];
-  enableShare: any;
-  toast: any;
-  boardStatuses: Record<number, boolean>;
-}) {
-  const { data: boardSessions = [], refetch: refetchSessions } = useQuery<BoardSession[]>({
-    queryKey: ['/api/tournaments', tournament.id, 'board-sessions'],
-    queryFn: async () => {
-      const res = await fetch(`/api/tournaments/${tournament.id}/board-sessions`, { credentials: 'include' });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: open,
-  });
-
-  const createSession = useMutation({
-    mutationFn: async (boardNumber: number) => {
-      const res = await apiRequest("POST", `/api/tournaments/${tournament.id}/board-sessions`, { boardNumber });
-      return res.json();
-    },
-    onSuccess: () => {
-      refetchSessions();
-      toast({ title: "Scorer tablet session created" });
-    },
-    onError: () => {
-      toast({ title: "Failed to create session", variant: "destructive" });
-    },
-  });
-
-  const deleteSession = useMutation({
-    mutationFn: async (sessionId: number) => {
-      await apiRequest("DELETE", `/api/board-sessions/${sessionId}`);
-    },
-    onSuccess: () => {
-      refetchSessions();
-      toast({ title: "Session removed" });
-    },
-  });
-
-  const sortedGroups = [...groups].sort((a: any, b: any) => a.name.localeCompare(b.name));
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto" data-testid="dialog-connected-devices">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <TabletSmartphone className="w-5 h-5 text-primary" />
-            Tablet Scoring
-          </DialogTitle>
-          <DialogDescription>
-            Create scorer tablet sessions for each board. Scan the QR code on a tablet to pair it as a scorer.
-          </DialogDescription>
-        </DialogHeader>
-
-        {groups.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-sm text-muted-foreground">No groups found. Start the tournament to generate boards.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {sortedGroups.map((group: any, idx: number) => {
-              const boardNumber = idx + 1;
-              const session = boardSessions.find((s: any) => s.boardNumber === boardNumber);
-              const isPaired = session?.pairedAt != null;
-              const pairUrl = session ? `${window.location.origin}/pair?token=${session.pairingToken}` : null;
-              const spectatorUrl = tournament.shareEnabled && tournament.shareToken
-                ? `${window.location.origin}/public/t/${tournament.shareToken}/board/${boardNumber}`
-                : null;
-
-              return (
-                <div key={group.id} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${boardNumber}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-bold text-sm">Board {boardNumber}</h3>
-                      <p className="text-xs text-muted-foreground">{group.name}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isPaired && boardStatuses[boardNumber] && (
-                        <Badge variant="outline" className="text-xs text-green-600 border-green-300 gap-1">
-                          <Wifi className="w-3 h-3" /> Online
-                        </Badge>
-                      )}
-                      {isPaired && !boardStatuses[boardNumber] && (
-                        <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 gap-1">
-                          <WifiOff className="w-3 h-3" /> Paired
-                        </Badge>
-                      )}
-                      <Badge variant="outline" className="text-xs">
-                        <Target className="w-3 h-3 mr-1" />
-                        Board {boardNumber}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {session && pairUrl ? (
-                    <div className="space-y-3">
-                      <div className="flex justify-center bg-white rounded-lg p-4">
-                        <QRCodeSVG value={pairUrl} size={160} level="M" />
-                      </div>
-                      <p className="text-xs text-center text-muted-foreground">
-                        {isPaired ? "Tablet is paired. Scan again to re-pair a new device." : "Scan this QR code on the scorer tablet to pair it."}
-                      </p>
-                      <div className="flex gap-2">
-                        <Input readOnly value={pairUrl} className="text-xs h-8" data-testid={`input-pair-url-${boardNumber}`} />
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-8 w-8 shrink-0"
-                          onClick={() => {
-                            navigator.clipboard.writeText(pairUrl);
-                            toast({ title: `Pairing link copied!` });
-                          }}
-                          data-testid={`button-copy-pair-${boardNumber}`}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-8 w-8 shrink-0 text-destructive"
-                          onClick={() => deleteSession.mutate(session.id)}
-                          data-testid={`button-delete-session-${boardNumber}`}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-
-                      {spectatorUrl && (
-                        <div className="pt-2 border-t">
-                          <p className="text-xs text-muted-foreground mb-1">Spectator view (read-only):</p>
-                          <div className="flex gap-2">
-                            <Input readOnly value={spectatorUrl} className="text-xs h-8" data-testid={`input-spectator-url-${boardNumber}`} />
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              className="h-8 w-8 shrink-0"
-                              onClick={() => {
-                                navigator.clipboard.writeText(spectatorUrl);
-                                toast({ title: `Spectator link copied!` });
-                              }}
-                              data-testid={`button-copy-spectator-${boardNumber}`}
-                            >
-                              <Copy className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <Button
-                      className="w-full"
-                      variant="outline"
-                      onClick={() => createSession.mutate(boardNumber)}
-                      disabled={createSession.isPending}
-                      data-testid={`button-create-scorer-${boardNumber}`}
-                    >
-                      {createSession.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <QrCode className="w-4 h-4 mr-2" />
-                      )}
-                      Create Scorer Tablet for Board {boardNumber}
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }
