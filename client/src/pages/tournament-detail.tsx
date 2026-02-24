@@ -273,6 +273,7 @@ export default function TournamentDetail() {
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
   const [isDevicesDialogOpen, setIsDevicesDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [renameName, setRenameName] = useState("");
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("none");
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
@@ -952,9 +953,9 @@ export default function TournamentDetail() {
               Tablet Scoring
             </Button>
             <Button
-              variant={tournament.shareEnabled ? "default" : "outline"}
+              variant="outline"
               className="w-full sm:w-auto gap-2 shadow-sm"
-              onClick={tournament.shareEnabled ? handleCopyLink : () => setIsSettingsDialogOpen(true)}
+              onClick={() => setIsShareDialogOpen(true)}
               data-testid="button-share-public"
             >
               <Share2 className="w-4 h-4" />
@@ -998,61 +999,86 @@ export default function TournamentDetail() {
           </TabsList>
 
           <TabsContent value="live" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {liveMatches.map((match: any) => {
                 const live = liveScorings.get(match.id);
                 const playerA = getPlayer(match.playerAId);
                 const playerB = getPlayer(match.playerBId);
+                const headerLabel = match.stage === 'GROUP'
+                  ? (groups.find((g: any) => g.id === match.groupId)?.name || 'Group Match')
+                  : match.roundKey === 'F' ? 'Final' : match.roundKey === 'SF' ? 'Semi Final' : match.roundKey === 'QF' ? 'Quarter Final' : 'Knockout';
                 return (
-                  <Card key={match.id} className="overflow-hidden border-2 border-primary/20 bg-primary/5">
-                    <CardHeader className="p-4 bg-primary text-primary-foreground flex flex-row items-center justify-between space-y-0">
-                      <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                        </span>
-                        {match.stage === 'GROUP' ? 'Group Match' : 'Knockout'}
+                  <Card key={match.id} className="border-2 border-primary shadow-xl overflow-hidden">
+                    <CardHeader className="bg-primary/10 border-b py-2.5 px-4">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                        {headerLabel}
+                        {live && (
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            Leg {live.legsWonA + live.legsWonB + 1} / Best of {live.bestOf}
+                          </span>
+                        )}
                       </CardTitle>
-                      {live && <Badge variant="secondary" className="text-[10px] h-5">BO{live.bestOf}</Badge>}
                     </CardHeader>
-                    <CardContent className="p-4 space-y-4">
-                      <div className="flex flex-col gap-3">
-                        <div className={cn(
-                          "flex items-center justify-between p-2.5 rounded-lg border transition-all",
-                          live?.currentThrower === 'A' ? "bg-primary/10 border-primary/40 shadow-sm" : "bg-muted/30 border-transparent"
-                        )}>
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "w-8 h-8 rounded-full flex items-center justify-center font-bold",
-                              live?.currentThrower === 'A' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                            )}>
-                              {live?.legsWonA || 0}
+                    <CardContent className="pt-3 pb-4 px-4 space-y-3">
+                      {live ? (
+                        <>
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-3 tabular-nums">
+                              <span className={cn("text-2xl font-bold", live.legsWonA >= live.legsWonB ? "text-primary" : "text-muted-foreground")}>{live.legsWonA}</span>
+                              <span className="text-muted-foreground text-sm">-</span>
+                              <span className={cn("text-2xl font-bold", live.legsWonB >= live.legsWonA ? "text-primary" : "text-muted-foreground")}>{live.legsWonB}</span>
                             </div>
-                            <span className="font-bold truncate max-w-[120px]">{playerA?.name || "Player A"}</span>
                           </div>
-                          <span className="text-2xl font-display font-black tracking-tighter tabular-nums">
-                            {live?.remainingA ?? 501}
-                          </span>
-                        </div>
-                        <div className={cn(
-                          "flex items-center justify-between p-2.5 rounded-lg border transition-all",
-                          live?.currentThrower === 'B' ? "bg-primary/10 border-primary/40 shadow-sm" : "bg-muted/30 border-transparent"
-                        )}>
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "w-8 h-8 rounded-full flex items-center justify-center font-bold",
-                              live?.currentThrower === 'B' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                            )}>
-                              {live?.legsWonB || 0}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className={cn("rounded-lg p-3 transition-all", live.currentThrower === 'A' ? "bg-red-600/15 ring-2 ring-red-500/50" : "bg-green-600/15 ring-2 ring-green-500/50")}>
+                              <div className="h-3.5 mb-0.5">
+                                {live.currentThrower === 'A' && (
+                                  <div className="flex items-center gap-1">
+                                    <Eye className="w-3 h-3 text-red-500" />
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
+                                  </div>
+                                )}
+                              </div>
+                              <p className="text-xs font-bold truncate">{live.playerAName}</p>
+                              <p className="text-4xl font-bold tabular-nums leading-none mt-1">{live.remainingA}</p>
+                              <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                                <div className="flex justify-between"><span>Avg</span><span className="font-medium tabular-nums text-foreground">{live.avgA}</span></div>
+                                <div className="flex justify-between"><span>Last</span><span className="font-medium tabular-nums text-foreground">{live.lastScoreA !== null ? live.lastScoreA : '-'}</span></div>
+                                <div className="flex justify-between"><span>Darts</span><span className="font-medium tabular-nums text-foreground">{live.dartsA}</span></div>
+                              </div>
                             </div>
-                            <span className="font-bold truncate max-w-[120px]">{playerB?.name || "Player B"}</span>
+                            <div className={cn("rounded-lg p-3 transition-all", live.currentThrower === 'B' ? "bg-red-600/15 ring-2 ring-red-500/50" : "bg-green-600/15 ring-2 ring-green-500/50")}>
+                              <div className="h-3.5 mb-0.5">
+                                {live.currentThrower === 'B' && (
+                                  <div className="flex items-center gap-1">
+                                    <Eye className="w-3 h-3 text-red-500" />
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
+                                  </div>
+                                )}
+                              </div>
+                              <p className="text-xs font-bold truncate">{live.playerBName}</p>
+                              <p className="text-4xl font-bold tabular-nums leading-none mt-1">{live.remainingB}</p>
+                              <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                                <div className="flex justify-between"><span>Avg</span><span className="font-medium tabular-nums text-foreground">{live.avgB}</span></div>
+                                <div className="flex justify-between"><span>Last</span><span className="font-medium tabular-nums text-foreground">{live.lastScoreB !== null ? live.lastScoreB : '-'}</span></div>
+                                <div className="flex justify-between"><span>Darts</span><span className="font-medium tabular-nums text-foreground">{live.dartsB}</span></div>
+                              </div>
+                            </div>
                           </div>
-                          <span className="text-2xl font-display font-black tracking-tighter tabular-nums">
-                            {live?.remainingB ?? 501}
-                          </span>
+                        </>
+                      ) : (
+                        <div className="flex items-center justify-between text-center py-4">
+                          <div className="flex-1"><p className="text-lg font-bold">{playerA?.name || "TBD"}</p></div>
+                          <div className="flex items-center gap-3 px-3">
+                            <span className="text-2xl font-bold tabular-nums">{match.scoreA || 0}</span>
+                            <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
+                            <span className="text-2xl font-bold tabular-nums">{match.scoreB || 0}</span>
+                          </div>
+                          <div className="flex-1"><p className="text-lg font-bold">{playerB?.name || "TBD"}</p></div>
                         </div>
-                      </div>
-                      <Button className="w-full h-11 font-bold shadow-lg" onClick={() => setSelectedMatch(match)}>
+                      )}
+                      <Button className="w-full h-10 font-bold" onClick={() => setSelectedMatch(match)}>
                         <Target className="w-4 h-4 mr-2" />
                         Scorer Panel
                       </Button>
@@ -1448,6 +1474,17 @@ export default function TournamentDetail() {
           />
         )}
 
+        <SharePublicDialog
+          open={isShareDialogOpen}
+          onOpenChange={setIsShareDialogOpen}
+          tournament={tournament}
+          enableShare={enableShare}
+          disableShare={disableShare}
+          copied={copied}
+          onCopyLink={handleCopyLink}
+          toast={toast}
+        />
+
         <TournamentSettingsDialog
           open={isSettingsDialogOpen}
           onOpenChange={setIsSettingsDialogOpen}
@@ -1506,6 +1543,103 @@ export default function TournamentDetail() {
         </AlertDialog>
       </div>
     </LayoutShell>
+  );
+}
+
+function SharePublicDialog({ open, onOpenChange, tournament, enableShare, disableShare, copied, onCopyLink, toast }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  tournament: any;
+  enableShare: any;
+  disableShare: any;
+  copied: boolean;
+  onCopyLink: () => void;
+  toast: any;
+}) {
+  const shareUrl = tournament.shareToken ? `${window.location.origin}/public/t/${tournament.shareToken}` : '';
+
+  const handleDownloadQR = () => {
+    const svg = document.querySelector('#share-qr-container svg');
+    if (!svg) return;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = 600;
+      canvas.height = 600;
+      ctx!.fillStyle = '#ffffff';
+      ctx!.fillRect(0, 0, 600, 600);
+      ctx!.drawImage(img, 0, 0, 600, 600);
+      const link = document.createElement('a');
+      link.download = `${tournament.name.replace(/[^a-zA-Z0-9]/g, '_')}_QR.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Share2 className="w-4 h-4" />
+            Share Tournament
+          </DialogTitle>
+          <DialogDescription>
+            Anyone with the link can view live scores and standings.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {!tournament.shareEnabled ? (
+            <div className="text-center py-6 space-y-3">
+              <p className="text-sm text-muted-foreground">Public sharing is currently disabled.</p>
+              <Button onClick={() => enableShare.mutate()} disabled={enableShare.isPending} className="gap-2">
+                {enableShare.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
+                Generate Public Link
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-col items-center" data-testid="section-share-qr">
+                <div className="bg-white p-3 rounded-lg" id="share-qr-container">
+                  <QRCodeSVG value={shareUrl} size={200} level="H" includeMargin={false} />
+                </div>
+                <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={handleDownloadQR} data-testid="button-download-qr">
+                  <Download className="w-3 h-3 mr-1" /> Download QR Code
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <Input readOnly value={shareUrl} className="text-xs" data-testid="input-share-link" />
+                <Button size="icon" variant="outline" onClick={onCopyLink} data-testid="button-copy-share-link">
+                  {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+              <div className="flex justify-between items-center">
+                <Button variant="ghost" asChild className="px-0 text-sm">
+                  <a href={`/public/t/${tournament.shareToken}`} target="_blank" rel="noopener noreferrer" data-testid="link-open-public-view">
+                    Open Public View <ExternalLink className="w-3 h-3 ml-1" />
+                  </a>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive/90"
+                  onClick={() => disableShare.mutate()}
+                  disabled={disableShare.isPending}
+                  data-testid="button-disable-sharing"
+                >
+                  <Lock className="w-3 h-3 mr-1" />
+                  Disable
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
