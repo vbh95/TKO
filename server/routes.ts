@@ -1125,8 +1125,13 @@ export async function registerRoutes(
     const userId = (req.user as any).id;
     const owned = await storage.getTournamentsByUserId(userId);
     const collaborated = await storage.getCollaboratedTournamentsByUserId(userId);
-    const ownedWithFlag = owned.map(t => ({ ...t, isOwner: true, isCollaborator: false }));
-    const collabWithFlag = collaborated.map(t => ({ ...t, isOwner: false, isCollaborator: true }));
+    const allTournamentIds = [...owned.map(t => t.id), ...collaborated.map(t => t.id)];
+    const collaboratorCounts = await storage.getCollaboratorCountsForTournaments(allTournamentIds);
+    const ownerUser = await storage.getUser(userId);
+    const ownerName = ownerUser?.name || '';
+    const ownerNamesByTournament = await storage.getOwnerNamesForTournaments(collaborated.map(t => t.id), collaborated.map(t => t.userId));
+    const ownedWithFlag = owned.map(t => ({ ...t, isOwner: true, isCollaborator: false, ownerName, collaboratorCount: collaboratorCounts[t.id] || 0 }));
+    const collabWithFlag = collaborated.map(t => ({ ...t, isOwner: false, isCollaborator: true, ownerName: ownerNamesByTournament[t.userId] || '', collaboratorCount: collaboratorCounts[t.id] || 0 }));
     const all = [...ownedWithFlag, ...collabWithFlag].sort((a, b) => {
       const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
@@ -1138,16 +1143,20 @@ export async function registerRoutes(
   app.get(api.tournaments.get.path, isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
     const tournament = await storage.getTournament(id);
+    const currentUserId = (req.user as any).id;
     
     if (!tournament) return res.status(404).json({ message: "Not found" });
-    if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+    if (!(await isAuthorizedForTournament(tournament, currentUserId))) return res.status(401).json({ message: "Unauthorized" });
     
     const players = await storage.getPlayersByTournamentId(id);
     const groups = await storage.getGroupsByTournamentId(id);
     const matches = await storage.getMatchesByTournamentId(id);
     const groupMemberships = await storage.getGroupMembershipsByTournamentId(id);
+    const ownerUser = await storage.getUser(tournament.userId);
+    const isOwner = tournament.userId === currentUserId;
+    const isCollaborator = !isOwner;
     
-    res.json({ tournament, players, groups, matches, groupMemberships });
+    res.json({ tournament, players, groups, matches, groupMemberships, ownerName: ownerUser?.name || '', isOwner, isCollaborator });
   });
 
   app.post(api.tournaments.create.path, isAuthenticated, async (req, res) => {
@@ -1225,7 +1234,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const tournament = await storage.getTournament(id);
       if (!tournament) return res.status(404).json({ message: "Not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (tournament.userId !== (req.user as any).id) return res.status(401).json({ message: "Only the tournament owner can reset the tournament" });
 
       const { name, settings, eventDate } = req.body;
 

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Trophy, Calendar, Users, ArrowRight, Trash2, Settings, Loader2, AlertTriangle, Medal, UserCheck } from "lucide-react";
+import { Trophy, Calendar, Users, ArrowRight, Trash2, Settings, Loader2, AlertTriangle, Medal, UserCheck, UserPlus, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -34,12 +35,14 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Tournament } from "@shared/schema";
 
-export function TournamentCard({ tournament }: { tournament: Tournament & { isCollaborator?: boolean; isOwner?: boolean } }) {
+export function TournamentCard({ tournament }: { tournament: Tournament & { isCollaborator?: boolean; isOwner?: boolean; ownerName?: string; collaboratorCount?: number } }) {
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const deleteMutation = useDeleteTournament();
   const { toast } = useToast();
   const isCollaborator = (tournament as any).isCollaborator === true;
+  const ownerName = (tournament as any).ownerName || '';
+  const collaboratorCount = (tournament as any).collaboratorCount || 0;
 
   const { data: leaguesList = [] } = useQuery<Array<{ id: number; name: string }>>({
     queryKey: ['/api/leagues'],
@@ -98,7 +101,7 @@ export function TournamentCard({ tournament }: { tournament: Tournament & { isCo
             {isCollaborator && (
               <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 gap-1 text-xs">
                 <UserCheck className="w-3 h-3" />
-                CO-ADMIN
+                COLLABORATOR
               </Badge>
             )}
             {tournament.isLegacy ? (
@@ -156,7 +159,12 @@ export function TournamentCard({ tournament }: { tournament: Tournament & { isCo
           </div>
         </div>
 
-        <div className="flex items-center gap-4 py-2">
+        {ownerName && (
+          <p className="text-xs text-muted-foreground -mt-2">
+            <span className="font-medium">{isCollaborator ? 'Owner:' : 'Run by:'}</span> {ownerName}
+          </p>
+        )}
+        <div className="flex items-center flex-wrap gap-2 py-2">
           <div className="flex items-center gap-1.5 text-sm font-medium bg-muted/50 px-3 py-1.5 rounded-lg">
             <Trophy className="w-4 h-4 text-primary" />
             {typeLabels[tournament.type]}
@@ -165,6 +173,12 @@ export function TournamentCard({ tournament }: { tournament: Tournament & { isCo
             <Users className="w-4 h-4 text-primary" />
             Players
           </div>
+          {collaboratorCount > 0 && (
+            <div className="flex items-center gap-1.5 text-sm font-medium bg-muted/50 px-3 py-1.5 rounded-lg">
+              <UserCheck className="w-4 h-4 text-primary" />
+              {collaboratorCount} Collaborator{collaboratorCount !== 1 ? 's' : ''}
+            </div>
+          )}
         </div>
 
         <div className="pt-2">
@@ -186,15 +200,67 @@ export function TournamentCard({ tournament }: { tournament: Tournament & { isCo
   );
 }
 
-function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tournament: Tournament; open: boolean; onOpenChange: (open: boolean) => void }) {
+function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tournament: Tournament & { isCollaborator?: boolean; isOwner?: boolean; ownerName?: string }; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [showResetWarning, setShowResetWarning] = useState(false);
   const [leagueSaving, setLeagueSaving] = useState(false);
+  const [newCollabEmail, setNewCollabEmail] = useState("");
+  const isOwner = (tournament as any).isOwner !== false;
+  const ownerName = (tournament as any).ownerName || '';
 
   const { data: leaguesList = [] } = useQuery<Array<{ id: number; name: string }>>({
     queryKey: ['/api/leagues'],
     enabled: open,
+  });
+
+  const { data: collaborators = [] } = useQuery<Array<{ id: number; userId: number; name: string; email: string }>>({
+    queryKey: ['/api/tournaments/:id/collaborators', tournament.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/tournaments/${tournament.id}/collaborators`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open && isOwner,
+  });
+
+  const addCollaboratorMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await fetch(`/api/tournaments/${tournament.id}/collaborators`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to add collaborator');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id/collaborators', tournament.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+      setNewCollabEmail("");
+      toast({ title: "Collaborator added", description: "They can now manage this tournament." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not add collaborator", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const removeCollaboratorMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await fetch(`/api/tournaments/${tournament.id}/collaborators/${userId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to remove');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id/collaborators', tournament.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+      toast({ title: "Collaborator removed" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove collaborator.", variant: "destructive" });
+    },
   });
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("none");
 
@@ -329,6 +395,9 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
             <Settings className="w-5 h-5" />
             Tournament Settings
           </DialogTitle>
+          <DialogDescription>
+            {ownerName ? <>Owner: <span className="font-medium text-foreground">{ownerName}</span></> : "Manage tournament settings."}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-2">
@@ -403,148 +472,210 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
             )}
           </div>
 
-          <Separator />
-
-          <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-primary" />
-            Format: {typeLabels[type] || type}
-          </div>
-
-          {hasGroups && (
-            <div className="space-y-4 border rounded-xl p-4 bg-muted/20">
-              <Label className="text-sm font-bold">Group Stage</Label>
+          {isOwner && (
+            <>
+              <Separator />
               <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="settings-groupCount" className="text-xs">Number of Groups</Label>
-                  <Select value={groupCount.toString()} onValueChange={(v) => setGroupCount(parseInt(v))}>
-                    <SelectTrigger id="settings-groupCount" className="h-10" data-testid="select-group-count">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 4, 8].map(n => (
-                        <SelectItem key={n} value={n.toString()}>{n} Group{n > 1 ? 's' : ''}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="settings-groupBestOf" className="text-xs">Match Format</Label>
-                  <Select value={groupBestOf.toString()} onValueChange={(v) => setGroupBestOf(parseInt(v))}>
-                    <SelectTrigger id="settings-groupBestOf" className="h-10" data-testid="select-group-best-of">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 3, 5, 7, 9, 11].map(n => (
-                        <SelectItem key={n} value={n.toString()}>Best of {n} legs</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="settings-ptsWin" className="text-xs">Points for Win</Label>
-                    <Input
-                      id="settings-ptsWin"
-                      type="number"
-                      min={0}
-                      max={10}
-                      value={pointsForWin}
-                      onChange={(e) => setPointsForWin(parseInt(e.target.value) || 0)}
-                      className="h-10"
-                      data-testid="input-settings-pts-win"
-                    />
+                <Label className="text-sm font-semibold flex items-center gap-1.5">
+                  <UserCheck className="w-4 h-4" />
+                  Collaborators
+                </Label>
+                <p className="text-xs text-muted-foreground">Invite other TKO users to help manage this tournament.</p>
+                {collaborators.length > 0 && (
+                  <div className="space-y-2">
+                    {collaborators.map((collab) => (
+                      <div key={collab.userId} className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border/40">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-primary">{collab.name.charAt(0).toUpperCase()}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{collab.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{collab.email}</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => removeCollaboratorMutation.mutate(collab.userId)}
+                          disabled={removeCollaboratorMutation.isPending}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="settings-ptsLoss" className="text-xs">Points for Loss</Label>
-                    <Input
-                      id="settings-ptsLoss"
-                      type="number"
-                      min={0}
-                      max={10}
-                      value={pointsForLoss}
-                      onChange={(e) => setPointsForLoss(parseInt(e.target.value) || 0)}
-                      className="h-10"
-                      data-testid="input-settings-pts-loss"
-                    />
-                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter their TKO email address..."
+                    value={newCollabEmail}
+                    onChange={(e) => setNewCollabEmail(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && newCollabEmail.trim()) addCollaboratorMutation.mutate(newCollabEmail.trim()); }}
+                    className="h-9 text-sm"
+                    data-testid="input-card-collab-email"
+                  />
+                  <Button
+                    size="sm"
+                    className="h-9 shrink-0"
+                    onClick={() => { if (newCollabEmail.trim()) addCollaboratorMutation.mutate(newCollabEmail.trim()); }}
+                    disabled={!newCollabEmail.trim() || addCollaboratorMutation.isPending}
+                    data-testid="button-card-add-collab"
+                  >
+                    {addCollaboratorMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><UserPlus className="w-4 h-4 mr-1" />Add</>}
+                  </Button>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
-          {hasKnockout && (
-            <div className="space-y-4 border rounded-xl p-4 bg-muted/20">
-              <Label className="text-sm font-bold">Knockout Stage</Label>
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Quarter Finals</Label>
-                    <Select value={qfBestOf.toString()} onValueChange={(v) => setQfBestOf(parseInt(v))}>
-                      <SelectTrigger className="h-10" data-testid="select-qf-best-of">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 3, 5, 7, 9, 11, 21].map(n => (
-                          <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Semi Finals</Label>
-                    <Select value={sfBestOf.toString()} onValueChange={(v) => setSfBestOf(parseInt(v))}>
-                      <SelectTrigger className="h-10" data-testid="select-sf-best-of">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 3, 5, 7, 9, 11, 21].map(n => (
-                          <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Grand Final</Label>
-                    <Select value={fBestOf.toString()} onValueChange={(v) => setFBestOf(parseInt(v))}>
-                      <SelectTrigger className="h-10" data-testid="select-final-best-of">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 3, 5, 7, 9, 11, 21].map(n => (
-                          <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+          {isOwner && (
+            <>
+              <Separator />
+
+              <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-primary" />
+                Format: {typeLabels[type] || type}
+              </div>
+
+              {hasGroups && (
+                <div className="space-y-4 border rounded-xl p-4 bg-muted/20">
+                  <Label className="text-sm font-bold">Group Stage</Label>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="settings-groupCount" className="text-xs">Number of Groups</Label>
+                      <Select value={groupCount.toString()} onValueChange={(v) => setGroupCount(parseInt(v))}>
+                        <SelectTrigger id="settings-groupCount" className="h-10" data-testid="select-group-count">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 4, 8].map(n => (
+                            <SelectItem key={n} value={n.toString()}>{n} Group{n > 1 ? 's' : ''}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="settings-groupBestOf" className="text-xs">Match Format</Label>
+                      <Select value={groupBestOf.toString()} onValueChange={(v) => setGroupBestOf(parseInt(v))}>
+                        <SelectTrigger id="settings-groupBestOf" className="h-10" data-testid="select-group-best-of">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 3, 5, 7, 9, 11].map(n => (
+                            <SelectItem key={n} value={n.toString()}>Best of {n} legs</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="settings-ptsWin" className="text-xs">Points for Win</Label>
+                        <Input
+                          id="settings-ptsWin"
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={pointsForWin}
+                          onChange={(e) => setPointsForWin(parseInt(e.target.value) || 0)}
+                          className="h-10"
+                          data-testid="input-settings-pts-win"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="settings-ptsLoss" className="text-xs">Points for Loss</Label>
+                        <Input
+                          id="settings-ptsLoss"
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={pointsForLoss}
+                          onChange={(e) => setPointsForLoss(parseInt(e.target.value) || 0)}
+                          className="h-10"
+                          data-testid="input-settings-pts-loss"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
+              )}
 
-                {type === "DOUBLE_ELIMINATION" && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Other Bracket Matches</Label>
-                    <Select value={knockoutBestOf.toString()} onValueChange={(v) => setKnockoutBestOf(parseInt(v))}>
-                      <SelectTrigger className="h-10" data-testid="select-knockout-best-of">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 3, 5, 7, 9, 11, 21].map(n => (
-                          <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {(type === "KNOCKOUT" || type === "MULTI_STAGE") && (
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm">Seeded Bracket</Label>
-                      <p className="text-xs text-muted-foreground">Highest seeds play lowest seeds</p>
+              {hasKnockout && (
+                <div className="space-y-4 border rounded-xl p-4 bg-muted/20">
+                  <Label className="text-sm font-bold">Knockout Stage</Label>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Quarter Finals</Label>
+                        <Select value={qfBestOf.toString()} onValueChange={(v) => setQfBestOf(parseInt(v))}>
+                          <SelectTrigger className="h-10" data-testid="select-qf-best-of">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                              <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Semi Finals</Label>
+                        <Select value={sfBestOf.toString()} onValueChange={(v) => setSfBestOf(parseInt(v))}>
+                          <SelectTrigger className="h-10" data-testid="select-sf-best-of">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                              <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Grand Final</Label>
+                        <Select value={fBestOf.toString()} onValueChange={(v) => setFBestOf(parseInt(v))}>
+                          <SelectTrigger className="h-10" data-testid="select-final-best-of">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                              <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <Switch checked={seeded} onCheckedChange={setSeeded} data-testid="switch-seeded" />
+
+                    {type === "DOUBLE_ELIMINATION" && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Other Bracket Matches</Label>
+                        <Select value={knockoutBestOf.toString()} onValueChange={(v) => setKnockoutBestOf(parseInt(v))}>
+                          <SelectTrigger className="h-10" data-testid="select-knockout-best-of">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                              <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {(type === "KNOCKOUT" || type === "MULTI_STAGE") && (
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm">Seeded Bracket</Label>
+                          <p className="text-xs text-muted-foreground">Highest seeds play lowest seeds</p>
+                        </div>
+                        <Switch checked={seeded} onCheckedChange={setSeeded} data-testid="switch-seeded" />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 

@@ -16,7 +16,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useCreateTournament } from "@/hooks/use-tournaments";
-import { Loader2, Plus, Trash2, Trophy, Users, History } from "lucide-react";
+import { Loader2, Plus, Trash2, Trophy, Users, History, UserPlus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 
@@ -38,6 +38,8 @@ export default function CreateTournament() {
     const [eventDate, setEventDate] = useState("");
     const [legacyPlayerCount, setLegacyPlayerCount] = useState(8);
     const [randomize, setRandomize] = useState(true);
+    const [collabEmails, setCollabEmails] = useState<string[]>([]);
+    const [collabInput, setCollabInput] = useState("");
     const [groupCount, setGroupCount] = useState(1);
     const [groupBestOf, setGroupBestOf] = useState(3);
     const [knockoutBestOf, setKnockoutBestOf] = useState(5);
@@ -149,7 +151,18 @@ export default function CreateTournament() {
           pointsForLoss: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForLoss : undefined,
         }
       }, {
-        onSuccess: () => {
+        onSuccess: async (newTournament) => {
+          if (collabEmails.length > 0) {
+            for (const email of collabEmails) {
+              try {
+                await fetch(`/api/tournaments/${newTournament.id}/collaborators`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email }),
+                });
+              } catch {}
+            }
+          }
           toast({
             title: "Tournament Created",
             description: "Ready to play! Redirecting...",
@@ -525,6 +538,75 @@ export default function CreateTournament() {
                   </Button>
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Collaborators */}
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Collaborators</h2>
+                  <p className="text-sm text-muted-foreground">Optional — invite others to help run this tournament.</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">They need a TKO account. Collaborators can manage players, score matches, and use tablets.</p>
+              {collabEmails.length > 0 && (
+                <div className="space-y-2">
+                  {collabEmails.map((email, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border/40">
+                      <span className="text-sm">{email}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => setCollabEmails(collabEmails.filter((_, i) => i !== idx))}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="Enter TKO email address..."
+                  value={collabInput}
+                  onChange={(e) => setCollabInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const trimmed = collabInput.trim();
+                      if (trimmed && !collabEmails.includes(trimmed)) {
+                        setCollabEmails([...collabEmails, trimmed]);
+                        setCollabInput("");
+                      }
+                    }
+                  }}
+                  className="flex-1"
+                  data-testid="input-collab-email"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const trimmed = collabInput.trim();
+                    if (trimmed && !collabEmails.includes(trimmed)) {
+                      setCollabEmails([...collabEmails, trimmed]);
+                      setCollabInput("");
+                    }
+                  }}
+                  disabled={!collabInput.trim()}
+                  data-testid="button-add-collab-email"
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Add
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

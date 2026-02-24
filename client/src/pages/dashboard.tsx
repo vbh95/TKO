@@ -104,7 +104,7 @@ function TournamentListRow({ tournament }: { tournament: Tournament & { isCollab
         {isCollaborator && (
           <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 text-xs gap-1">
             <UserCheck className="w-3 h-3" />
-            CO-ADMIN
+            COLLABORATOR
           </Badge>
         )}
         {tournament.isLegacy && (

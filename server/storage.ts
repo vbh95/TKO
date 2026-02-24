@@ -17,7 +17,7 @@ import type {
 } from "@shared/schema";
 import { db } from "./db";
 import { pool } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 
@@ -99,6 +99,8 @@ export interface IStorage {
   removeTournamentCollaborator(tournamentId: number, userId: number): Promise<void>;
   isTournamentCollaborator(tournamentId: number, userId: number): Promise<boolean>;
   getCollaboratedTournamentsByUserId(userId: number): Promise<Tournament[]>;
+  getCollaboratorCountsForTournaments(tournamentIds: number[]): Promise<Record<number, number>>;
+  getOwnerNamesForTournaments(tournamentIds: number[], ownerIds: number[]): Promise<Record<number, string>>;
 
   // Beta Feedback
   createBetaFeedback(feedback: InsertBetaFeedback): Promise<BetaFeedback>;
@@ -548,6 +550,33 @@ export class DatabaseStorage implements IStorage {
     await db.delete(boardSessions).where(eq(boardSessions.tournamentId, tournamentId));
     await db.delete(matches).where(eq(matches.tournamentId, tournamentId));
     await db.delete(groups).where(eq(groups.tournamentId, tournamentId));
+  }
+
+  async getCollaboratorCountsForTournaments(tournamentIds: number[]): Promise<Record<number, number>> {
+    if (tournamentIds.length === 0) return {};
+    const rows = await db
+      .select({ tournamentId: tournamentCollaborators.tournamentId })
+      .from(tournamentCollaborators)
+      .where(inArray(tournamentCollaborators.tournamentId, tournamentIds));
+    const counts: Record<number, number> = {};
+    for (const row of rows) {
+      counts[row.tournamentId] = (counts[row.tournamentId] || 0) + 1;
+    }
+    return counts;
+  }
+
+  async getOwnerNamesForTournaments(tournamentIds: number[], ownerIds: number[]): Promise<Record<number, string>> {
+    if (ownerIds.length === 0) return {};
+    const uniqueOwnerIds = [...new Set(ownerIds)];
+    const rows = await db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(inArray(users.id, uniqueOwnerIds));
+    const map: Record<number, string> = {};
+    for (const row of rows) {
+      map[row.id] = row.name;
+    }
+    return map;
   }
 
   async getTournamentCollaborators(tournamentId: number): Promise<Array<TournamentCollaborator & { name: string; email: string }>> {
