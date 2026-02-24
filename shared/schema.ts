@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   billingAddress: text("billing_address"),
   memorableWord: text("memorable_word"),
   recoveryKey: text("recovery_key"),
+  isSuperUser: boolean("is_super_user").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
