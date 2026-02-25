@@ -217,7 +217,7 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
   return (
     <Card
       className={cn(
-        "overflow-hidden",
+        "overflow-hidden flex flex-col h-full",
         isCompleted ? "border border-muted-foreground/20 cursor-pointer" : "border-2 border-dashed border-primary/40"
       )}
       data-testid={`knockout-match-${match.id}`}
@@ -243,7 +243,7 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="py-4 px-4">
+      <CardContent className="py-4 px-4 flex-1 flex flex-col">
         {isCompleted ? (
           <div className="flex items-center justify-between text-center">
             <div className="flex-1">
@@ -263,7 +263,7 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center min-h-[56px] text-center">
+          <div className="flex-1 flex items-center justify-center text-center">
             <p className="text-lg font-bold">
               {playerA?.name || "TBD"}
               <span className="text-muted-foreground text-xs uppercase font-medium tracking-wider mx-2">vs</span>
