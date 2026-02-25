@@ -1079,10 +1079,11 @@ export default function TournamentDetail() {
                           <div className="flex-1"><p className="text-lg font-bold">{playerB?.name || "TBD"}</p></div>
                         </div>
                       )}
-                      <Button className="w-full h-10 font-bold" onClick={() => setSelectedMatch(match)}>
-                        <Target className="w-4 h-4 mr-2" />
-                        Scorer Panel
-                      </Button>
+                      {match.scorerName && (
+                        <p className="text-[11px] text-muted-foreground text-center" data-testid={`live-scorer-name-${match.id}`}>
+                          Scorer: {match.scorerName}
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
                 );

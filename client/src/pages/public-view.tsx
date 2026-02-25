@@ -425,6 +425,11 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
             </p>
           </div>
         )}
+        {match.scorerName && (
+          <p className="mt-2 text-[11px] text-muted-foreground text-center" data-testid={`public-live-scorer-${match.id}`}>
+            Scorer: {match.scorerName}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
