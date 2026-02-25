@@ -795,33 +795,33 @@ export default function PublicView() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <table className="w-full table-fixed text-base">
+                  <table className="w-full table-fixed text-lg">
                     <thead>
                       <tr className="border-b">
-                        <th className="w-10 pl-2 pr-1 py-3 text-left text-sm font-medium text-muted-foreground">#</th>
-                        <th className="py-3 text-left text-sm font-medium text-muted-foreground">Player</th>
-                        <th className="w-10 py-3 text-center text-sm font-medium text-muted-foreground">P</th>
-                        <th className="w-10 py-3 text-center text-sm font-medium text-muted-foreground">W</th>
-                        <th className="w-10 py-3 text-center text-sm font-medium text-muted-foreground">L</th>
-                        <th className="w-10 py-3 text-center text-sm font-medium text-muted-foreground">LF</th>
-                        <th className="w-10 py-3 text-center text-sm font-medium text-muted-foreground">LA</th>
-                        <th className="w-12 py-3 pr-2 text-right text-sm font-bold text-muted-foreground">Pts</th>
+                        <th className="w-12 pl-3 pr-1 py-3 text-left text-base font-medium text-muted-foreground">#</th>
+                        <th className="py-3 text-left text-base font-medium text-muted-foreground">Player</th>
+                        <th className="w-12 py-3 text-center text-base font-medium text-muted-foreground">P</th>
+                        <th className="w-12 py-3 text-center text-base font-medium text-muted-foreground">W</th>
+                        <th className="w-12 py-3 text-center text-base font-medium text-muted-foreground">L</th>
+                        <th className="w-12 py-3 text-center text-base font-medium text-muted-foreground">LF</th>
+                        <th className="w-12 py-3 text-center text-base font-medium text-muted-foreground">LA</th>
+                        <th className="w-14 py-3 pr-3 text-right text-base font-bold text-muted-foreground">Pts</th>
                       </tr>
                     </thead>
                     <tbody>
                       {standings.map((player, idx) => (
                         <tr key={player.id} className={cn("border-b last:border-0", idx < 2 && "bg-green-50 dark:bg-green-950/30")} data-testid={`row-standing-${player.id}`}>
-                          <td className="pl-2 pr-1 py-3 text-muted-foreground text-sm flex items-center gap-1">
+                          <td className="pl-3 pr-1 py-3 text-muted-foreground text-base flex items-center gap-1.5">
                             {idx + 1}
-                            {idx < 2 && <div className="w-2 h-2 rounded-full bg-green-500" />}
+                            {idx < 2 && <div className="w-2.5 h-2.5 rounded-full bg-green-500" />}
                           </td>
-                          <td className={cn("py-3 font-bold truncate text-base", idx < 2 && "text-green-700 dark:text-green-400")}>{player.name}</td>
-                          <td className="py-3 text-center text-sm">{player.played}</td>
-                          <td className="py-3 text-center text-sm text-green-600">{player.won}</td>
-                          <td className="py-3 text-center text-sm text-red-500">{player.lost}</td>
-                          <td className="py-3 text-center text-sm">{player.legsFor}</td>
-                          <td className="py-3 text-center text-sm">{player.legsAgainst}</td>
-                          <td className="py-3 pr-2 text-right font-bold text-primary text-lg">{player.pts}</td>
+                          <td className={cn("py-3 font-bold truncate text-lg", idx < 2 && "text-green-700 dark:text-green-400")}>{player.name}</td>
+                          <td className="py-3 text-center text-base tabular-nums">{player.played}</td>
+                          <td className="py-3 text-center text-base tabular-nums text-green-600">{player.won}</td>
+                          <td className="py-3 text-center text-base tabular-nums text-red-500">{player.lost}</td>
+                          <td className="py-3 text-center text-base tabular-nums">{player.legsFor}</td>
+                          <td className="py-3 text-center text-base tabular-nums">{player.legsAgainst}</td>
+                          <td className="py-3 pr-3 text-right font-bold text-primary text-xl">{player.pts}</td>
                         </tr>
                       ))}
                     </tbody>
