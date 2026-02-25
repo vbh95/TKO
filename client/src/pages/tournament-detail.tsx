@@ -124,20 +124,18 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
 
   if (isLegacy) {
     return (
-      <div className="mt-2 pt-2 border-t border-dashed text-[10px] text-muted-foreground uppercase font-bold tracking-wider truncate" data-testid={`match-scorer-${matchId}`}>
-        <div className="flex items-center gap-1 truncate">
-          <ClipboardList className="w-3 h-3 shrink-0" />
-          <span className="truncate">Scorer: N/A</span>
-        </div>
+      <div className="flex items-center gap-1 truncate text-[11px] text-muted-foreground uppercase font-bold tracking-wider" data-testid={`match-scorer-${matchId}`}>
+        <ClipboardList className="w-3.5 h-3.5 shrink-0" />
+        <span className="truncate">Scorer: N/A</span>
       </div>
     );
   }
 
   return (
-    <div className="mt-2 pt-2 border-t border-dashed text-[10px] text-muted-foreground uppercase font-bold tracking-wider truncate" data-testid={`match-scorer-${matchId}`}>
+    <div className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider truncate" data-testid={`match-scorer-${matchId}`}>
       {editing ? (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <ClipboardList className="w-3 h-3 shrink-0" />
+          <ClipboardList className="w-3.5 h-3.5 shrink-0" />
           <span className="shrink-0">Scorer:</span>
           <input
             ref={inputRef}
@@ -155,9 +153,9 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
           onClick={(e) => { e.stopPropagation(); setEditing(true); }}
           data-testid={`button-edit-scorer-${matchId}`}
         >
-          <ClipboardList className="w-3 h-3 shrink-0" />
+          <ClipboardList className="w-3.5 h-3.5 shrink-0" />
           <span className="truncate">Scorer: {currentName || "None"}</span>
-          <Pencil className="w-2.5 h-2.5 ml-0.5 opacity-50 shrink-0" />
+          <Pencil className="w-3 h-3 ml-0.5 opacity-50 shrink-0" />
         </button>
       )}
     </div>
@@ -678,51 +676,51 @@ export default function TournamentDetail() {
                                 )}
                                 data-testid={`match-card-${match.id}`}
                               >
-                                <div className="mb-2 flex justify-center border-b border-dashed pb-2">
-                                  <InlineScorerEdit
-                                    matchId={match.id}
-                                    tournamentId={tournamentId}
-                                    currentName={match.scorerName || null}
-                                    isLegacy={tournament.isLegacy || false}
-                                  />
-                                </div>
                                 <div className="flex items-center justify-between">
-                                  <div className="flex-1 space-y-1">
+                                  <div className="flex-1 space-y-2">
                                     <div className={cn(
-                                      "text-sm font-medium",
-                                      match.status === 'COMPLETED' && match.winnerId === playerA?.id && "text-primary font-bold"
+                                      "text-base font-bold",
+                                      match.status === 'COMPLETED' && match.winnerId === playerA?.id && "text-primary font-black"
                                     )}>
                                       {playerA?.name || "TBD"}
                                     </div>
                                     <div className={cn(
-                                      "text-sm font-medium",
-                                      match.status === 'COMPLETED' && match.winnerId === playerB?.id && "text-primary font-bold"
+                                      "text-base font-bold",
+                                      match.status === 'COMPLETED' && match.winnerId === playerB?.id && "text-primary font-black"
                                     )}>
                                       {playerB?.name || "TBD"}
                                     </div>
                                   </div>
-                                  <div className="flex flex-col items-center gap-1 ml-3">
+                                  <div className="flex flex-col items-center gap-2 ml-4">
                                     <div className={cn(
-                                      "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                                      "w-8 h-8 flex items-center justify-center rounded text-base font-black",
                                       match.status === 'COMPLETED' && match.scoreA! > match.scoreB! ? "bg-primary text-primary-foreground" : "bg-muted"
                                     )}>
                                       {match.scoreA || 0}
                                     </div>
                                     <div className={cn(
-                                      "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
+                                      "w-8 h-8 flex items-center justify-center rounded text-base font-black",
                                       match.status === 'COMPLETED' && match.scoreB! > match.scoreA! ? "bg-primary text-primary-foreground" : "bg-muted"
                                     )}>
                                       {match.scoreB || 0}
                                     </div>
                                   </div>
                                 </div>
-                                <div className="flex items-center justify-end gap-2">
-                                  <div className="flex items-center gap-1 mt-2 pt-2 border-t border-dashed w-full justify-end">
+                                <div className="flex items-center justify-between mt-3 pt-2 border-t border-dashed">
+                                  <div className="flex-1">
+                                    <InlineScorerEdit
+                                      matchId={match.id}
+                                      tournamentId={tournamentId}
+                                      currentName={match.scorerName || null}
+                                      isLegacy={tournament.isLegacy || false}
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-2">
                                     {match.status === 'COMPLETED' && !tournament.isLegacy && (
                                       <Button
                                         size="icon"
                                         variant="ghost"
-                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setResetMatchTarget(match);
@@ -730,7 +728,7 @@ export default function TournamentDetail() {
                                         data-testid={`button-reset-match-${match.id}`}
                                         title="Reset Match"
                                       >
-                                        <RefreshCw className="w-3.5 h-3.5" />
+                                        <RefreshCw className="w-4 h-4" />
                                       </Button>
                                     )}
                                   </div>
