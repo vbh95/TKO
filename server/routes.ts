@@ -166,6 +166,7 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
   if (standings.length < 2) return;
 
   const groupCount = groupsList.length;
+  type Pairing = { aGroupIdx: number; aPos: number; bGroupIdx: number; bPos: number };
   const pairings: Pairing[] = [];
   
   if (groupCount === 4) {

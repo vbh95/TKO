@@ -523,17 +523,28 @@ export default function TournamentDetail() {
     const groupCount = groups.length;
     const pairings: { a: string; b: string }[] = [];
 
-    for (let i = 0; i < groupCount; i += 2) {
-      const oppIdx = i + 1;
-      if (oppIdx < groupCount) {
-        pairings.push(
-          { a: `1st ${groups[i].name}`, b: `2nd ${groups[oppIdx].name}` },
-          { a: `2nd ${groups[i].name}`, b: `1st ${groups[oppIdx].name}` },
-        );
-      } else {
-        pairings.push(
-          { a: `1st ${groups[i].name}`, b: `2nd ${groups[i].name}` },
-        );
+    if (groupCount === 4) {
+      // QF1: 1st Group A vs 2nd Group B
+      pairings.push({ a: `1st ${groups[0].name}`, b: `2nd ${groups[1].name}` });
+      // QF2: 2nd Group C vs 1st Group D
+      pairings.push({ a: `2nd ${groups[2].name}`, b: `1st ${groups[3].name}` });
+      // QF3: 1st Group C vs 2nd Group D
+      pairings.push({ a: `1st ${groups[2].name}`, b: `2nd ${groups[3].name}` });
+      // QF4: 2nd Group A vs 1st Group B
+      pairings.push({ a: `2nd ${groups[0].name}`, b: `1st ${groups[1].name}` });
+    } else {
+      for (let i = 0; i < groupCount; i += 2) {
+        const oppIdx = i + 1;
+        if (oppIdx < groupCount) {
+          pairings.push(
+            { a: `1st ${groups[i].name}`, b: `2nd ${groups[oppIdx].name}` },
+            { a: `2nd ${groups[i].name}`, b: `1st ${groups[oppIdx].name}` },
+          );
+        } else {
+          pairings.push(
+            { a: `1st ${groups[i].name}`, b: `2nd ${groups[i].name}` },
+          );
+        }
       }
     }
 
