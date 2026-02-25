@@ -785,108 +785,102 @@ export default function TournamentDetail() {
                     <span className="text-primary-foreground font-bold text-sm">
                       {roundKey === 'F' ? 'Final' : `${getRoundDisplayName(roundKey)} ${matchIdx + 1}`}
                     </span>
-                    <div className="flex items-center gap-2">
-                      {match.status === 'COMPLETED' && !tournament.isLegacy && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setResetMatchTarget(match);
-                          }}
-                          data-testid={`button-reset-knockout-${match.id}`}
-                          title="Reset Match"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {match.status === 'COMPLETED' && (
-                        <Badge variant="secondary" className="text-xs">Completed</Badge>
-                      )}
-                    </div>
+                    {match.status === 'COMPLETED' && (
+                      <Badge variant="secondary" className="text-xs">Completed</Badge>
+                    )}
                   </div>
-                  <CardContent className="p-0">
-                    <div className="px-4 py-2 flex justify-center border-b border-dashed">
-                      <InlineScorerEdit
-                        matchId={match.id}
-                        tournamentId={tournamentId}
-                        currentName={match.scorerName || null}
-                        isLegacy={tournament.isLegacy || false}
-                      />
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 space-y-2">
+                        <div className={cn(
+                          "text-base font-bold",
+                          match.status === 'COMPLETED' && match.winnerId === match.playerAId && match.playerAId && "text-primary font-black"
+                        )}>
+                          {isEditingThis ? (
+                            <Select
+                              value={match.playerAId?.toString() || ""}
+                              onValueChange={(val) => handleUpdateMatchPlayer(match.id, 'A', parseInt(val))}
+                            >
+                              <SelectTrigger className="h-8" onClick={(e) => e.stopPropagation()} data-testid={`select-knockout-player-a-${match.id}`}>
+                                <SelectValue placeholder="Select player" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {players.map((p: Player) => (
+                                  <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : labelA}
+                        </div>
+                        <div className={cn(
+                          "text-base font-bold",
+                          match.status === 'COMPLETED' && match.winnerId === match.playerBId && match.playerBId && "text-primary font-black"
+                        )}>
+                          {isEditingThis ? (
+                            <Select
+                              value={match.playerBId?.toString() || ""}
+                              onValueChange={(val) => handleUpdateMatchPlayer(match.id, 'B', parseInt(val))}
+                            >
+                              <SelectTrigger className="h-8" onClick={(e) => e.stopPropagation()} data-testid={`select-knockout-player-b-${match.id}`}>
+                                <SelectValue placeholder="Select player" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {players.map((p: Player) => (
+                                  <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : labelB}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-center gap-2 ml-4">
+                        <div className={cn(
+                          "w-8 h-8 flex items-center justify-center rounded text-base font-black",
+                          match.status === 'COMPLETED' && match.scoreA > match.scoreB ? "bg-primary text-primary-foreground" : "bg-muted"
+                        )}>
+                          {match.scoreA || 0}
+                        </div>
+                        <div className={cn(
+                          "w-8 h-8 flex items-center justify-center rounded text-base font-black",
+                          match.status === 'COMPLETED' && match.scoreB > match.scoreA ? "bg-primary text-primary-foreground" : "bg-muted"
+                        )}>
+                          {match.scoreB || 0}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between px-4 py-3 border-b gap-2">
+                    <div className="flex items-center justify-between mt-3">
                       <div className="flex-1">
-                        {isEditingThis ? (
-                          <Select
-                            value={match.playerAId?.toString() || ""}
-                            onValueChange={(val) => handleUpdateMatchPlayer(match.id, 'A', parseInt(val))}
+                        <InlineScorerEdit
+                          matchId={match.id}
+                          tournamentId={tournamentId}
+                          currentName={match.scorerName || null}
+                          isLegacy={tournament.isLegacy || false}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {match.status === 'COMPLETED' && !tournament.isLegacy && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setResetMatchTarget(match);
+                            }}
+                            data-testid={`button-reset-knockout-${match.id}`}
+                            title="Reset Match"
                           >
-                            <SelectTrigger className="h-8" onClick={(e) => e.stopPropagation()} data-testid={`select-knockout-player-a-${match.id}`}>
-                              <SelectValue placeholder="Select player" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {players.map((p: Player) => (
-                                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className={cn(
-                            "text-sm font-medium",
-                            match.status === 'COMPLETED' && match.winnerId === match.playerAId && match.playerAId && "text-primary font-bold"
-                          )}>
-                            {labelA}
-                          </span>
+                            <RefreshCw className="w-4 h-4" />
+                          </Button>
                         )}
-                      </div>
-                      <div className={cn(
-                        "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
-                        match.status === 'COMPLETED' && match.scoreA > match.scoreB ? "bg-primary text-primary-foreground" : "bg-muted"
-                      )}>
-                        {match.scoreA || 0}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-3 gap-2">
-                      <div className="flex-1">
-                        {isEditingThis ? (
-                          <Select
-                            value={match.playerBId?.toString() || ""}
-                            onValueChange={(val) => handleUpdateMatchPlayer(match.id, 'B', parseInt(val))}
-                          >
-                            <SelectTrigger className="h-8" onClick={(e) => e.stopPropagation()} data-testid={`select-knockout-player-b-${match.id}`}>
-                              <SelectValue placeholder="Select player" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {players.map((p: Player) => (
-                                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className={cn(
-                            "text-sm font-medium",
-                            match.status === 'COMPLETED' && match.winnerId === match.playerBId && match.playerBId && "text-primary font-bold"
-                          )}>
-                            {labelB}
-                          </span>
-                        )}
-                      </div>
-                      <div className={cn(
-                        "w-7 h-7 flex items-center justify-center rounded text-sm font-bold",
-                        match.status === 'COMPLETED' && match.scoreB > match.scoreA ? "bg-primary text-primary-foreground" : "bg-muted"
-                      )}>
-                        {match.scoreB || 0}
                       </div>
                     </div>
                     {match.status === 'COMPLETED' && (
-                      <div className="px-4 pb-3">
-                        <AdminMatchStats
-                          matchId={match.id}
-                          playerAName={labelA}
-                          playerBName={labelB}
-                        />
-                      </div>
+                      <AdminMatchStats
+                        matchId={match.id}
+                        playerAName={labelA}
+                        playerBName={labelB}
+                      />
                     )}
                   </CardContent>
                 </Card>
