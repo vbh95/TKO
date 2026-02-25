@@ -668,13 +668,12 @@ export default function PublicView() {
           knockoutCards.push({ isLive: false, label: roundName, allDone: true });
         } else {
           roundMatches.forEach((match, j) => {
-            // Only show names if all matches in the previous knockout round are COMPLETED
-            const prevRoundFinished = i === 0 || knockoutStageMatches.filter(m => m.roundKey === knockoutRounds[i-1]).every(m => m.status === 'COMPLETED');
+            // Show names if they are present (qualifiers)
             knockoutCards.push({
               match,
               isLive: match.status === 'IN_PROGRESS',
               label: `${roundName}${roundMatches.length > 1 ? ` ${j + 1}` : ''}`,
-              hideNames: !prevRoundFinished
+              hideNames: false // Names will show if present in match.playerAId/BId
             });
           });
         }
@@ -815,7 +814,11 @@ export default function PublicView() {
 
                 const ls = liveScorings.get(match!.id);
                 const isKnockout = match!.stage === 'KNOCKOUT';
-                const effectiveHideNames = hideNames || (isKnockout && !groupsFinished);
+                // Only hide names for the very first knockout round (usually QF) until groups are done.
+                // For later rounds, if a player has progressed, they should show.
+                const isFirstKnockoutRound = isKnockout && match!.roundKey === knockoutRounds[0];
+                const effectiveHideNames = (isFirstKnockoutRound && !groupsFinished);
+                
                 const playerA = effectiveHideNames ? null : getPlayer(match!.playerAId);
                 const playerB = effectiveHideNames ? null : getPlayer(match!.playerBId);
                 const isCompleted = match!.status === 'COMPLETED';
