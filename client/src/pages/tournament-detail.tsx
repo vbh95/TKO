@@ -1124,18 +1124,18 @@ export default function TournamentDetail() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                      <Table>
+                      <Table className="table-fixed">
                       <TableHeader className="bg-muted/50">
                         <TableRow>
-                          <TableHead className="w-[50px] py-3 px-3 text-sm">#</TableHead>
-                          <TableHead className="py-3 px-3 text-sm">Player</TableHead>
-                          <TableHead className="text-center py-3 px-2 text-sm">P</TableHead>
-                          <TableHead className="text-center py-3 px-2 text-sm">W</TableHead>
-                          <TableHead className="text-center py-3 px-2 text-sm">L</TableHead>
-                          <TableHead className="text-center py-3 px-2 text-sm">LW</TableHead>
-                          <TableHead className="text-center py-3 px-2 text-sm">LL</TableHead>
-                          <TableHead className="text-center py-3 px-2 text-sm">+/-</TableHead>
-                          <TableHead className="text-right py-3 px-3 font-bold text-sm">Pts</TableHead>
+                          <TableHead className="w-[6%] py-3 px-3 text-sm">#</TableHead>
+                          <TableHead className="w-[24%] py-3 px-3 text-sm">Player</TableHead>
+                          <TableHead className="w-[10%] text-center py-3 px-2 text-sm">P</TableHead>
+                          <TableHead className="w-[10%] text-center py-3 px-2 text-sm">W</TableHead>
+                          <TableHead className="w-[10%] text-center py-3 px-2 text-sm">L</TableHead>
+                          <TableHead className="w-[10%] text-center py-3 px-2 text-sm">LW</TableHead>
+                          <TableHead className="w-[10%] text-center py-3 px-2 text-sm">LL</TableHead>
+                          <TableHead className="w-[10%] text-center py-3 px-2 text-sm">+/-</TableHead>
+                          <TableHead className="w-[10%] text-right py-3 px-3 font-bold text-sm">Pts</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
