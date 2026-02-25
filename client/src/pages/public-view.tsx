@@ -602,7 +602,7 @@ export default function PublicView() {
         })
     : [];
 
-  const knockoutCards: { match: typeof matches[0]; isLive: boolean; label: string; allDone?: boolean }[] = [];
+  const knockoutCards: { match?: typeof matches[0]; isLive: boolean; label: string; allDone?: boolean }[] = [];
   if (groupsFinished && knockoutStageMatches.length > 0) {
     const knockoutRounds = Array.from(new Set(knockoutStageMatches.map(m => m.roundKey))) as string[];
     const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
@@ -621,17 +621,25 @@ export default function PublicView() {
       currentRoundKey = knockoutRounds[knockoutRounds.length - 1];
     }
 
-    if (currentRoundKey) {
-      const currentRoundMatches = knockoutStageMatches
-        .filter(m => m.roundKey === currentRoundKey)
+    const currentRoundIndex = knockoutRounds.indexOf(currentRoundKey!);
+    for (let i = 0; i <= currentRoundIndex; i++) {
+      const rk = knockoutRounds[i];
+      const roundName = getRoundDisplayName(rk);
+      const roundMatches = knockoutStageMatches
+        .filter(m => m.roundKey === rk)
         .sort((a, b) => (a.order || 0) - (b.order || 0));
-      currentRoundMatches.forEach((match, i) => {
-        knockoutCards.push({
-          match,
-          isLive: match.status === 'IN_PROGRESS',
-          label: `${getRoundDisplayName(currentRoundKey!)}${currentRoundMatches.length > 1 ? ` ${i + 1}` : ''}`,
+
+      if (i < currentRoundIndex) {
+        knockoutCards.push({ isLive: false, label: roundName, allDone: true });
+      } else {
+        roundMatches.forEach((match, j) => {
+          knockoutCards.push({
+            match,
+            isLive: match.status === 'IN_PROGRESS',
+            label: `${roundName}${roundMatches.length > 1 ? ` ${j + 1}` : ''}`,
+          });
         });
-      });
+      }
     }
   }
 
@@ -689,8 +697,8 @@ export default function PublicView() {
                     <Card key={`completed-${group.id}`} className="border-2 border-dashed" data-testid={`completed-group-${group.id}`}>
                       <CardContent className="py-12 text-center">
                         <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-                        <h2 className="text-xl font-bold mb-2">All Matches Complete!</h2>
-                        <p className="text-muted-foreground">All matches on this board have been played.</p>
+                        <h2 className="text-xl font-bold mb-2">{group.name} matches complete</h2>
+                        <p className="text-muted-foreground">Waiting on other matches to finish</p>
                       </CardContent>
                     </Card>
                   );
@@ -754,20 +762,32 @@ export default function PublicView() {
               )}
             </div>
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              {knockoutCards.map(({ match, isLive, label }) => {
-                const ls = liveScorings.get(match.id);
-                const playerA = getPlayer(match.playerAId);
-                const playerB = getPlayer(match.playerBId);
-                const isCompleted = match.status === 'COMPLETED';
+              {knockoutCards.map(({ match, isLive, label, allDone }, idx) => {
+                if (allDone) {
+                  return (
+                    <Card key={`ko-done-${idx}`} className="border-2 border-dashed" data-testid={`completed-ko-${label.replace(/\s+/g, '-').toLowerCase()}`}>
+                      <CardContent className="py-12 text-center">
+                        <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                        <h2 className="text-xl font-bold mb-2">{label} matches complete</h2>
+                        <p className="text-muted-foreground">Waiting on other matches to finish</p>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+
+                const ls = liveScorings.get(match!.id);
+                const playerA = getPlayer(match!.playerAId);
+                const playerB = getPlayer(match!.playerBId);
+                const isCompleted = match!.status === 'COMPLETED';
 
                 if (isLive) {
-                  return <LiveMatchCard key={match.id} match={match} ls={ls} playerA={playerA} playerB={playerB} headerLabel={label} />;
+                  return <LiveMatchCard key={match!.id} match={match!} ls={ls} playerA={playerA} playerB={playerB} headerLabel={label} />;
                 }
 
                 return (
                   <KnockoutMatchCard
-                    key={match.id}
-                    match={match}
+                    key={match!.id}
+                    match={match!}
                     playerA={playerA}
                     playerB={playerB}
                     label={label}
