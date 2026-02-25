@@ -244,23 +244,31 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
         </CardTitle>
       </CardHeader>
       <CardContent className="py-4 px-4">
-        <div className="flex items-center justify-between text-center">
-          <div className="flex-1">
-            <p className={cn("text-lg font-bold", isCompleted && match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>
-              {playerA?.name || "TBD"}
-            </p>
+        {isCompleted ? (
+          <div className="flex items-center justify-between text-center">
+            <div className="flex-1">
+              <p className={cn("text-lg font-bold", match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>
+                {playerA?.name || "TBD"}
+              </p>
+            </div>
+            <div className="flex items-center gap-3 px-3">
+              <span className={cn("text-2xl font-bold tabular-nums", match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>{match.scoreA || 0}</span>
+              <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
+              <span className={cn("text-2xl font-bold tabular-nums", match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>{match.scoreB || 0}</span>
+            </div>
+            <div className="flex-1">
+              <p className={cn("text-lg font-bold", match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>
+                {playerB?.name || "TBD"}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-3 px-3">
-            <span className={cn("text-2xl font-bold tabular-nums", isCompleted && match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>{match.scoreA || 0}</span>
-            <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
-            <span className={cn("text-2xl font-bold tabular-nums", isCompleted && match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>{match.scoreB || 0}</span>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-1 py-2 text-center">
+            <p className="text-lg font-bold">{playerA?.name || "TBD"}</p>
+            <span className="text-muted-foreground text-xs uppercase font-medium tracking-wider">vs</span>
+            <p className="text-lg font-bold">{playerB?.name || "TBD"}</p>
           </div>
-          <div className="flex-1">
-            <p className={cn("text-lg font-bold", isCompleted && match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>
-              {playerB?.name || "TBD"}
-            </p>
-          </div>
-        </div>
+        )}
         {match.scorerName && (
           <div className="pt-2 text-[11px] text-muted-foreground text-center" data-testid={`knockout-scorer-${match.id}`}>
             Scorer: {match.scorerName}
@@ -324,13 +332,13 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
             </span>
           )}
         </CardTitle>
-        <div className="flex items-center justify-between mt-2">
-          <span className="truncate max-w-[38%] text-xl font-black">{ls?.playerAName || playerA?.name || 'TBD'}</span>
-          <span className="text-primary font-black font-mono shrink-0 px-3 text-2xl tabular-nums">
-            {ls ? `${ls.legsWonA} — ${ls.legsWonB}` : `${match.scoreA || 0} — ${match.scoreB || 0}`}
-          </span>
-          <span className="truncate max-w-[38%] text-right text-xl font-black">{ls?.playerBName || playerB?.name || 'TBD'}</span>
-        </div>
+        {ls && (
+          <div className="flex items-center justify-between mt-2">
+            <span className="truncate max-w-[38%] text-xl font-black">{ls.playerAName || playerA?.name || 'TBD'}</span>
+            <span className="text-primary font-black font-mono shrink-0 px-3 text-2xl tabular-nums">{ls.legsWonA} — {ls.legsWonB}</span>
+            <span className="truncate max-w-[38%] text-right text-xl font-black">{ls.playerBName || playerB?.name || 'TBD'}</span>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="pt-3 pb-4 px-4">
         {ls ? (
@@ -407,18 +415,10 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between text-center py-4">
-            <div className="flex-1">
-              <p className="text-lg font-bold">{playerA?.name || "TBD"}</p>
-            </div>
-            <div className="flex items-center gap-3 px-3">
-              <span className="text-2xl font-bold tabular-nums">{match.scoreA || 0}</span>
-              <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
-              <span className="text-2xl font-bold tabular-nums">{match.scoreB || 0}</span>
-            </div>
-            <div className="flex-1">
-              <p className="text-lg font-bold">{playerB?.name || "TBD"}</p>
-            </div>
+          <div className="flex flex-col items-center justify-center gap-1 py-4 text-center">
+            <p className="text-lg font-bold">{playerA?.name || "TBD"}</p>
+            <span className="text-muted-foreground text-xs uppercase font-medium tracking-wider">vs</span>
+            <p className="text-lg font-bold">{playerB?.name || "TBD"}</p>
           </div>
         )}
       </CardContent>

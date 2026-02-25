@@ -1617,7 +1617,7 @@ export default function ScorerPage() {
                   <Grid2x2 className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
                 </button>
                 <div
-                  className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-lg px-3 h-12 md:h-16 text-xl md:text-3xl font-medium tabular-nums flex items-center justify-between"
+                  className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-lg px-4 h-14 md:h-18 text-2xl md:text-4xl font-medium tabular-nums flex items-center justify-between"
                   data-testid="text-input-value"
                 >
                   <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
