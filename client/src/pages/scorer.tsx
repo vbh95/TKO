@@ -1617,14 +1617,14 @@ export default function ScorerPage() {
                   <Grid2x2 className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
                 </button>
                 <div
-                  className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-lg px-3 h-9 md:h-12 text-base md:text-xl font-medium tabular-nums flex items-center justify-between"
+                  className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-lg px-3 h-12 md:h-16 text-xl md:text-3xl font-medium tabular-nums flex items-center justify-between"
                   data-testid="text-input-value"
                 >
                   <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
                   <button
                     className={cn(
-                      "ml-1 p-2 md:p-3 rounded-lg touch-manipulation active:scale-90 active:bg-red-900/30 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center",
-                      inputValue ? "bg-red-900/20 border border-red-800/30" : "opacity-30 pointer-events-none"
+                      "ml-1 p-2 md:p-3 rounded-lg touch-manipulation active:scale-90 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center",
+                      inputValue ? "opacity-100" : "opacity-30 pointer-events-none"
                     )}
                     onClick={() => setInputValue(prev => prev.slice(0, -1))}
                     disabled={!inputValue}
