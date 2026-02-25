@@ -123,7 +123,10 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
         </div>
 
         {isCompleted && (
-          <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform ml-2", expanded && "rotate-180")} />
+          <span className="flex items-center gap-1 text-xs text-muted-foreground ml-2">
+            Stats
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", expanded && "rotate-180")} />
+          </span>
         )}
       </div>
 
@@ -237,7 +240,7 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
           )}
           {isCompleted && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
-              Tap for stats
+              Stats
               <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", expanded && "rotate-180")} />
             </span>
           )}
