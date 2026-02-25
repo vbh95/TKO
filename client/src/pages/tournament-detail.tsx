@@ -132,7 +132,7 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
   }
 
   return (
-    <div className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider truncate" data-testid={`match-scorer-${matchId}`}>
+    <div className="mt-2 pt-2 border-t border-dashed text-[11px] text-muted-foreground uppercase font-bold tracking-wider truncate" data-testid={`match-scorer-${matchId}`}>
       {editing ? (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <ClipboardList className="w-3.5 h-3.5 shrink-0" />
@@ -706,7 +706,7 @@ export default function TournamentDetail() {
                                     </div>
                                   </div>
                                 </div>
-                                <div className="flex items-center justify-between mt-3 pt-2 border-t border-dashed">
+                                <div className="flex items-center justify-between mt-3">
                                   <div className="flex-1">
                                     <InlineScorerEdit
                                       matchId={match.id}
