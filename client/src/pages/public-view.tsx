@@ -637,46 +637,49 @@ export default function PublicView() {
         })
     : [];
 
-  const knockoutCards: { match?: typeof matches[0]; isLive: boolean; label: string; allDone?: boolean }[] = [];
-  if (groupsFinished && knockoutStageMatches.length > 0) {
-    const knockoutRounds = Array.from(new Set(knockoutStageMatches.map(m => m.roundKey))) as string[];
-    const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
-    knockoutRounds.sort((a, b) => (koOrder[a] || 0) - (koOrder[b] || 0));
+    const knockoutCards: { match?: typeof matches[0]; isLive: boolean; label: string; allDone?: boolean; hideNames?: boolean }[] = [];
+    if (groupsFinished && knockoutStageMatches.length > 0) {
+      const knockoutRounds = Array.from(new Set(knockoutStageMatches.map(m => m.roundKey))) as string[];
+      const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
+      knockoutRounds.sort((a, b) => (koOrder[a] || 0) - (koOrder[b] || 0));
 
-    let currentRoundKey: string | null = null;
-    for (const rk of knockoutRounds) {
-      const roundMatches = knockoutStageMatches.filter(m => m.roundKey === rk);
-      if (!roundMatches.every(m => m.status === 'COMPLETED')) {
-        currentRoundKey = rk;
-        break;
+      let currentRoundKey: string | null = null;
+      for (const rk of knockoutRounds) {
+        const roundMatches = knockoutStageMatches.filter(m => m.roundKey === rk);
+        if (!roundMatches.every(m => m.status === 'COMPLETED')) {
+          currentRoundKey = rk;
+          break;
+        }
       }
-    }
 
-    if (!currentRoundKey) {
-      currentRoundKey = knockoutRounds[knockoutRounds.length - 1];
-    }
+      if (!currentRoundKey) {
+        currentRoundKey = knockoutRounds[knockoutRounds.length - 1];
+      }
 
-    const currentRoundIndex = knockoutRounds.indexOf(currentRoundKey!);
-    for (let i = 0; i <= currentRoundIndex; i++) {
-      const rk = knockoutRounds[i];
-      const roundName = getRoundDisplayName(rk);
-      const roundMatches = knockoutStageMatches
-        .filter(m => m.roundKey === rk)
-        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const currentRoundIndex = knockoutRounds.indexOf(currentRoundKey!);
+      for (let i = 0; i <= currentRoundIndex; i++) {
+        const rk = knockoutRounds[i];
+        const roundName = getRoundDisplayName(rk);
+        const roundMatches = knockoutStageMatches
+          .filter(m => m.roundKey === rk)
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-      if (i < currentRoundIndex) {
-        knockoutCards.push({ isLive: false, label: roundName, allDone: true });
-      } else {
-        roundMatches.forEach((match, j) => {
-          knockoutCards.push({
-            match,
-            isLive: match.status === 'IN_PROGRESS',
-            label: `${roundName}${roundMatches.length > 1 ? ` ${j + 1}` : ''}`,
+        if (i < currentRoundIndex) {
+          knockoutCards.push({ isLive: false, label: roundName, allDone: true });
+        } else {
+          roundMatches.forEach((match, j) => {
+            // Only show names if all matches in the previous knockout round are COMPLETED
+            const prevRoundFinished = i === 0 || knockoutStageMatches.filter(m => m.roundKey === knockoutRounds[i-1]).every(m => m.status === 'COMPLETED');
+            knockoutCards.push({
+              match,
+              isLive: match.status === 'IN_PROGRESS',
+              label: `${roundName}${roundMatches.length > 1 ? ` ${j + 1}` : ''}`,
+              hideNames: !prevRoundFinished
+            });
           });
-        });
+        }
       }
     }
-  }
 
   const hasGroupMatches = groupStageMatches.length > 0;
   const showGroupSlots = hasGroupMatches && !groupsFinished && groupSlots.length > 0;
@@ -797,7 +800,7 @@ export default function PublicView() {
               )}
             </div>
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              {knockoutCards.map(({ match, isLive, label, allDone }, idx) => {
+              {knockoutCards.map(({ match, isLive, label, allDone, hideNames }, idx) => {
                 if (allDone) {
                   return (
                     <Card key={`ko-done-${idx}`} className="border-2 border-dashed" data-testid={`completed-ko-${label.replace(/\s+/g, '-').toLowerCase()}`}>
@@ -811,8 +814,10 @@ export default function PublicView() {
                 }
 
                 const ls = liveScorings.get(match!.id);
-                const playerA = getPlayer(match!.playerAId);
-                const playerB = getPlayer(match!.playerBId);
+                const isKnockout = match!.stage === 'KNOCKOUT';
+                const effectiveHideNames = hideNames || (isKnockout && !groupsFinished);
+                const playerA = effectiveHideNames ? null : getPlayer(match!.playerAId);
+                const playerB = effectiveHideNames ? null : getPlayer(match!.playerBId);
                 const isCompleted = match!.status === 'COMPLETED';
 
                 if (isLive) {
