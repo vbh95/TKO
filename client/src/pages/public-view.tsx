@@ -95,7 +95,10 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
         data-testid={`button-match-stats-${match.id}`}
       >
         <div className="flex-1 text-right font-medium">
-          <span className={cn(match.winnerId === match.playerAId && "text-green-600 dark:text-green-400 font-bold")}>
+          <span className={cn(
+            match.winnerId === match.playerAId ? "text-green-600 dark:text-green-400 font-bold" : "text-foreground",
+            !playerA && "text-muted-foreground/60 font-normal"
+          )}>
             {playerA?.name || "TBD"}
           </span>
         </div>
@@ -117,7 +120,10 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
         </div>
 
         <div className="flex-1 text-left font-medium">
-          <span className={cn(match.winnerId === match.playerBId && "text-green-600 dark:text-green-400 font-bold")}>
+          <span className={cn(
+            match.winnerId === match.playerBId ? "text-green-600 dark:text-green-400 font-bold" : "text-foreground",
+            !playerB && "text-muted-foreground/60 font-normal"
+          )}>
             {playerB?.name || "TBD"}
           </span>
         </div>
@@ -250,7 +256,11 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
         {isCompleted ? (
           <div className="flex items-center justify-between text-center">
             <div className="flex-1">
-              <p className={cn("text-lg font-bold", match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>
+              <p className={cn(
+                "text-lg font-bold",
+                match.winnerId === match.playerAId ? "text-green-600 dark:text-green-400" : "text-foreground",
+                !playerA && "text-muted-foreground/60 font-normal"
+              )}>
                 {playerA?.name || "TBD"}
               </p>
             </div>
@@ -260,18 +270,22 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
               <span className={cn("text-2xl font-bold tabular-nums", match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>{match.scoreB || 0}</span>
             </div>
             <div className="flex-1">
-              <p className={cn("text-lg font-bold", match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>
+              <p className={cn(
+                "text-lg font-bold",
+                match.winnerId === match.playerBId ? "text-green-600 dark:text-green-400" : "text-foreground",
+                !playerB && "text-muted-foreground/60 font-normal"
+              )}>
                 {playerB?.name || "TBD"}
               </p>
             </div>
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-center">
-            <p className="text-xl font-bold">
-              {playerA?.name || "TBD"}
+            <div className="text-xl font-bold flex items-center justify-center">
+              <span className={cn(!playerA && "text-muted-foreground/60 font-normal")}>{playerA?.name || "TBD"}</span>
               <span className="text-muted-foreground text-sm uppercase font-medium tracking-wider mx-3">vs</span>
-              {playerB?.name || "TBD"}
-            </p>
+              <span className={cn(!playerB && "text-muted-foreground/60 font-normal")}>{playerB?.name || "TBD"}</span>
+            </div>
           </div>
         )}
         {isCompleted && (
@@ -347,9 +361,19 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
         </CardTitle>
         {ls && (
           <div className="flex items-center justify-between mt-2">
-            <span className="truncate max-w-[38%] text-xl font-black">{ls.playerAName || playerA?.name || 'TBD'}</span>
+            <span className={cn(
+              "truncate max-w-[38%] text-xl font-black",
+              !(ls.playerAName || playerA?.name) && "text-muted-foreground/60 font-normal"
+            )}>
+              {ls.playerAName || playerA?.name || 'TBD'}
+            </span>
             <span className="text-primary font-black font-mono shrink-0 px-3 text-2xl tabular-nums">{ls.legsWonA} — {ls.legsWonB}</span>
-            <span className="truncate max-w-[38%] text-right text-xl font-black">{ls.playerBName || playerB?.name || 'TBD'}</span>
+            <span className={cn(
+              "truncate max-w-[38%] text-right text-xl font-black",
+              !(ls.playerBName || playerB?.name) && "text-muted-foreground/60 font-normal"
+            )}>
+              {ls.playerBName || playerB?.name || 'TBD'}
+            </span>
           </div>
         )}
       </CardHeader>
@@ -429,11 +453,11 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
           </div>
         ) : (
           <div className="flex items-center justify-center min-h-[100px] text-center">
-            <p className="text-lg font-bold">
-              {playerA?.name || "TBD"}
+            <div className="text-lg font-bold flex items-center justify-center">
+              <span className={cn(!(playerA?.name) && "text-muted-foreground/60 font-normal")}>{playerA?.name || "TBD"}</span>
               <span className="text-muted-foreground text-xs uppercase font-medium tracking-wider mx-2">vs</span>
-              {playerB?.name || "TBD"}
-            </p>
+              <span className={cn(!(playerB?.name) && "text-muted-foreground/60 font-normal")}>{playerB?.name || "TBD"}</span>
+            </div>
           </div>
         )}
         {match.scorerName && (
