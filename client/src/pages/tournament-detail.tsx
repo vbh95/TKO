@@ -1127,15 +1127,15 @@ export default function TournamentDetail() {
                       <Table>
                       <TableHeader className="bg-muted/50">
                         <TableRow>
-                          <TableHead className="w-[40px] py-2 px-2 text-sm">#</TableHead>
-                          <TableHead className="py-2 px-2 text-sm">Player</TableHead>
-                          <TableHead className="text-center py-2 px-1 text-sm">P</TableHead>
-                          <TableHead className="text-center py-2 px-1 text-sm">W</TableHead>
-                          <TableHead className="text-center py-2 px-1 text-sm">L</TableHead>
-                          <TableHead className="text-center py-2 px-1 hidden md:table-cell text-sm">LW</TableHead>
-                          <TableHead className="text-center py-2 px-1 hidden md:table-cell text-sm">LL</TableHead>
-                          <TableHead className="text-center py-2 px-1 hidden md:table-cell text-sm">+/-</TableHead>
-                          <TableHead className="text-right py-2 px-2 font-bold text-sm">Pts</TableHead>
+                          <TableHead className="w-[50px] py-3 px-3 text-sm">#</TableHead>
+                          <TableHead className="py-3 px-3 text-sm">Player</TableHead>
+                          <TableHead className="text-center py-3 px-2 text-sm">P</TableHead>
+                          <TableHead className="text-center py-3 px-2 text-sm">W</TableHead>
+                          <TableHead className="text-center py-3 px-2 text-sm">L</TableHead>
+                          <TableHead className="text-center py-3 px-2 text-sm">LW</TableHead>
+                          <TableHead className="text-center py-3 px-2 text-sm">LL</TableHead>
+                          <TableHead className="text-center py-3 px-2 text-sm">+/-</TableHead>
+                          <TableHead className="text-right py-3 px-3 font-bold text-sm">Pts</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1146,25 +1146,25 @@ export default function TournamentDetail() {
                             qualifying ? "bg-green-50 dark:bg-green-950/30" : "",
                             "hover:bg-muted/40 transition-colors"
                           )}>
-                            <TableCell className="py-2 px-2 font-medium text-muted-foreground text-sm">
-                              <div className="flex items-center gap-1">
+                            <TableCell className="py-4 px-3 font-medium text-muted-foreground text-sm">
+                              <div className="flex items-center gap-1.5">
                                 {idx + 1}
                                 {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
                               </div>
                             </TableCell>
-                            <TableCell className={cn("py-2 px-2 font-bold text-sm", qualifying && "text-green-700 dark:text-green-400")}>{s.name}</TableCell>
-                            <TableCell className="py-2 px-1 text-center tabular-nums text-sm">{s.played}</TableCell>
-                            <TableCell className="py-2 px-1 text-center tabular-nums text-green-600 dark:text-green-400 font-medium text-sm">{s.won}</TableCell>
-                            <TableCell className="py-2 px-1 text-center tabular-nums text-destructive font-medium text-sm">{s.lost}</TableCell>
-                            <TableCell className="py-2 px-1 text-center tabular-nums hidden md:table-cell font-mono text-sm">{s.legsFor}</TableCell>
-                            <TableCell className="py-2 px-1 text-center tabular-nums hidden md:table-cell font-mono text-sm">{s.legsAgainst}</TableCell>
+                            <TableCell className={cn("py-4 px-3 font-bold text-sm", qualifying && "text-green-700 dark:text-green-400")}>{s.name}</TableCell>
+                            <TableCell className="py-4 px-2 text-center tabular-nums text-sm">{s.played}</TableCell>
+                            <TableCell className="py-4 px-2 text-center tabular-nums text-green-600 dark:text-green-400 font-medium text-sm">{s.won}</TableCell>
+                            <TableCell className="py-4 px-2 text-center tabular-nums text-destructive font-medium text-sm">{s.lost}</TableCell>
+                            <TableCell className="py-4 px-2 text-center tabular-nums text-sm">{s.legsFor}</TableCell>
+                            <TableCell className="py-4 px-2 text-center tabular-nums text-sm">{s.legsAgainst}</TableCell>
                             <TableCell className={cn(
-                              "py-2 px-1 text-center tabular-nums font-medium hidden md:table-cell font-mono text-sm",
+                              "py-4 px-2 text-center tabular-nums font-medium text-sm",
                               s.diff > 0 ? "text-green-600" : s.diff < 0 ? "text-destructive" : ""
                             )}>
                               {s.diff > 0 ? `+${s.diff}` : s.diff}
                             </TableCell>
-                            <TableCell className="py-2 px-2 text-right font-bold text-primary text-base">{s.pts}</TableCell>
+                            <TableCell className="py-4 px-3 text-right font-bold text-primary text-base">{s.pts}</TableCell>
                           </TableRow>
                           );
                         })}
