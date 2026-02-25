@@ -96,7 +96,7 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
       >
         <div className="flex-1 text-right font-medium">
           <span className={cn(
-            match.winnerId === match.playerAId ? "text-green-600 dark:text-green-400 font-bold" : "text-foreground",
+            match.winnerId === match.playerAId && match.playerAId ? "text-green-600 dark:text-green-400 font-bold" : "text-foreground",
             !playerA && "text-muted-foreground/60 font-normal"
           )}>
             {playerA?.name || "TBD"}
@@ -106,14 +106,14 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
         <div className="flex items-center gap-3 px-6">
           <span className={cn(
             "text-xl font-bold",
-            match.scoreA! > match.scoreB! ? "text-primary" : "text-muted-foreground"
+            match.scoreA! > match.scoreB! && match.playerAId ? "text-primary" : "text-muted-foreground"
           )}>
             {match.scoreA || 0}
           </span>
           <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
           <span className={cn(
             "text-xl font-bold",
-            match.scoreB! > match.scoreA! ? "text-primary" : "text-muted-foreground"
+            match.scoreB! > match.scoreA! && match.playerBId ? "text-primary" : "text-muted-foreground"
           )}>
             {match.scoreB || 0}
           </span>
@@ -121,7 +121,7 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
 
         <div className="flex-1 text-left font-medium">
           <span className={cn(
-            match.winnerId === match.playerBId ? "text-green-600 dark:text-green-400 font-bold" : "text-foreground",
+            match.winnerId === match.playerBId && match.playerBId ? "text-green-600 dark:text-green-400 font-bold" : "text-foreground",
             !playerB && "text-muted-foreground/60 font-normal"
           )}>
             {playerB?.name || "TBD"}
@@ -259,21 +259,21 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
             <div className="flex-1">
               <p className={cn(
                 "text-lg font-bold",
-                match.winnerId === match.playerAId ? "text-green-600 dark:text-green-400" : "text-foreground",
+                match.winnerId === match.playerAId && match.playerAId ? "text-green-600 dark:text-green-400" : "text-foreground",
                 !playerA && "text-muted-foreground/60 font-normal"
               )}>
                 {playerA?.name || "TBD"}
               </p>
             </div>
             <div className="flex items-center gap-3 px-3">
-              <span className={cn("text-2xl font-bold tabular-nums", match.winnerId === match.playerAId && "text-green-600 dark:text-green-400")}>{match.scoreA || 0}</span>
+              <span className={cn("text-2xl font-bold tabular-nums", match.winnerId === match.playerAId && match.playerAId ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>{match.scoreA || 0}</span>
               <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
-              <span className={cn("text-2xl font-bold tabular-nums", match.winnerId === match.playerBId && "text-green-600 dark:text-green-400")}>{match.scoreB || 0}</span>
+              <span className={cn("text-2xl font-bold tabular-nums", match.winnerId === match.playerBId && match.playerBId ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>{match.scoreB || 0}</span>
             </div>
             <div className="flex-1">
               <p className={cn(
                 "text-lg font-bold",
-                match.winnerId === match.playerBId ? "text-green-600 dark:text-green-400" : "text-foreground",
+                match.winnerId === match.playerBId && match.playerBId ? "text-green-600 dark:text-green-400" : "text-foreground",
                 !playerB && "text-muted-foreground/60 font-normal"
               )}>
                 {playerB?.name || "TBD"}
