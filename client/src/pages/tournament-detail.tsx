@@ -1170,6 +1170,17 @@ export default function TournamentDetail() {
                 </Card>
               ))}
             </div>
+            <div className="rounded-lg border border-border bg-muted/30 px-5 py-4 space-y-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-foreground">Standings Criteria</p>
+              <p className="text-sm text-muted-foreground">Group standings are determined by the following criteria, applied in order:</p>
+              <ol className="space-y-1.5 text-sm">
+                <li><span className="font-bold text-foreground">1. Points</span><span className="text-muted-foreground"> — {ptsWin} for a win. The player with the most points is ranked highest.</span></li>
+                <li><span className="font-bold text-foreground">2. Leg Difference</span><span className="text-muted-foreground"> — If tied on points, the player with the better leg difference (legs won minus legs lost) is ranked higher.</span></li>
+                <li><span className="font-bold text-foreground">3. Legs Won</span><span className="text-muted-foreground"> — If still tied, the player with the most legs won is ranked higher.</span></li>
+                <li><span className="font-bold text-foreground">4. Head-to-Head</span><span className="text-muted-foreground"> — If still tied, the result between the tied players is used. The same criteria (points, leg difference, legs won) are applied to only the matches played between the tied players.</span></li>
+              </ol>
+              <p className="text-xs text-muted-foreground/60 pt-1">If players remain tied after all criteria, they share the same effective position.</p>
+            </div>
             </div>
           </TabsContent>
 
