@@ -697,7 +697,7 @@ export default function PublicView() {
                     <Card key={`completed-${group.id}`} className="border-2 border-dashed" data-testid={`completed-group-${group.id}`}>
                       <CardContent className="py-12 text-center">
                         <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-                        <h2 className="text-xl font-bold mb-2">{group.name} matches complete</h2>
+                        <h2 className="text-xl font-bold mb-2">{group.name} Complete</h2>
                         <p className="text-muted-foreground">Waiting on other matches to finish</p>
                       </CardContent>
                     </Card>
@@ -768,7 +768,7 @@ export default function PublicView() {
                     <Card key={`ko-done-${idx}`} className="border-2 border-dashed" data-testid={`completed-ko-${label.replace(/\s+/g, '-').toLowerCase()}`}>
                       <CardContent className="py-12 text-center">
                         <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-                        <h2 className="text-xl font-bold mb-2">{label} matches complete</h2>
+                        <h2 className="text-xl font-bold mb-2">{label} Complete</h2>
                         <p className="text-muted-foreground">Waiting on other matches to finish</p>
                       </CardContent>
                     </Card>
