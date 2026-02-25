@@ -1135,7 +1135,7 @@ export default function TournamentDetail() {
                           <TableHead className="w-[10%] text-center py-3 px-2 text-sm">LW</TableHead>
                           <TableHead className="w-[10%] text-center py-3 px-2 text-sm">LL</TableHead>
                           <TableHead className="w-[10%] text-center py-3 px-2 text-sm">+/-</TableHead>
-                          <TableHead className="w-[10%] text-right py-3 px-3 font-bold text-sm">Pts</TableHead>
+                          <TableHead className="w-[10%] text-center py-3 px-2 text-sm">Pts</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1165,7 +1165,7 @@ export default function TournamentDetail() {
                               {s.diff > 0 ? `+${s.diff}` : s.diff}
                             </TableCell>
                             <TableCell className={cn(
-                              "py-4 px-3 text-right font-bold text-base",
+                              "py-4 px-2 text-center font-bold text-base",
                               qualifying ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
                             )}>{s.pts}</TableCell>
                           </TableRow>
