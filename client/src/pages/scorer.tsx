@@ -2018,7 +2018,7 @@ export default function ScorerPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40px]">#</TableHead>
+                  <TableHead className="w-[40px] text-center">#</TableHead>
                   <TableHead>Player</TableHead>
                   <TableHead className="text-center">P</TableHead>
                   <TableHead className="text-center">W</TableHead>
@@ -2029,7 +2029,12 @@ export default function ScorerPage() {
               <TableBody>
                 {standings.map((player, idx) => (
                   <TableRow key={player.id} className={idx === 0 ? "bg-yellow-50 dark:bg-yellow-900/10" : ""}>
-                    <TableCell className="font-medium text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="font-medium text-muted-foreground">
+                      <div className="flex items-center justify-center gap-1.5 text-center">
+                        {idx === 0 && <div className="w-2 h-2 rounded-full bg-green-500" />}
+                        {idx + 1}
+                      </div>
+                    </TableCell>
                     <TableCell className="font-bold">{player.name}</TableCell>
                     <TableCell className="text-center">{player.played}</TableCell>
                     <TableCell className="text-center text-green-600">{player.won}</TableCell>

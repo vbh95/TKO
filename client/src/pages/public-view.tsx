@@ -846,7 +846,7 @@ export default function PublicView() {
                         return (
                         <tr key={player.id} className={cn("border-b last:border-0 hover:bg-muted/40 transition-colors", qualifying && "bg-green-50 dark:bg-green-950/30")} data-testid={`row-standing-${player.id}`}>
                           <td className="py-4 px-3 text-sm text-muted-foreground font-medium">
-                            <div className="flex items-center justify-center gap-1.5">
+                            <div className="flex items-center justify-center gap-1.5 text-center">
                               {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
                               {idx + 1}
                             </div>
