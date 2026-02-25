@@ -121,14 +121,20 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
             {playerB?.name || "TBD"}
           </span>
         </div>
+      </div>
 
-        {isCompleted && (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground ml-2">
+      {isCompleted && (
+        <div className="flex justify-center pb-3">
+          <button
+            onClick={handleClick}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            data-testid={`button-match-stats-${match.id}`}
+          >
             Stats
             <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", expanded && "rotate-180")} />
-          </span>
-        )}
-      </div>
+          </button>
+        </div>
+      )}
 
       {scorerName && (
         <div className="px-4 pb-1 text-[11px] text-muted-foreground text-center" data-testid={`public-match-scorer-${match.id}`}>
@@ -238,12 +244,6 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
           {!isCompleted && (
             <span className="text-xs text-muted-foreground ml-auto">Next Up</span>
           )}
-          {isCompleted && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
-              Stats
-              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", expanded && "rotate-180")} />
-            </span>
-          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="py-4 px-4 flex-1 flex flex-col">
@@ -272,6 +272,14 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
               <span className="text-muted-foreground text-sm uppercase font-medium tracking-wider mx-3">vs</span>
               {playerB?.name || "TBD"}
             </p>
+          </div>
+        )}
+        {isCompleted && (
+          <div className="flex justify-center mt-2 mb-1">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              Stats
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", expanded && "rotate-180")} />
+            </div>
           </div>
         )}
         {match.scorerName && (
