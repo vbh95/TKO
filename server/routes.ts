@@ -166,19 +166,30 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
   if (standings.length < 2) return;
 
   const groupCount = groupsList.length;
-  type Pairing = { aGroupIdx: number; aPos: number; bGroupIdx: number; bPos: number };
   const pairings: Pairing[] = [];
-  for (let i = 0; i < groupCount; i += 2) {
-    const oppIdx = i + 1;
-    if (oppIdx < groupCount) {
-      pairings.push(
-        { aGroupIdx: i, aPos: 0, bGroupIdx: oppIdx, bPos: 1 },
-        { aGroupIdx: i, aPos: 1, bGroupIdx: oppIdx, bPos: 0 },
-      );
-    } else {
-      pairings.push(
-        { aGroupIdx: i, aPos: 0, bGroupIdx: i, bPos: 1 },
-      );
+  
+  if (groupCount === 4) {
+    // QF1 - 1st Group A vs 2nd Group B
+    pairings.push({ aGroupIdx: 0, aPos: 0, bGroupIdx: 1, bPos: 1 });
+    // QF2 - 2nd Group C vs 1st Group D
+    pairings.push({ aGroupIdx: 2, aPos: 1, bGroupIdx: 3, bPos: 0 });
+    // QF3 - 1st Group C vs 2nd Group D
+    pairings.push({ aGroupIdx: 2, aPos: 0, bGroupIdx: 3, bPos: 1 });
+    // QF4 - 2nd Group A vs 1st Group B
+    pairings.push({ aGroupIdx: 0, aPos: 1, bGroupIdx: 1, bPos: 0 });
+  } else {
+    for (let i = 0; i < groupCount; i += 2) {
+      const oppIdx = i + 1;
+      if (oppIdx < groupCount) {
+        pairings.push(
+          { aGroupIdx: i, aPos: 0, bGroupIdx: oppIdx, bPos: 1 },
+          { aGroupIdx: i, aPos: 1, bGroupIdx: oppIdx, bPos: 0 },
+        );
+      } else {
+        pairings.push(
+          { aGroupIdx: i, aPos: 0, bGroupIdx: i, bPos: 1 },
+        );
+      }
     }
   }
 
