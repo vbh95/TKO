@@ -686,15 +686,11 @@ export default function PublicView() {
               {groupSlots.map(({ group, currentMatch, isLive, allDone }) => {
                 if (allDone) {
                   return (
-                    <Card key={`completed-${group.id}`} className="border border-dashed border-muted-foreground/30 shadow-none" data-testid={`completed-group-${group.id}`}>
-                      <CardHeader className="bg-muted/30 border-b py-2.5 px-4">
-                        <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
-                          <Check className="w-4 h-4 text-green-500" />
-                          {group.name}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex items-center justify-center py-8 px-4">
-                        <p className="text-sm text-muted-foreground text-center">All matches completed — waiting for other groups to finish</p>
+                    <Card key={`completed-${group.id}`} className="border-2 border-dashed" data-testid={`completed-group-${group.id}`}>
+                      <CardContent className="py-12 text-center">
+                        <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                        <h2 className="text-xl font-bold mb-2">All Matches Complete!</h2>
+                        <p className="text-muted-foreground">All matches on this board have been played.</p>
                       </CardContent>
                     </Card>
                   );
