@@ -186,13 +186,14 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
   );
 }
 
-function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareToken }: {
+function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareToken, hideScorer }: {
   match: any;
   playerA: any;
   playerB: any;
   label: string;
   isCompleted: boolean;
   shareToken: string;
+  hideScorer?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState<any>(null);
@@ -296,7 +297,7 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
             </div>
           </div>
         )}
-        {match.scorerName && (
+        {match.scorerName && !hideScorer && (
           <div className="pt-2 text-[11px] text-muted-foreground text-center" data-testid={`knockout-scorer-${match.id}`}>
             Scorer: {match.scorerName}
           </div>
@@ -340,12 +341,13 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
   );
 }
 
-function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
+function LiveMatchCard({ match, ls, playerA, playerB, headerLabel, hideScorer }: {
   match: any;
   ls: LiveScoring | undefined;
   playerA: any;
   playerB: any;
   headerLabel: string;
+  hideScorer?: boolean;
 }) {
   return (
     <Card className="border-2 border-primary shadow-xl overflow-hidden" data-testid={`live-match-${match.id}`}>
@@ -460,7 +462,7 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
             </div>
           </div>
         )}
-        {match.scorerName && (
+        {match.scorerName && !hideScorer && (
           <p className="mt-2 text-[11px] text-muted-foreground text-center" data-testid={`public-live-scorer-${match.id}`}>
             Scorer: {match.scorerName}
           </p>
@@ -821,10 +823,11 @@ export default function PublicView() {
                 
                 const playerA = effectiveHideNames ? null : getPlayer(match!.playerAId);
                 const playerB = effectiveHideNames ? null : getPlayer(match!.playerBId);
+                const hideScorer = isKnockout && !groupsFinished;
                 const isCompleted = match!.status === 'COMPLETED';
 
                 if (isLive) {
-                  return <LiveMatchCard key={match!.id} match={match!} ls={ls} playerA={playerA} playerB={playerB} headerLabel={label} />;
+                  return <LiveMatchCard key={match!.id} match={match!} ls={ls} playerA={playerA} playerB={playerB} headerLabel={label} hideScorer={hideScorer} />;
                 }
 
                 return (
@@ -836,6 +839,7 @@ export default function PublicView() {
                     label={label}
                     isCompleted={isCompleted}
                     shareToken={shareToken || ''}
+                    hideScorer={hideScorer}
                   />
                 );
               })}
@@ -930,9 +934,15 @@ export default function PublicView() {
                   <div className="divide-y">
                     {roundMatches.map((match) => {
                       const isKnockout = !match.groupId;
-                      const hideNames = isKnockout && !groupsFinished;
+                      const knockoutRounds = Array.from(new Set(knockoutStageMatches.map(m => m.roundKey))) as string[];
+                      const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
+                      knockoutRounds.sort((a, b) => (koOrder[a] || 0) - (koOrder[b] || 0));
+
+                      const isFirstKnockoutRound = isKnockout && match.roundKey === knockoutRounds[0];
+                      const hideNames = isFirstKnockoutRound && !groupsFinished;
                       const playerA = hideNames ? null : getPlayer(match.playerAId);
                       const playerB = hideNames ? null : getPlayer(match.playerBId);
+                      const hideScorer = isKnockout && !groupsFinished;
                       return (
                         <CompletedMatchRow
                           key={match.id}
@@ -940,7 +950,7 @@ export default function PublicView() {
                           playerA={playerA}
                           playerB={playerB}
                           shareToken={shareToken || ''}
-                          scorerName={match.scorerName || null}
+                          scorerName={hideScorer ? null : (match.scorerName || null)}
                         />
                       );
                     })}
