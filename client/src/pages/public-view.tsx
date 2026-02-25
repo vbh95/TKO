@@ -415,10 +415,12 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center gap-1 py-4 text-center">
-            <p className="text-lg font-bold">{playerA?.name || "TBD"}</p>
-            <span className="text-muted-foreground text-xs uppercase font-medium tracking-wider">vs</span>
-            <p className="text-lg font-bold">{playerB?.name || "TBD"}</p>
+          <div className="flex items-center justify-center min-h-[100px] text-center">
+            <p className="text-lg font-bold">
+              {playerA?.name || "TBD"}
+              <span className="text-muted-foreground text-xs uppercase font-medium tracking-wider mx-2">vs</span>
+              {playerB?.name || "TBD"}
+            </p>
           </div>
         )}
       </CardContent>
