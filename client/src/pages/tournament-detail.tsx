@@ -979,6 +979,7 @@ export default function TournamentDetail() {
             </TabsTrigger>
             {isMultiStage ? (
               <>
+                <TabsTrigger value="groups" data-testid="tab-groups">Groups</TabsTrigger>
                 <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
                 <TabsTrigger value="knockout" data-testid="tab-knockout">Knockout</TabsTrigger>
               </>
