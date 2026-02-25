@@ -1118,8 +1118,8 @@ export default function TournamentDetail() {
               <div className="grid grid-cols-1 gap-8">
                 {groupStandings.map(({ group, standings }) => (
                   <Card key={group.name} className="shadow-md overflow-hidden">
-                    <CardHeader className="bg-primary py-4">
-                      <CardTitle className="text-primary-foreground flex items-center gap-2 text-lg">
+                    <CardHeader className="py-4 px-4 border-b">
+                      <CardTitle className="text-foreground flex items-center gap-2 text-lg font-bold">
                         {group.name}
                       </CardTitle>
                     </CardHeader>
@@ -1164,7 +1164,10 @@ export default function TournamentDetail() {
                             )}>
                               {s.diff > 0 ? `+${s.diff}` : s.diff}
                             </TableCell>
-                            <TableCell className="py-4 px-3 text-right font-bold text-primary text-base">{s.pts}</TableCell>
+                            <TableCell className={cn(
+                              "py-4 px-3 text-right font-bold text-base",
+                              qualifying ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                            )}>{s.pts}</TableCell>
                           </TableRow>
                           );
                         })}
