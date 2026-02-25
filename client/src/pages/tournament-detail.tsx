@@ -1379,13 +1379,13 @@ export default function TournamentDetail() {
                             const playerGroup = hasGroups ? getPlayerGroup(player.id) : null;
                             return (
                             <TableRow key={player.id} data-testid={`player-result-row-${player.id}`} className="border-b border-muted-foreground/10 hover:bg-muted/5 transition-colors">
-                              <TableCell className="font-bold text-muted-foreground px-2 py-6 text-sm sm:text-lg">
+                              <TableCell className="font-bold text-muted-foreground px-2 py-3 text-sm">
                                 <div className="flex items-center gap-2">
                                   {idx + 1}
-                                  {player.wonFinal && <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />}
+                                  {player.wonFinal && <Trophy className="w-4 h-4 text-yellow-500" />}
                                 </div>
                               </TableCell>
-                              <TableCell className="px-2 py-6">
+                              <TableCell className="px-2 py-3">
                                 {editingPlayerId === player.id ? (
                                   <div className="flex items-center gap-1">
                                     <Input
@@ -1405,7 +1405,7 @@ export default function TournamentDetail() {
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-2 max-w-[120px] sm:max-w-none">
-                                    <span className="font-bold truncate text-sm sm:text-xl">{player.name}</span>
+                                    <span className="font-semibold truncate text-sm sm:text-base">{player.name}</span>
                                     <button
                                       onClick={() => { setEditingPlayerId(player.id); setEditingPlayerName(player.name); }}
                                       className="text-muted-foreground/40 hover:text-foreground transition-colors shrink-0"
@@ -1417,7 +1417,7 @@ export default function TournamentDetail() {
                                 )}
                               </TableCell>
                               {hasGroups && (
-                                <TableCell className="text-center px-1 py-6">
+                                <TableCell className="text-center px-1 py-3">
                                   {tournament.isLegacy ? (
                                     <Select
                                       value={playerGroup?.id?.toString() || ""}
@@ -1439,13 +1439,13 @@ export default function TournamentDetail() {
                                   )}
                                 </TableCell>
                               )}
-                              <TableCell className="text-center px-1 py-6">
-                                <span className={cn("inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold border whitespace-nowrap", getPositionBadgeColor(player.bestRound, player.wonFinal))}>
+                              <TableCell className="text-center px-1 py-3">
+                                <span className={cn("inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap", getPositionBadgeColor(player.bestRound, player.wonFinal))}>
                                   {player.positionLabel === 'Group Stage' ? 'Group' : player.positionLabel}
                                 </span>
                               </TableCell>
-                              <TableCell className="text-center font-bold px-1 py-6 text-sm sm:text-xl text-muted-foreground/90">{player.legsWon}</TableCell>
-                              <TableCell className="text-center font-black text-green-500 dark:text-green-400 text-xl sm:text-3xl px-2 py-6">{player.points}</TableCell>
+                              <TableCell className="text-center font-semibold px-1 py-3 text-sm text-muted-foreground/90">{player.legsWon}</TableCell>
+                              <TableCell className="text-center font-bold text-green-500 dark:text-green-400 text-base sm:text-lg px-2 py-3">{player.points}</TableCell>
                             </TableRow>
                             );
                           })}
