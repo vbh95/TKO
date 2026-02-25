@@ -787,43 +787,57 @@ export default function PublicView() {
 
           <TabsContent value="standings" className="space-y-6">
             {groupStandings.map(({ group, standings }) => (
-              <Card key={group?.id ?? 'all'} className="border-t-4 border-t-primary shadow-xl overflow-hidden" data-testid={`standings-${group?.id ?? 'all'}`}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-yellow-500" />
+              <Card key={group?.id ?? 'all'} className="shadow-md overflow-hidden" data-testid={`standings-${group?.id ?? 'all'}`}>
+                <CardHeader className="py-4 px-4 border-b">
+                  <CardTitle className="text-foreground flex items-center gap-2 text-lg font-bold">
                     {group ? group.name : 'Standings'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <table className="w-full table-fixed text-lg">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="w-12 pl-3 pr-1 py-3 text-left text-base font-medium text-muted-foreground">#</th>
-                        <th className="py-3 text-left text-base font-medium text-muted-foreground">Player</th>
-                        <th className="w-12 py-3 text-center text-base font-medium text-muted-foreground">P</th>
-                        <th className="w-12 py-3 text-center text-base font-medium text-muted-foreground">W</th>
-                        <th className="w-12 py-3 text-center text-base font-medium text-muted-foreground">L</th>
-                        <th className="w-12 py-3 text-center text-base font-medium text-muted-foreground">LF</th>
-                        <th className="w-12 py-3 text-center text-base font-medium text-muted-foreground">LA</th>
-                        <th className="w-14 py-3 pr-3 text-right text-base font-bold text-muted-foreground">Pts</th>
+                  <table className="w-full table-fixed">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="w-[6%] py-3 px-3 text-left text-sm font-medium text-muted-foreground">#</th>
+                        <th className="w-[24%] py-3 px-3 text-left text-sm font-medium text-muted-foreground">Player</th>
+                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">P</th>
+                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">W</th>
+                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">L</th>
+                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">LW</th>
+                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">LL</th>
+                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">+/-</th>
+                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">Pts</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {standings.map((player, idx) => (
-                        <tr key={player.id} className={cn("border-b last:border-0", idx < 2 && "bg-green-50 dark:bg-green-950/30")} data-testid={`row-standing-${player.id}`}>
-                          <td className="pl-3 pr-1 py-3 text-muted-foreground text-base flex items-center gap-1.5">
-                            {idx + 1}
-                            {idx < 2 && <div className="w-2.5 h-2.5 rounded-full bg-green-500" />}
+                      {standings.map((player, idx) => {
+                        const qualifying = idx < 2;
+                        return (
+                        <tr key={player.id} className={cn("border-b last:border-0 hover:bg-muted/40 transition-colors", qualifying && "bg-green-50 dark:bg-green-950/30")} data-testid={`row-standing-${player.id}`}>
+                          <td className="py-4 px-3 text-sm text-muted-foreground font-medium">
+                            <div className="flex items-center gap-1.5">
+                              {idx + 1}
+                              {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
+                            </div>
                           </td>
-                          <td className={cn("py-3 font-bold truncate text-lg", idx < 2 && "text-green-700 dark:text-green-400")}>{player.name}</td>
-                          <td className="py-3 text-center text-base tabular-nums">{player.played}</td>
-                          <td className="py-3 text-center text-base tabular-nums text-green-600">{player.won}</td>
-                          <td className="py-3 text-center text-base tabular-nums text-red-500">{player.lost}</td>
-                          <td className="py-3 text-center text-base tabular-nums">{player.legsFor}</td>
-                          <td className="py-3 text-center text-base tabular-nums">{player.legsAgainst}</td>
-                          <td className="py-3 pr-3 text-right font-bold text-primary text-xl">{player.pts}</td>
+                          <td className={cn("py-4 px-3 font-bold text-sm truncate", qualifying && "text-green-700 dark:text-green-400")}>{player.name}</td>
+                          <td className="py-4 px-2 text-center text-sm tabular-nums">{player.played}</td>
+                          <td className="py-4 px-2 text-center text-sm tabular-nums text-green-600 dark:text-green-400 font-medium">{player.won}</td>
+                          <td className="py-4 px-2 text-center text-sm tabular-nums text-destructive font-medium">{player.lost}</td>
+                          <td className="py-4 px-2 text-center text-sm tabular-nums">{player.legsFor}</td>
+                          <td className="py-4 px-2 text-center text-sm tabular-nums">{player.legsAgainst}</td>
+                          <td className={cn(
+                            "py-4 px-2 text-center text-sm tabular-nums font-medium",
+                            player.diff > 0 ? "text-green-600" : player.diff < 0 ? "text-destructive" : ""
+                          )}>
+                            {player.diff > 0 ? `+${player.diff}` : player.diff}
+                          </td>
+                          <td className={cn(
+                            "py-4 px-2 text-center font-bold text-base",
+                            qualifying ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                          )}>{player.pts}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </CardContent>
