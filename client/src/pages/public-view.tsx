@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { usePublicTournament } from "@/hooks/use-tournaments";
-import { Loader2, Trophy, Eye, Sun, Moon, Check, ChevronDown } from "lucide-react";
+import { Loader2, Trophy, Eye, Sun, Moon, Check, ChevronDown, Crosshair } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import tkoLogoFull from "@assets/TKO_White-04_1771178906649.png";
 import { useSocket } from "@/hooks/use-socket";
@@ -324,17 +324,17 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
             </span>
           )}
         </CardTitle>
+        <div className="flex items-center justify-between mt-1 text-xs font-semibold">
+          <span className="truncate max-w-[35%]">{ls?.playerAName || playerA?.name || 'TBD'}</span>
+          <span className="text-muted-foreground font-mono shrink-0 px-2">
+            {ls ? `${ls.legsWonA} — ${ls.legsWonB}` : `${match.scoreA || 0} — ${match.scoreB || 0}`}
+          </span>
+          <span className="truncate max-w-[35%] text-right">{ls?.playerBName || playerB?.name || 'TBD'}</span>
+        </div>
       </CardHeader>
       <CardContent className="pt-3 pb-4 px-4">
         {ls ? (
           <div>
-            <div className="text-center mb-2">
-              <div className="flex items-center justify-center gap-3 tabular-nums">
-                <span className={cn("text-2xl font-bold", ls.legsWonA >= ls.legsWonB ? "text-primary" : "text-muted-foreground")}>{ls.legsWonA}</span>
-                <span className="text-muted-foreground text-sm">-</span>
-                <span className={cn("text-2xl font-bold", ls.legsWonB >= ls.legsWonA ? "text-primary" : "text-muted-foreground")}>{ls.legsWonB}</span>
-              </div>
-            </div>
             <div className="grid grid-cols-2 gap-2">
               <div
                 className={cn(
@@ -348,7 +348,7 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
                 <div className="h-3.5 mb-0.5">
                   {ls.currentThrower === 'A' && (
                     <div className="flex items-center gap-1">
-                      <Eye className="w-3 h-3 text-red-500" />
+                      <Crosshair className="w-3 h-3 text-red-500" />
                       <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
                     </div>
                   )}
@@ -382,7 +382,7 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
                 <div className="h-3.5 mb-0.5">
                   {ls.currentThrower === 'B' && (
                     <div className="flex items-center gap-1">
-                      <Eye className="w-3 h-3 text-red-500" />
+                      <Crosshair className="w-3 h-3 text-red-500" />
                       <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
                     </div>
                   )}

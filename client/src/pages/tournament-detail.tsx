@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Pencil,
   Eye,
+  Crosshair,
   Download,
   ClipboardList,
   Plus,
@@ -1019,23 +1020,23 @@ export default function TournamentDetail() {
                           </span>
                         )}
                       </CardTitle>
+                      <div className="flex items-center justify-between mt-1 text-xs font-semibold">
+                        <span className="truncate max-w-[35%]">{live?.playerAName || playerA?.name || 'TBD'}</span>
+                        <span className="text-muted-foreground font-mono shrink-0 px-2">
+                          {live ? `${live.legsWonA} — ${live.legsWonB}` : `${match.scoreA || 0} — ${match.scoreB || 0}`}
+                        </span>
+                        <span className="truncate max-w-[35%] text-right">{live?.playerBName || playerB?.name || 'TBD'}</span>
+                      </div>
                     </CardHeader>
                     <CardContent className="pt-3 pb-4 px-4 space-y-3">
                       {live ? (
                         <>
-                          <div className="text-center">
-                            <div className="flex items-center justify-center gap-3 tabular-nums">
-                              <span className={cn("text-2xl font-bold", live.legsWonA >= live.legsWonB ? "text-primary" : "text-muted-foreground")}>{live.legsWonA}</span>
-                              <span className="text-muted-foreground text-sm">-</span>
-                              <span className={cn("text-2xl font-bold", live.legsWonB >= live.legsWonA ? "text-primary" : "text-muted-foreground")}>{live.legsWonB}</span>
-                            </div>
-                          </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div className={cn("rounded-lg p-3 transition-all", live.currentThrower === 'A' ? "bg-red-600/15 ring-2 ring-red-500/50" : "bg-green-600/15 ring-2 ring-green-500/50")}>
                               <div className="h-3.5 mb-0.5">
                                 {live.currentThrower === 'A' && (
                                   <div className="flex items-center gap-1">
-                                    <Eye className="w-3 h-3 text-red-500" />
+                                    <Crosshair className="w-3 h-3 text-red-500" />
                                     <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
                                   </div>
                                 )}
@@ -1052,7 +1053,7 @@ export default function TournamentDetail() {
                               <div className="h-3.5 mb-0.5">
                                 {live.currentThrower === 'B' && (
                                   <div className="flex items-center gap-1">
-                                    <Eye className="w-3 h-3 text-red-500" />
+                                    <Crosshair className="w-3 h-3 text-red-500" />
                                     <span className="text-[9px] font-bold uppercase tracking-wider text-red-500">Throwing</span>
                                   </div>
                                 )}
