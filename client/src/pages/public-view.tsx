@@ -324,12 +324,12 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel }: {
             </span>
           )}
         </CardTitle>
-        <div className="flex items-center justify-between mt-2 text-sm font-bold">
-          <span className="truncate max-w-[38%] text-base">{ls?.playerAName || playerA?.name || 'TBD'}</span>
-          <span className="text-primary font-black font-mono shrink-0 px-3 text-lg tabular-nums">
+        <div className="flex items-center justify-between mt-2">
+          <span className="truncate max-w-[38%] text-xl font-black">{ls?.playerAName || playerA?.name || 'TBD'}</span>
+          <span className="text-primary font-black font-mono shrink-0 px-3 text-2xl tabular-nums">
             {ls ? `${ls.legsWonA} — ${ls.legsWonB}` : `${match.scoreA || 0} — ${match.scoreB || 0}`}
           </span>
-          <span className="truncate max-w-[38%] text-right text-base">{ls?.playerBName || playerB?.name || 'TBD'}</span>
+          <span className="truncate max-w-[38%] text-right text-xl font-black">{ls?.playerBName || playerB?.name || 'TBD'}</span>
         </div>
       </CardHeader>
       <CardContent className="pt-3 pb-4 px-4">

@@ -1020,12 +1020,12 @@ export default function TournamentDetail() {
                           </span>
                         )}
                       </CardTitle>
-                      <div className="flex items-center justify-between mt-1 text-xs font-semibold">
-                        <span className="truncate max-w-[35%]">{live?.playerAName || playerA?.name || 'TBD'}</span>
-                        <span className="text-muted-foreground font-mono shrink-0 px-2">
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="truncate max-w-[38%] text-xl font-black">{live?.playerAName || playerA?.name || 'TBD'}</span>
+                        <span className="text-primary font-black font-mono shrink-0 px-3 text-2xl tabular-nums">
                           {live ? `${live.legsWonA} — ${live.legsWonB}` : `${match.scoreA || 0} — ${match.scoreB || 0}`}
                         </span>
-                        <span className="truncate max-w-[35%] text-right">{live?.playerBName || playerB?.name || 'TBD'}</span>
+                        <span className="truncate max-w-[38%] text-right text-xl font-black">{live?.playerBName || playerB?.name || 'TBD'}</span>
                       </div>
                     </CardHeader>
                     <CardContent className="pt-3 pb-4 px-4 space-y-3">
