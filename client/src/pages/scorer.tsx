@@ -1385,7 +1385,7 @@ export default function ScorerPage() {
             </div>
             <div className="ml-auto flex items-center gap-1.5 md:gap-3 z-10">
               <button
-                onClick={() => refetch()}
+                onClick={() => window.location.reload()}
                 className="p-1 rounded hover:bg-white/10 transition-colors"
                 data-testid="button-refresh-scorer"
               >

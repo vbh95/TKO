@@ -1127,15 +1127,15 @@ export default function TournamentDetail() {
                       <Table>
                       <TableHeader className="bg-muted/50">
                         <TableRow>
-                          <TableHead className="w-[50px]">#</TableHead>
-                          <TableHead>Player</TableHead>
-                          <TableHead className="text-center">P</TableHead>
-                          <TableHead className="text-center">W</TableHead>
-                          <TableHead className="text-center">L</TableHead>
-                          <TableHead className="text-center hidden md:table-cell">LW</TableHead>
-                          <TableHead className="text-center hidden md:table-cell">LL</TableHead>
-                          <TableHead className="text-center hidden md:table-cell">+/-</TableHead>
-                          <TableHead className="text-right font-bold">Pts</TableHead>
+                          <TableHead className="w-[50px] text-base">#</TableHead>
+                          <TableHead className="text-base">Player</TableHead>
+                          <TableHead className="text-center text-base">P</TableHead>
+                          <TableHead className="text-center text-base">W</TableHead>
+                          <TableHead className="text-center text-base">L</TableHead>
+                          <TableHead className="text-center hidden md:table-cell text-base">LW</TableHead>
+                          <TableHead className="text-center hidden md:table-cell text-base">LL</TableHead>
+                          <TableHead className="text-center hidden md:table-cell text-base">+/-</TableHead>
+                          <TableHead className="text-right font-bold text-base">Pts</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1146,25 +1146,25 @@ export default function TournamentDetail() {
                             qualifying ? "bg-green-50 dark:bg-green-950/30" : "",
                             "hover:bg-muted/40 transition-colors"
                           )}>
-                            <TableCell className="font-medium text-muted-foreground">
+                            <TableCell className="font-medium text-muted-foreground text-base">
                               <div className="flex items-center gap-1.5">
                                 {idx + 1}
                                 {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
                               </div>
                             </TableCell>
-                            <TableCell className={cn("font-bold", qualifying && "text-green-700 dark:text-green-400")}>{s.name}</TableCell>
-                            <TableCell className="text-center tabular-nums">{s.played}</TableCell>
-                            <TableCell className="text-center tabular-nums text-green-600 dark:text-green-400 font-medium">{s.won}</TableCell>
-                            <TableCell className="text-center tabular-nums text-destructive font-medium">{s.lost}</TableCell>
-                            <TableCell className="text-center tabular-nums hidden md:table-cell font-mono">{s.legsFor}</TableCell>
-                            <TableCell className="text-center tabular-nums hidden md:table-cell font-mono">{s.legsAgainst}</TableCell>
+                            <TableCell className={cn("font-bold text-base", qualifying && "text-green-700 dark:text-green-400")}>{s.name}</TableCell>
+                            <TableCell className="text-center tabular-nums text-base">{s.played}</TableCell>
+                            <TableCell className="text-center tabular-nums text-green-600 dark:text-green-400 font-medium text-base">{s.won}</TableCell>
+                            <TableCell className="text-center tabular-nums text-destructive font-medium text-base">{s.lost}</TableCell>
+                            <TableCell className="text-center tabular-nums hidden md:table-cell font-mono text-base">{s.legsFor}</TableCell>
+                            <TableCell className="text-center tabular-nums hidden md:table-cell font-mono text-base">{s.legsAgainst}</TableCell>
                             <TableCell className={cn(
-                              "text-center tabular-nums font-medium hidden md:table-cell font-mono",
+                              "text-center tabular-nums font-medium hidden md:table-cell font-mono text-base",
                               s.diff > 0 ? "text-green-600" : s.diff < 0 ? "text-destructive" : ""
                             )}>
                               {s.diff > 0 ? `+${s.diff}` : s.diff}
                             </TableCell>
-                            <TableCell className="text-right font-bold text-primary text-lg">{s.pts}</TableCell>
+                            <TableCell className="text-right font-bold text-primary text-xl">{s.pts}</TableCell>
                           </TableRow>
                           );
                         })}

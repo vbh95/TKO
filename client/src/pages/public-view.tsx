@@ -264,9 +264,9 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-center">
-            <p className="text-lg font-bold">
+            <p className="text-xl font-bold">
               {playerA?.name || "TBD"}
-              <span className="text-muted-foreground text-xs uppercase font-medium tracking-wider mx-2">vs</span>
+              <span className="text-muted-foreground text-sm uppercase font-medium tracking-wider mx-3">vs</span>
               {playerB?.name || "TBD"}
             </p>
           </div>
@@ -795,33 +795,33 @@ export default function PublicView() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <table className="w-full table-fixed text-sm">
+                  <table className="w-full table-fixed text-base">
                     <thead>
                       <tr className="border-b">
-                        <th className="w-8 pl-2 pr-1 py-2 text-left text-xs font-medium text-muted-foreground">#</th>
-                        <th className="py-2 text-left text-xs font-medium text-muted-foreground">Player</th>
-                        <th className="w-8 py-2 text-center text-xs font-medium text-muted-foreground">P</th>
-                        <th className="w-8 py-2 text-center text-xs font-medium text-muted-foreground">W</th>
-                        <th className="w-8 py-2 text-center text-xs font-medium text-muted-foreground">L</th>
-                        <th className="w-8 py-2 text-center text-xs font-medium text-muted-foreground">LF</th>
-                        <th className="w-8 py-2 text-center text-xs font-medium text-muted-foreground">LA</th>
-                        <th className="w-10 py-2 pr-2 text-right text-xs font-bold text-muted-foreground">Pts</th>
+                        <th className="w-10 pl-2 pr-1 py-3 text-left text-sm font-medium text-muted-foreground">#</th>
+                        <th className="py-3 text-left text-sm font-medium text-muted-foreground">Player</th>
+                        <th className="w-10 py-3 text-center text-sm font-medium text-muted-foreground">P</th>
+                        <th className="w-10 py-3 text-center text-sm font-medium text-muted-foreground">W</th>
+                        <th className="w-10 py-3 text-center text-sm font-medium text-muted-foreground">L</th>
+                        <th className="w-10 py-3 text-center text-sm font-medium text-muted-foreground">LF</th>
+                        <th className="w-10 py-3 text-center text-sm font-medium text-muted-foreground">LA</th>
+                        <th className="w-12 py-3 pr-2 text-right text-sm font-bold text-muted-foreground">Pts</th>
                       </tr>
                     </thead>
                     <tbody>
                       {standings.map((player, idx) => (
                         <tr key={player.id} className={cn("border-b last:border-0", idx < 2 && "bg-green-50 dark:bg-green-950/30")} data-testid={`row-standing-${player.id}`}>
-                          <td className="pl-2 pr-1 py-2 text-muted-foreground flex items-center gap-1">
+                          <td className="pl-2 pr-1 py-3 text-muted-foreground text-sm flex items-center gap-1">
                             {idx + 1}
                             {idx < 2 && <div className="w-2 h-2 rounded-full bg-green-500" />}
                           </td>
-                          <td className={cn("py-2 font-bold truncate", idx < 2 && "text-green-700 dark:text-green-400")}>{player.name}</td>
-                          <td className="py-2 text-center">{player.played}</td>
-                          <td className="py-2 text-center text-green-600">{player.won}</td>
-                          <td className="py-2 text-center text-red-500">{player.lost}</td>
-                          <td className="py-2 text-center">{player.legsFor}</td>
-                          <td className="py-2 text-center">{player.legsAgainst}</td>
-                          <td className="py-2 pr-2 text-right font-bold text-primary text-base">{player.pts}</td>
+                          <td className={cn("py-3 font-bold truncate text-base", idx < 2 && "text-green-700 dark:text-green-400")}>{player.name}</td>
+                          <td className="py-3 text-center text-sm">{player.played}</td>
+                          <td className="py-3 text-center text-sm text-green-600">{player.won}</td>
+                          <td className="py-3 text-center text-sm text-red-500">{player.lost}</td>
+                          <td className="py-3 text-center text-sm">{player.legsFor}</td>
+                          <td className="py-3 text-center text-sm">{player.legsAgainst}</td>
+                          <td className="py-3 pr-2 text-right font-bold text-primary text-lg">{player.pts}</td>
                         </tr>
                       ))}
                     </tbody>
