@@ -897,8 +897,10 @@ export default function PublicView() {
                 <CardContent className="p-0">
                   <div className="divide-y">
                     {roundMatches.map((match) => {
-                      const playerA = getPlayer(match.playerAId);
-                      const playerB = getPlayer(match.playerBId);
+                      const isKnockout = !match.groupId;
+                      const hideNames = isKnockout && !groupsFinished;
+                      const playerA = hideNames ? null : getPlayer(match.playerAId);
+                      const playerB = hideNames ? null : getPlayer(match.playerBId);
                       return (
                         <CompletedMatchRow
                           key={match.id}
