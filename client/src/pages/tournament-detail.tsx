@@ -1116,7 +1116,7 @@ export default function TournamentDetail() {
                       <Table className="table-fixed">
                       <TableHeader className="bg-muted/50">
                         <TableRow>
-                          <TableHead className="w-[6%] py-3 px-3 text-sm">#</TableHead>
+                          <TableHead className="w-[6%] py-3 px-3 text-center text-sm">#</TableHead>
                           <TableHead className="w-[24%] py-3 px-3 text-sm">Player</TableHead>
                           <TableHead className="w-[10%] text-center py-3 px-2 text-sm">P</TableHead>
                           <TableHead className="w-[10%] text-center py-3 px-2 text-sm">W</TableHead>
@@ -1136,9 +1136,9 @@ export default function TournamentDetail() {
                             "hover:bg-muted/40 transition-colors"
                           )}>
                             <TableCell className="py-4 px-3 font-medium text-muted-foreground text-sm">
-                              <div className="flex items-center gap-1.5">
-                                {idx + 1}
+                              <div className="flex items-center justify-center gap-1.5">
                                 {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
+                                {idx + 1}
                               </div>
                             </TableCell>
                             <TableCell className={cn("py-4 px-3 font-bold text-sm", qualifying && "text-green-700 dark:text-green-400")}>{s.name}</TableCell>

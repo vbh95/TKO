@@ -827,10 +827,10 @@ export default function PublicView() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <table className="w-full table-fixed">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="w-[6%] py-3 px-3 text-left text-sm font-medium text-muted-foreground">#</th>
-                        <th className="w-[24%] py-3 px-3 text-left text-sm font-medium text-muted-foreground">Player</th>
+                        <thead className="bg-muted/50">
+                          <tr>
+                            <th className="w-[6%] py-3 px-3 text-center text-sm font-medium text-muted-foreground">#</th>
+                            <th className="w-[24%] py-3 px-3 text-left text-sm font-medium text-muted-foreground">Player</th>
                         <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">P</th>
                         <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">W</th>
                         <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">L</th>
@@ -846,9 +846,9 @@ export default function PublicView() {
                         return (
                         <tr key={player.id} className={cn("border-b last:border-0 hover:bg-muted/40 transition-colors", qualifying && "bg-green-50 dark:bg-green-950/30")} data-testid={`row-standing-${player.id}`}>
                           <td className="py-4 px-3 text-sm text-muted-foreground font-medium">
-                            <div className="flex items-center gap-1.5">
-                              {idx + 1}
+                            <div className="flex items-center justify-center gap-1.5">
                               {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
+                              {idx + 1}
                             </div>
                           </td>
                           <td className={cn("py-4 px-3 font-bold text-sm truncate", qualifying && "text-green-700 dark:text-green-400")}>{player.name}</td>
