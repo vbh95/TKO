@@ -1365,27 +1365,27 @@ export default function TournamentDetail() {
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[40px] px-2 text-xs sm:text-sm">#</TableHead>
-                            <TableHead className="px-2 text-xs sm:text-sm">Player</TableHead>
-                            {hasGroups && <TableHead className="text-center px-1 text-xs sm:text-sm">Group</TableHead>}
-                            <TableHead className="text-center px-1 text-xs sm:text-sm">Pos</TableHead>
-                            <TableHead className="text-center px-1 text-xs sm:text-sm">LW</TableHead>
-                            <TableHead className="text-right px-2 font-bold text-xs sm:text-sm">Pts</TableHead>
+                          <TableRow className="hover:bg-transparent border-b border-muted-foreground/20">
+                            <TableHead className="w-[50px] px-2 text-sm sm:text-base font-bold text-muted-foreground/70">#</TableHead>
+                            <TableHead className="px-2 text-sm sm:text-base font-bold text-muted-foreground/70">Player</TableHead>
+                            {hasGroups && <TableHead className="text-center px-1 text-sm sm:text-base font-bold text-muted-foreground/70">Group</TableHead>}
+                            <TableHead className="text-center px-1 text-sm sm:text-base font-bold text-muted-foreground/70">Position</TableHead>
+                            <TableHead className="text-center px-1 text-sm sm:text-base font-bold text-muted-foreground/70">Legs Won</TableHead>
+                            <TableHead className="text-center px-2 font-black text-sm sm:text-base text-muted-foreground/70">Points</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {playerResults.map((player: any, idx: number) => {
                             const playerGroup = hasGroups ? getPlayerGroup(player.id) : null;
                             return (
-                            <TableRow key={player.id} data-testid={`player-result-row-${player.id}`}>
-                              <TableCell className="font-medium text-muted-foreground px-2 py-2 text-xs sm:text-sm">
-                                <div className="flex items-center gap-1">
+                            <TableRow key={player.id} data-testid={`player-result-row-${player.id}`} className="border-b border-muted-foreground/10 hover:bg-muted/5 transition-colors">
+                              <TableCell className="font-bold text-muted-foreground px-2 py-6 text-sm sm:text-lg">
+                                <div className="flex items-center gap-2">
                                   {idx + 1}
-                                  {player.wonFinal && <Trophy className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />}
+                                  {player.wonFinal && <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />}
                                 </div>
                               </TableCell>
-                              <TableCell className="px-2 py-2">
+                              <TableCell className="px-2 py-6">
                                 {editingPlayerId === player.id ? (
                                   <div className="flex items-center gap-1">
                                     <Input
@@ -1395,57 +1395,57 @@ export default function TournamentDetail() {
                                         if (e.key === 'Enter') handleSavePlayerName(player.id);
                                         if (e.key === 'Escape') setEditingPlayerId(null);
                                       }}
-                                      className="h-7 w-24 sm:h-8 sm:w-40 text-xs sm:text-sm"
+                                      className="h-8 w-24 sm:h-9 sm:w-40 text-sm sm:text-base"
                                       autoFocus
                                       data-testid={`input-player-name-${player.id}`}
                                     />
-                                    <Button size="sm" variant="ghost" className="h-7 w-7 px-0" onClick={() => handleSavePlayerName(player.id)} data-testid={`button-save-player-${player.id}`}>
-                                      <Check className="w-3.5 h-3.5 text-green-600" />
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 px-0" onClick={() => handleSavePlayerName(player.id)} data-testid={`button-save-player-${player.id}`}>
+                                      <Check className="w-4 h-4 text-green-600" />
                                     </Button>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center gap-1 max-w-[80px] sm:max-w-none">
-                                    <span className="font-bold truncate text-xs sm:text-sm">{player.name}</span>
+                                  <div className="flex items-center gap-2 max-w-[120px] sm:max-w-none">
+                                    <span className="font-bold truncate text-sm sm:text-xl">{player.name}</span>
                                     <button
                                       onClick={() => { setEditingPlayerId(player.id); setEditingPlayerName(player.name); }}
-                                      className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                                      className="text-muted-foreground/40 hover:text-foreground transition-colors shrink-0"
                                       data-testid={`button-edit-player-${player.id}`}
                                     >
-                                      <Pencil className="w-3 h-3" />
+                                      <Pencil className="w-4 h-4" />
                                     </button>
                                   </div>
                                 )}
                               </TableCell>
                               {hasGroups && (
-                                <TableCell className="text-center px-1 py-2">
+                                <TableCell className="text-center px-1 py-6">
                                   {tournament.isLegacy ? (
                                     <Select
                                       value={playerGroup?.id?.toString() || ""}
                                       onValueChange={(val) => handleGroupReassign(player.id, parseInt(val))}
                                     >
-                                      <SelectTrigger className="h-7 w-16 sm:h-8 sm:w-28 text-[10px] sm:text-xs px-1" data-testid={`select-group-${player.id}`}>
+                                      <SelectTrigger className="h-8 w-24 sm:h-10 sm:w-32 text-xs sm:text-sm px-3 rounded-md border-muted-foreground/20 bg-transparent font-bold" data-testid={`select-group-${player.id}`}>
                                         <SelectValue placeholder="—" />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {groups.map((g: any) => (
                                           <SelectItem key={g.id} value={g.id.toString()}>
-                                            {g.name.replace("Group ", "")}
+                                            {g.name}
                                           </SelectItem>
                                         ))}
                                       </SelectContent>
                                     </Select>
                                   ) : (
-                                    <Badge variant="outline" className="text-[10px] px-1 h-5">{playerGroup?.name?.replace("Group ", "") || "—"}</Badge>
+                                    <Badge variant="outline" className="text-xs px-4 h-8 rounded-md border-muted-foreground/30 bg-transparent font-bold">{playerGroup?.name || "—"}</Badge>
                                   )}
                                 </TableCell>
                               )}
-                              <TableCell className="text-center px-1 py-2">
-                                <span className={cn("inline-flex items-center px-1 py-0 rounded-full text-[10px] font-medium border whitespace-nowrap", getPositionBadgeColor(player.bestRound, player.wonFinal))}>
+                              <TableCell className="text-center px-1 py-6">
+                                <span className={cn("inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold border whitespace-nowrap", getPositionBadgeColor(player.bestRound, player.wonFinal))}>
                                   {player.positionLabel === 'Group Stage' ? 'Group' : player.positionLabel}
                                 </span>
                               </TableCell>
-                              <TableCell className="text-center font-mono px-1 py-2 text-xs sm:text-sm">{player.legsWon}</TableCell>
-                              <TableCell className="text-right font-bold text-primary text-sm sm:text-lg px-2 py-2">{player.points}</TableCell>
+                              <TableCell className="text-center font-bold px-1 py-6 text-sm sm:text-xl text-muted-foreground/90">{player.legsWon}</TableCell>
+                              <TableCell className="text-center font-black text-green-500 dark:text-green-400 text-xl sm:text-3xl px-2 py-6">{player.points}</TableCell>
                             </TableRow>
                             );
                           })}
