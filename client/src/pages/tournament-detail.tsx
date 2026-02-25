@@ -979,7 +979,7 @@ export default function TournamentDetail() {
             </TabsTrigger>
             {isMultiStage ? (
               <>
-                <TabsTrigger value="groups" data-testid="tab-groups">Groups</TabsTrigger>
+                <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
                 <TabsTrigger value="knockout" data-testid="tab-knockout">Knockout</TabsTrigger>
               </>
             ) : tournament.type === 'ROUND_ROBIN' ? (
@@ -987,7 +987,7 @@ export default function TournamentDetail() {
             ) : (
               <TabsTrigger value="knockout" data-testid="tab-knockout">Matches</TabsTrigger>
             )}
-            <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
+            {isMultiStage ? null : <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>}
             <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
           </TabsList>
 
@@ -1098,10 +1098,6 @@ export default function TournamentDetail() {
             {renderGroupMatches()}
           </TabsContent>
 
-          <TabsContent value="knockout" className="space-y-6">
-            {renderKnockoutMatches()}
-          </TabsContent>
-
           <TabsContent value="standings" className="space-y-6">
             <div className="flex flex-col gap-6">
               <div className="flex items-center gap-2 px-1">
@@ -1182,6 +1178,10 @@ export default function TournamentDetail() {
               <p className="text-xs text-muted-foreground/60 pt-1">If players remain tied after all criteria, they share the same effective position.</p>
             </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="knockout" className="space-y-6">
+            {renderKnockoutMatches()}
           </TabsContent>
 
           <TabsContent value="players">
