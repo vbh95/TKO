@@ -602,7 +602,7 @@ export default function ScorerPage() {
           setCurrentThrower(saved.currentThrower);
           setLegVisits(saved.legVisits);
           setAllMatchVisits(saved.allMatchVisits);
-          setLegStartingThrower(saved.legStartingThrower);
+          setLegStartingThrower(saved.legStartingThrower ?? saved.currentThrower ?? 'A');
           setCheckoutAttemptsA(saved.checkoutStats.attemptsA);
           setCheckoutAttemptsB(saved.checkoutStats.attemptsB);
           setCheckoutSuccessA(saved.checkoutStats.successA);
@@ -636,6 +636,7 @@ export default function ScorerPage() {
                 dartsB: vB.length * 3,
                 lastScoreA: vA.length > 0 ? vA[vA.length - 1].score : null,
                 lastScoreB: vB.length > 0 ? vB[vB.length - 1].score : null,
+                legStartingThrower: saved.legStartingThrower ?? saved.currentThrower ?? 'A',
               }),
             }).catch(() => {});
           }
@@ -801,7 +802,7 @@ export default function ScorerPage() {
     saveScorerState(state);
   }, [activeMatchId, remainingA, remainingB, currentThrower, legsWonA, legsWonB, legVisits, allMatchVisits, legStartingThrower, swapPlayers]);
 
-  const emitLiveState = useCallback((rA: number, rB: number, thrower: 'A' | 'B', lA: number, lB: number, visits?: Visit[]) => {
+  const emitLiveState = useCallback((rA: number, rB: number, thrower: 'A' | 'B', lA: number, lB: number, visits?: Visit[], lstOverride?: 'A' | 'B') => {
     const activeM = data?.matches.find(m => m.id === activeMatchId);
     const pA = activeM ? data?.players.find(p => p.id === activeM.playerAId) : null;
     const pB = activeM ? data?.players.find(p => p.id === activeM.playerBId) : null;
@@ -823,7 +824,7 @@ export default function ScorerPage() {
       dartsB: vB.length * 3,
       lastScoreA: vA.length > 0 ? vA[vA.length - 1].score : null,
       lastScoreB: vB.length > 0 ? vB[vB.length - 1].score : null,
-      legStartingThrower,
+      legStartingThrower: lstOverride ?? legStartingThrower,
     });
   }, [activeMatchId, data, legVisits, legStartingThrower]);
 
@@ -1158,7 +1159,7 @@ export default function ScorerPage() {
         setCurrentThrower(saved.currentThrower);
         setLegVisits(saved.legVisits);
         setAllMatchVisits(saved.allMatchVisits);
-        setLegStartingThrower(saved.legStartingThrower);
+        setLegStartingThrower(saved.legStartingThrower ?? saved.currentThrower ?? 'A');
         setCheckoutAttemptsA(saved.checkoutStats.attemptsA);
         setCheckoutAttemptsB(saved.checkoutStats.attemptsB);
         setCheckoutSuccessA(saved.checkoutStats.successA);
@@ -1192,6 +1193,7 @@ export default function ScorerPage() {
               dartsB: vB.length * 3,
               lastScoreA: vA.length > 0 ? vA[vA.length - 1].score : null,
               lastScoreB: vB.length > 0 ? vB[vB.length - 1].score : null,
+              legStartingThrower: saved.legStartingThrower ?? saved.currentThrower ?? 'A',
             }),
           }).catch(() => {});
         }
@@ -1257,6 +1259,7 @@ export default function ScorerPage() {
           checkoutStats: { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 },
           swapPlayers: thrower === 'B',
         });
+        emitLiveState(STARTING_SCORE, STARTING_SCORE, thrower, initLegsA, initLegsB, [], thrower);
       };
 
       if (activeMatch.status === 'IN_PROGRESS') {
