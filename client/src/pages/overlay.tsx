@@ -31,110 +31,53 @@ interface LiveOverlayData {
 
 const MAROON       = "#7B1818";
 const GREEN        = "#4B9B3E";
-const CHECKOUT_RED = "#B91C1C";
+const CHECKOUT_RED = "#8B1A1A";
 
 const COL        = { sets: 70, legs: 70, rem: 110 };
 const ARROW_W    = 44;
 const ROW_H      = 76;
 const TOP_H      = 46;
 const BOTTOM_H   = 42;
-const CARD_H     = TOP_H + ROW_H * 2 + BOTTOM_H;
-const CHECKOUT_W = 180;
+const CHECKOUT_W = 200;
 
 const NAME_SZ  = 34;
 const STAT_SZ  = 24;
 const SCORE_SZ = 32;
-const DART_SZ  = 30;
-const DART_HEADER_SZ = 16;
+const DART_SZ  = 26;
 
-function CheckoutPanel({ darts, playerName, visible }: { darts: string[] | null; playerName: string; visible: boolean }) {
+function PlayerCheckoutRow({ darts, visible }: { darts: string[] | null; visible: boolean }) {
   return (
     <div style={{ overflow: "hidden", width: CHECKOUT_W, flexShrink: 0 }}>
       <div
         style={{
           width: CHECKOUT_W,
-          height: CARD_H,
+          height: ROW_H,
+          background: CHECKOUT_RED,
           display: "flex",
-          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "space-evenly",
           transform: visible ? "translateX(0)" : "translateX(100%)",
           transition: "transform 300ms ease",
           willChange: "transform",
         }}
       >
-        {/* Header – matches TOP_H */}
-        <div
-          style={{
-            height: TOP_H,
-            background: "#111",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <span style={{ color: "#ccc", fontWeight: 700, fontSize: DART_HEADER_SZ, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            Checkout
-          </span>
-        </div>
-
-        {/* Body – red, dart suggestions */}
-        <div
-          style={{
-            flex: 1,
-            background: CHECKOUT_RED,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            padding: "8px 0",
-          }}
-        >
-          {darts?.map((dart, i) => {
-            const isFinal = i === (darts.length - 1);
-            return (
-              <div
-                key={i}
-                style={{
-                  color: isFinal ? "#FFE066" : "#fff",
-                  fontWeight: 800,
-                  fontSize: DART_SZ,
-                  lineHeight: 1.15,
-                  letterSpacing: "0.02em",
-                  fontFamily: "inherit",
-                }}
-              >
-                {dart}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer – matches BOTTOM_H */}
-        <div
-          style={{
-            height: BOTTOM_H,
-            background: "#111",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            paddingLeft: 8,
-            paddingRight: 8,
-          }}
-        >
-          <span
-            style={{
-              color: "#aaa",
-              fontWeight: 600,
-              fontSize: 13,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              maxWidth: "100%",
-            }}
-          >
-            {playerName}
-          </span>
-        </div>
+        {(darts ?? []).map((dart, i) => {
+          const isFinal = i === ((darts?.length ?? 1) - 1);
+          return (
+            <span
+              key={i}
+              style={{
+                color: isFinal ? "#FFE066" : "#fff",
+                fontWeight: 800,
+                fontSize: DART_SZ,
+                letterSpacing: "0.02em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {dart}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
@@ -182,25 +125,28 @@ export default function OverlayPage() {
 
   const topLabel = `${roundLabel} ${matchNumber} – Best of ${bestOf}`;
 
-  const activeRemaining  = currentThrower === "A" ? remainingA : currentThrower === "B" ? remainingB : null;
-  const activePlayerName = currentThrower === "A" ? playerAName : currentThrower === "B" ? playerBName : "";
-  const checkoutDarts    = activeRemaining !== null ? getCheckoutSuggestion(activeRemaining) : null;
-  const showCheckout     = checkoutDarts !== null;
+  const checkoutA   = getCheckoutSuggestion(remainingA);
+  const checkoutB   = getCheckoutSuggestion(remainingB);
+  const showCheckoutA = currentThrower === "A" && checkoutA !== null;
+  const showCheckoutB = currentThrower === "B" && checkoutB !== null;
 
   return (
     <>
       <title>{`Overlay – ${playerAName} vs ${playerBName}`}</title>
-      <div style={{ background: "transparent", position: "fixed", bottom: 60, right: 60 }} className="flex">
+      <div style={{ background: "transparent", position: "fixed", bottom: 60, right: 60 }}>
 
-        {/* ── OUTER FLEX ROW: [checkout] [main card] [arrow] ── */}
+        {/* ── OUTER FLEX ROW: [checkout column] [main card] [arrow] ── */}
         <div className="flex items-stretch">
 
-          {/* ── CHECKOUT PANEL (slides out from behind the card to the left) ── */}
-          <CheckoutPanel
-            darts={checkoutDarts}
-            playerName={activePlayerName}
-            visible={showCheckout}
-          />
+          {/* ── CHECKOUT COLUMN
+                Top + bottom spacers align the two player rows with the card.
+                Each row slides independently from behind the player name. ── */}
+          <div className="flex flex-col">
+            <div style={{ height: TOP_H }} />
+            <PlayerCheckoutRow darts={checkoutA} visible={showCheckoutA} />
+            <PlayerCheckoutRow darts={checkoutB} visible={showCheckoutB} />
+            <div style={{ height: BOTTOM_H }} />
+          </div>
 
           {/* ── MAIN CARD ── */}
           <div className="flex flex-col shadow-2xl">
