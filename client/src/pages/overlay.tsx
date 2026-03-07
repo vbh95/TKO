@@ -204,10 +204,14 @@ export default function OverlayPage() {
   // committedToNext — true once bull is selected for the current "next" match.
   const [committedToNext, setCommittedToNext] = useState(false);
   // frozenDisplayData — snapshot of the last match we were committed to.
-  // This persists even when nextMatchId changes so we never flash back to the
-  // original primary match's winner panel once we've moved beyond it.
+  // Persists across nextMatchId changes so we never revert to the primary
+  // match's winner panel once we have moved beyond it.
   const [frozenDisplayData, setFrozenDisplayData] = useState<LiveOverlayData | null>(null);
-  const prevNextMatchIdRef = useRef<number | null>(null);
+  // pollMatchId drives the secondary poll. Unlike nextMatchId it does NOT
+  // go null when a match completes — it keeps the previous ID so we can
+  // reliably fetch the COMPLETED state (with winnerId) before the poll stops.
+  const [pollMatchId, setPollMatchId] = useState<number | null>(null);
+  const prevPollMatchIdRef = useRef<number | null>(null);
 
   // Primary poll — the original match
   useEffect(() => {
@@ -225,27 +229,33 @@ export default function OverlayPage() {
     return () => clearInterval(interval);
   }, [matchId]);
 
-  // Secondary poll — tracks the next in-progress match while committed to it.
   const nextMatchId = data?.nextMatchId ?? null;
 
-  // When nextMatchId changes to a new non-null value a fresh match has become
-  // the "next" — reset commitment so we wait for bull selection again.
-  // When nextMatchId goes null (just-completed match, no replacement yet) we
-  // leave everything as-is: frozenDisplayData keeps the winner visible.
+  // Advance pollMatchId whenever nextMatchId changes to a new non-null value
+  // (a fresh match has become the active "next"). Reset commitment so we
+  // wait for that match's bull selection before switching the display.
+  // When nextMatchId goes null (the polled match just finished, nothing new
+  // yet) we intentionally leave pollMatchId unchanged — the secondary poll
+  // keeps running on the same match so we capture its COMPLETED state.
   useEffect(() => {
-    const prev = prevNextMatchIdRef.current;
-    prevNextMatchIdRef.current = nextMatchId;
-    if (nextMatchId !== null && nextMatchId !== prev) {
+    if (nextMatchId !== null && nextMatchId !== prevPollMatchIdRef.current) {
+      prevPollMatchIdRef.current = nextMatchId;
       setCommittedToNext(false);
       setNextData(null);
+      setPollMatchId(nextMatchId);
     }
   }, [nextMatchId]);
 
+  // Secondary poll — driven by pollMatchId, NOT nextMatchId.
+  // Continues even while nextMatchId is null so we always get the COMPLETED
+  // response (and thus the correct winnerId) for the just-finished match.
+  // Stops naturally when pollMatchId advances to a new match (old interval
+  // is cleaned up by the effect's return).
   useEffect(() => {
-    if (!nextMatchId) return;
+    if (!pollMatchId) return;
     const fetchNext = async () => {
       try {
-        const res = await fetch(`/api/matches/${nextMatchId}/live`);
+        const res = await fetch(`/api/matches/${pollMatchId}/live`);
         if (!res.ok) return;
         setNextData(await res.json());
       } catch { /* ignore */ }
@@ -253,7 +263,7 @@ export default function OverlayPage() {
     fetchNext();
     const interval = setInterval(fetchNext, 1000);
     return () => clearInterval(interval);
-  }, [nextMatchId]);
+  }, [pollMatchId]);
 
   // Commit to showing the next match the moment its bull thrower is selected.
   const bullSelected = nextData?.live?.legStartingThrower != null;
@@ -262,7 +272,7 @@ export default function OverlayPage() {
   }, [bullSelected]);
 
   // While committed, keep frozenDisplayData current so it captures the final
-  // COMPLETED state (with winnerId) when the match ends and cache is cleared.
+  // COMPLETED state (with winnerId) after the match ends and cache clears.
   useEffect(() => {
     if (committedToNext && nextData) {
       setFrozenDisplayData(nextData);
@@ -271,7 +281,7 @@ export default function OverlayPage() {
 
   // Resolution order:
   //   1. Actively committed to a next match → show live nextData
-  //   2. Previously committed (frozen) → show last known match data (winner or scoreboard)
+  //   2. Previously committed (frozen) → show last known match (winner panel)
   //   3. Fallback → primary match data
   const displayData = (committedToNext && nextData) ? nextData : (frozenDisplayData ?? data);
 
