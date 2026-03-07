@@ -2732,6 +2732,7 @@ export async function registerRoutes(
         bestOf: match.bestOf,
         matchNumber,
         useSets: !!(tournament?.settings as any)?.useSets,
+        winnerId: match.winnerId ?? null,
         playerA: playerA ? { id: playerA.id, name: playerA.name } : null,
         playerB: playerB ? { id: playerB.id, name: playerB.name } : null,
         scoreA: match.scoreA || 0,

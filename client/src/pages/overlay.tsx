@@ -11,6 +11,7 @@ interface LiveOverlayData {
   bestOf: number;
   matchNumber: number;
   useSets: boolean;
+  winnerId: number | null;
   playerA: { id: number; name: string } | null;
   playerB: { id: number; name: string } | null;
   scoreA: number;
@@ -31,6 +32,8 @@ interface LiveOverlayData {
   } | null;
 }
 
+type OverlayMode = "live" | "winner" | "idle";
+
 const MAROON       = "#7B1818";
 const GREEN        = "#4B9B3E";
 const CHECKOUT_RED = "#8B1A1A";
@@ -40,12 +43,13 @@ const ARROW_W    = 44;
 const ROW_H      = 76;
 const TOP_H      = 46;
 const BOTTOM_H   = 42;
+const CARD_H     = TOP_H + ROW_H * 2 + BOTTOM_H;
 const CHECKOUT_W = 240;
 
-const NAME_SZ  = 34;
-const STAT_SZ  = 24;
-const SCORE_SZ = 32;
-const DART_SZ  = 26;
+const NAME_SZ    = 34;
+const STAT_SZ    = 24;
+const SCORE_SZ   = 32;
+const DART_SZ    = 26;
 
 function PlayerCheckoutRow({ darts, visible }: { darts: string[] | null; visible: boolean }) {
   return (
@@ -84,6 +88,107 @@ function PlayerCheckoutRow({ darts, visible }: { darts: string[] | null; visible
   );
 }
 
+function WinnerPanel({
+  visible,
+  winnerName,
+  topLabel,
+  tournamentName,
+}: {
+  visible: boolean;
+  winnerName: string;
+  topLabel: string;
+  tournamentName: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        width: 500,
+        height: CARD_H,
+        opacity: visible ? 1 : 0,
+        transform: visible ? "scale(1)" : "scale(0.96)",
+        transition: "opacity 450ms ease, transform 450ms ease",
+        pointerEvents: visible ? "auto" : "none",
+        shadow: "0 4px 32px rgba(0,0,0,0.5)",
+      }}
+    >
+      {/* Top bar — matches live overlay top bar */}
+      <div
+        style={{
+          height: TOP_H,
+          background: "#000",
+          display: "flex",
+          alignItems: "center",
+          paddingLeft: 20,
+          paddingRight: 20,
+        }}
+      >
+        <span style={{ color: "#aaa", fontWeight: 700, fontSize: STAT_SZ }}>
+          {topLabel}
+        </span>
+      </div>
+
+      {/* Body */}
+      <div
+        style={{
+          flex: 1,
+          background: "#111",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
+          borderLeft: "4px solid #C41E3A",
+          borderRight: "4px solid #C41E3A",
+        }}
+      >
+        <span
+          style={{
+            color: "#C41E3A",
+            fontWeight: 800,
+            fontSize: 22,
+            letterSpacing: "0.25em",
+            textTransform: "uppercase",
+            lineHeight: 1,
+          }}
+        >
+          Winner
+        </span>
+        <span
+          style={{
+            color: "#fff",
+            fontWeight: 800,
+            fontSize: 44,
+            lineHeight: 1.15,
+            textAlign: "center",
+            paddingLeft: 24,
+            paddingRight: 24,
+          }}
+        >
+          {winnerName}
+        </span>
+      </div>
+
+      {/* Bottom bar — matches live overlay bottom bar */}
+      <div
+        style={{
+          height: BOTTOM_H,
+          background: "#000",
+          display: "flex",
+          alignItems: "center",
+          paddingLeft: 20,
+          paddingRight: 20,
+        }}
+      >
+        <span style={{ color: "#aaa", fontWeight: 700, fontSize: STAT_SZ }}>
+          {tournamentName}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function OverlayPage() {
   const { matchId } = useParams<{ matchId: string }>();
   const [data, setData] = useState<LiveOverlayData | null>(null);
@@ -114,35 +219,70 @@ export default function OverlayPage() {
 
   if (!data) return <div style={{ background: "transparent" }} className="w-screen h-screen" />;
 
-  const { tournamentName, roundLabel, bestOf, matchNumber, useSets, playerA, playerB, scoreA, scoreB, live } = data;
+  const { tournamentName, roundLabel, bestOf, matchNumber, useSets, winnerId, playerA, playerB, scoreA, scoreB, live } = data;
 
-  const remainingA          = live?.remainingA          ?? 501;
-  const remainingB          = live?.remainingB          ?? 501;
-  const currentThrower      = live?.currentThrower      ?? null;
-  const legStartingThrower  = live?.legStartingThrower  ?? null;
-  const legsWonA            = live?.legsWonA            ?? 0;
-  const legsWonB            = live?.legsWonB            ?? 0;
-  const playerAName    = playerA?.name        ?? "Player A";
-  const playerBName    = playerB?.name        ?? "Player B";
+  const overlayMode: OverlayMode =
+    data.status === "IN_PROGRESS" ? "live" :
+    data.status === "COMPLETED"   ? "winner" :
+    "idle";
+
+  const remainingA         = live?.remainingA         ?? 501;
+  const remainingB         = live?.remainingB         ?? 501;
+  const currentThrower     = live?.currentThrower     ?? null;
+  const legStartingThrower = live?.legStartingThrower ?? null;
+  const legsWonA           = live?.legsWonA           ?? 0;
+  const legsWonB           = live?.legsWonB           ?? 0;
+  const playerAName        = playerA?.name            ?? "Player A";
+  const playerBName        = playerB?.name            ?? "Player B";
 
   const topLabel = `${roundLabel} ${matchNumber} – Best of ${bestOf}`;
 
-  const checkoutA   = getCheckoutSuggestion(remainingA);
-  const checkoutB   = getCheckoutSuggestion(remainingB);
-  const showCheckoutA = currentThrower === "A" && checkoutA !== null;
-  const showCheckoutB = currentThrower === "B" && checkoutB !== null;
+  const winnerName =
+    winnerId === playerA?.id ? playerAName :
+    winnerId === playerB?.id ? playerBName :
+    scoreA > scoreB          ? playerAName :
+    playerBName;
+
+  const isLive   = overlayMode === "live";
+  const isWinner = overlayMode === "winner";
+
+  const checkoutA    = getCheckoutSuggestion(remainingA);
+  const checkoutB    = getCheckoutSuggestion(remainingB);
+  const showCheckoutA = isLive && currentThrower === "A" && checkoutA !== null;
+  const showCheckoutB = isLive && currentThrower === "B" && checkoutB !== null;
 
   return (
     <>
       <title>{`Overlay – ${playerAName} vs ${playerBName}`}</title>
-      <div style={{ background: "transparent", position: "fixed", bottom: 60, right: 60 }}>
 
-        {/* ── OUTER FLEX ROW: [checkout column] [main card] [arrow] ── */}
-        <div className="flex items-stretch">
+      {/*
+        Outer fixed wrapper.
+        Both panels share the same grid cell so they cross-fade cleanly
+        without any layout jump.
+      */}
+      <div
+        style={{
+          background: "transparent",
+          position: "fixed",
+          bottom: 60,
+          right: 60,
+          display: "grid",
+        }}
+      >
 
-          {/* ── CHECKOUT COLUMN
-                Top + bottom spacers align the two player rows with the card.
-                Each row slides independently from behind the player name. ── */}
+        {/* ── LIVE SCOREBOARD ── fades out when match is complete */}
+        <div
+          style={{
+            gridColumn: 1,
+            gridRow: 1,
+            display: "flex",
+            alignItems: "stretch",
+            opacity: isLive ? 1 : 0,
+            transition: "opacity 450ms ease",
+            pointerEvents: isLive ? "auto" : "none",
+          }}
+        >
+          {/* Checkout column */}
           <div className="flex flex-col">
             <div style={{ height: TOP_H }} />
             <PlayerCheckoutRow darts={checkoutA} visible={showCheckoutA} />
@@ -150,10 +290,10 @@ export default function OverlayPage() {
             <div style={{ height: BOTTOM_H }} />
           </div>
 
-          {/* ── MAIN CARD ── */}
+          {/* Main card */}
           <div className="flex flex-col shadow-2xl">
 
-            {/* TOP BAR */}
+            {/* Top bar */}
             <div className="flex items-center bg-black" style={{ height: TOP_H }}>
               <div className="flex-1 px-4">
                 <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>
@@ -171,7 +311,7 @@ export default function OverlayPage() {
               <div style={{ width: COL.rem }} />
             </div>
 
-            {/* MIDDLE ROW */}
+            {/* Middle row */}
             <div className="flex items-stretch">
 
               {/* Player names */}
@@ -197,7 +337,6 @@ export default function OverlayPage() {
               {/* Green stats */}
               <div className="flex" style={{ background: GREEN }}>
 
-                {/* Sets */}
                 {useSets && (
                   <div className="flex flex-col" style={{ width: COL.sets }}>
                     <div className="flex items-center justify-center" style={{ height: ROW_H }}>
@@ -209,7 +348,6 @@ export default function OverlayPage() {
                   </div>
                 )}
 
-                {/* Legs */}
                 <div className="flex flex-col" style={{ width: COL.legs }}>
                   <div className="flex items-center justify-center" style={{ height: ROW_H }}>
                     <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{legsWonA}</span>
@@ -219,7 +357,6 @@ export default function OverlayPage() {
                   </div>
                 </div>
 
-                {/* Remaining */}
                 <div className="flex flex-col" style={{ width: COL.rem }}>
                   <div className="flex items-center justify-center" style={{ height: ROW_H }}>
                     <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{remainingA}</span>
@@ -233,7 +370,7 @@ export default function OverlayPage() {
 
             </div>
 
-            {/* BOTTOM BAR */}
+            {/* Bottom bar */}
             <div className="flex items-center bg-black px-4" style={{ height: BOTTOM_H }}>
               <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>
                 {tournamentName}
@@ -242,7 +379,7 @@ export default function OverlayPage() {
 
           </div>
 
-          {/* ── EXTERNAL ARROW COLUMN ── */}
+          {/* Arrow column */}
           <div className="flex flex-col" style={{ width: ARROW_W }}>
             <div style={{ height: TOP_H }} />
             <div
@@ -265,6 +402,24 @@ export default function OverlayPage() {
           </div>
 
         </div>
+
+        {/* ── WINNER PANEL ── fades in when match is complete, same grid cell */}
+        <div
+          style={{
+            gridColumn: 1,
+            gridRow: 1,
+            alignSelf: "end",
+            justifySelf: "end",
+          }}
+        >
+          <WinnerPanel
+            visible={isWinner}
+            winnerName={winnerName}
+            topLabel={topLabel}
+            tournamentName={tournamentName}
+          />
+        </div>
+
       </div>
     </>
   );
