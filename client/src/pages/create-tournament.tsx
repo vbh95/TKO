@@ -49,6 +49,8 @@ export default function CreateTournament() {
     const [seeded, setSeeded] = useState(true);
     const [pointsForWin, setPointsForWin] = useState(2);
     const [pointsForLoss, setPointsForLoss] = useState(0);
+    const [numBoards, setNumBoards] = useState(1);
+    const [useSets, setUseSets] = useState(false);
 
     const handleAddPlayer = () => {
       if (players.length >= 48) return;
@@ -147,6 +149,8 @@ export default function CreateTournament() {
             final: fBestOf
           } : undefined,
           seeded: (type === "KNOCKOUT" || type === "MULTI_STAGE") ? seeded : undefined,
+          numBoards: type === "KNOCKOUT" ? numBoards : undefined,
+          useSets: type === "KNOCKOUT" ? useSets : undefined,
           pointsForWin: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForWin : undefined,
           pointsForLoss: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForLoss : undefined,
         }
@@ -426,6 +430,33 @@ export default function CreateTournament() {
                     </div>
                     <Switch checked={seeded} onCheckedChange={setSeeded} />
                   </div>
+                )}
+
+                {type === "KNOCKOUT" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="numBoards">Number of Boards</Label>
+                      <Select value={numBoards.toString()} onValueChange={(v) => setNumBoards(parseInt(v))}>
+                        <SelectTrigger id="numBoards" className="h-12" data-testid="select-num-boards">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 4, 8].map(n => (
+                            <SelectItem key={n} value={n.toString()}>{n} {n === 1 ? 'Board' : 'Boards'}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">How many scorer tablets will be used simultaneously</p>
+                    </div>
+
+                    <div className="space-y-2 flex items-center justify-between border rounded-xl p-4">
+                      <div className="space-y-0.5">
+                        <Label className="text-base">Use Sets</Label>
+                        <p className="text-xs text-muted-foreground">Play matches in sets (each set won by winning legs)</p>
+                      </div>
+                      <Switch checked={useSets} onCheckedChange={setUseSets} data-testid="toggle-use-sets" />
+                    </div>
+                  </>
                 )}
               </div>
             </CardContent>

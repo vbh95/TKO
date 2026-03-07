@@ -1456,8 +1456,11 @@ export default function ScorerPage() {
                   </div>
                 )}
               </div>
-              <p className="text-xs md:text-lg lg:text-xl font-black text-white truncate mb-1 uppercase tracking-tight" data-testid="text-player-a-name">
+              <p className="text-xs md:text-lg lg:text-xl font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5" data-testid="text-player-a-name">
                 {leftPlayer?.name || "Player 1"}
+                {legStartingThrower === leftThrower && (
+                  <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
+                )}
               </p>
               <div
                 className="text-5xl md:text-8xl lg:text-[9rem] font-bold text-white tabular-nums leading-none tracking-tighter"
@@ -1494,8 +1497,11 @@ export default function ScorerPage() {
                   </div>
                 )}
               </div>
-              <p className="text-xs md:text-lg lg:text-xl font-black text-white truncate mb-1 uppercase tracking-tight" data-testid="text-player-b-name">
+              <p className="text-xs md:text-lg lg:text-xl font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5" data-testid="text-player-b-name">
                 {rightPlayer?.name || "Player 2"}
+                {legStartingThrower === rightThrower && (
+                  <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
+                )}
               </p>
               <div
                 className="text-5xl md:text-8xl lg:text-[9rem] font-bold text-white tabular-nums leading-none tracking-tighter"

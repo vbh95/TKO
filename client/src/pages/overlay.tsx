@@ -32,12 +32,15 @@ const MAROON = "#7B1818";
 const GREEN  = "#4B9B3E";
 
 // Column widths – identical in header row AND data rows
-const COL   = { sets: 70, legs: 70, rem: 110, arrow: 44 };
+const COL   = { sets: 70, legs: 70, rem: 110 };
+// Arrow column width – sits OUTSIDE the main card
+const ARROW_W = 44;
 // Row height for each player
 const ROW_H = 58;
 // Font sizes
 const NUM_SZ   = 32;  // all numeric data: Sets, Legs, Remaining
-const LABEL_SZ = 16;  // all label text: column headers, top bar, bottom bar
+const LABEL_SZ = 16;  // column headers
+const TITLE_SZ = 24;  // tournament name + round label
 
 export default function OverlayPage() {
   const { matchId } = useParams<{ matchId: string }>();
@@ -81,118 +84,133 @@ export default function OverlayPage() {
 
   const topLabel = `${roundLabel} ${matchNumber} – Best of ${bestOf}`;
 
+  // Heights for top and bottom bars – used to vertically align the external arrows
+  const TOP_H    = 46;
+  const BOTTOM_H = 42;
+
   return (
     <>
       <title>{`Overlay – ${playerAName} vs ${playerBName}`}</title>
       <div style={{ background: "transparent" }} className="w-screen h-screen flex items-center justify-center">
 
-        <div className="flex flex-col shadow-2xl">
+        {/* Outer flex row: [main card] [external arrow column] */}
+        <div className="flex items-stretch">
 
-          {/* ── TOP BAR ──
-              Must mirror the middle row's column structure exactly:
-              [flex-1 name area] [COL.sets] [COL.legs] [COL.rem] [COL.arrow]
-              This guarantees Sets/Legs headers sit directly above their data. */}
-          <div className="flex items-center bg-black" style={{ height: 38 }}>
-            <div className="flex-1 px-4">
-              <span style={{ color: "#fff", fontWeight: 700, fontSize: LABEL_SZ }}>
-                {topLabel}
+          {/* ── MAIN CARD ── */}
+          <div className="flex flex-col shadow-2xl">
+
+            {/* ── TOP BAR ──
+                [flex-1 name area] [COL.sets] [COL.legs] [COL.rem]
+                The last rem width sits above Remaining – no arrow spacer needed here. */}
+            <div className="flex items-center bg-black" style={{ height: TOP_H }}>
+              <div className="flex-1 px-4">
+                <span style={{ color: "#fff", fontWeight: 700, fontSize: TITLE_SZ }}>
+                  {topLabel}
+                </span>
+              </div>
+              <div style={{ width: COL.sets, textAlign: "center" }}>
+                <span style={{ color: "#fff", fontWeight: 700, fontSize: LABEL_SZ }}>Sets</span>
+              </div>
+              <div style={{ width: COL.legs, textAlign: "center" }}>
+                <span style={{ color: "#fff", fontWeight: 700, fontSize: LABEL_SZ }}>Legs</span>
+              </div>
+              {/* spacer for Remaining column – no header text */}
+              <div style={{ width: COL.rem }} />
+            </div>
+
+            {/* ── MIDDLE ROW ── */}
+            <div className="flex items-stretch">
+
+              {/* Player names (white) */}
+              <div className="flex-1 flex flex-col" style={{ background: "#fff", minWidth: 260 }}>
+                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16 }}>
+                  <span style={{ fontWeight: 700, fontSize: 26, color: "#111", lineHeight: 1 }} className="truncate">
+                    {playerAName}
+                  </span>
+                </div>
+                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16 }}>
+                  <span style={{ fontWeight: 700, fontSize: 26, color: "#111", lineHeight: 1 }} className="truncate">
+                    {playerBName}
+                  </span>
+                </div>
+              </div>
+
+              {/* Green stats */}
+              <div className="flex" style={{ background: GREEN }}>
+
+                {/* Sets */}
+                <div className="flex flex-col" style={{ width: COL.sets }}>
+                  <div className="flex items-center justify-center" style={{ height: ROW_H }}>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{scoreA}</span>
+                  </div>
+                  <div className="flex items-center justify-center" style={{ height: ROW_H }}>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{scoreB}</span>
+                  </div>
+                </div>
+
+                {/* Legs */}
+                <div className="flex flex-col" style={{ width: COL.legs }}>
+                  <div className="flex items-center justify-center" style={{ height: ROW_H }}>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{legsWonA}</span>
+                  </div>
+                  <div className="flex items-center justify-center" style={{ height: ROW_H }}>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{legsWonB}</span>
+                  </div>
+                </div>
+
+                {/* Remaining */}
+                <div className="flex flex-col" style={{ width: COL.rem }}>
+                  <div className="flex items-center justify-center" style={{ height: ROW_H }}>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{remainingA}</span>
+                  </div>
+                  <div className="flex items-center justify-center" style={{ height: ROW_H }}>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{remainingB}</span>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* ── BOTTOM BAR ── */}
+            <div className="flex items-center bg-black px-4" style={{ height: BOTTOM_H }}>
+              <span style={{ color: "#fff", fontWeight: 700, fontSize: TITLE_SZ }}>
+                {tournamentName}
               </span>
             </div>
-            <div style={{ width: COL.sets, textAlign: "center" }}>
-              <span style={{ color: "#fff", fontWeight: 700, fontSize: LABEL_SZ }}>Sets</span>
-            </div>
-            <div style={{ width: COL.legs, textAlign: "center" }}>
-              <span style={{ color: "#fff", fontWeight: 700, fontSize: LABEL_SZ }}>Legs</span>
-            </div>
-            {/* no header for Remaining or arrow */}
-            <div style={{ width: COL.rem + COL.arrow }} />
-          </div>
-
-          {/* ── MIDDLE ROW ── */}
-          <div className="flex items-stretch">
-
-            {/* Player names (white) */}
-            <div className="flex-1 flex flex-col" style={{ background: "#fff", minWidth: 260 }}>
-              <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 148 }}>
-                <span style={{ fontWeight: 700, fontSize: 26, color: "#111", lineHeight: 1 }} className="truncate">
-                  {playerAName}
-                </span>
-                {currentThrower === "A" && (
-                  <span style={{ color: "#b00000", fontSize: 18, lineHeight: 1, marginLeft: 8 }}>•</span>
-                )}
-              </div>
-              <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 148 }}>
-                <span style={{ fontWeight: 700, fontSize: 26, color: "#111", lineHeight: 1 }} className="truncate">
-                  {playerBName}
-                </span>
-                {currentThrower === "B" && (
-                  <span style={{ color: "#b00000", fontSize: 18, lineHeight: 1, marginLeft: 8 }}>•</span>
-                )}
-              </div>
-            </div>
-
-            {/* Green stats */}
-            <div className="flex" style={{ background: GREEN }}>
-
-              {/* Sets */}
-              <div className="flex flex-col" style={{ width: COL.sets }}>
-                <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                  <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{scoreA}</span>
-                </div>
-                <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                  <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{scoreB}</span>
-                </div>
-              </div>
-
-              {/* Legs */}
-              <div className="flex flex-col" style={{ width: COL.legs }}>
-                <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                  <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{legsWonA}</span>
-                </div>
-                <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                  <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{legsWonB}</span>
-                </div>
-              </div>
-
-              {/* Remaining */}
-              <div className="flex flex-col" style={{ width: COL.rem }}>
-                <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                  <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{remainingA}</span>
-                </div>
-                <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                  <span style={{ color: "#fff", fontWeight: 700, fontSize: NUM_SZ }}>{remainingB}</span>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Arrow – per player, active thrower only */}
-            <div className="flex flex-col" style={{ width: COL.arrow }}>
-              <div
-                className="flex items-center justify-center"
-                style={{ height: ROW_H, background: currentThrower === "A" ? MAROON : "transparent" }}
-              >
-                {currentThrower === "A" && (
-                  <span style={{ color: "#fff", fontWeight: 700, fontSize: 20 }}>◀</span>
-                )}
-              </div>
-              <div
-                className="flex items-center justify-center"
-                style={{ height: ROW_H, background: currentThrower === "B" ? MAROON : "transparent" }}
-              >
-                {currentThrower === "B" && (
-                  <span style={{ color: "#fff", fontWeight: 700, fontSize: 20 }}>◀</span>
-                )}
-              </div>
-            </div>
 
           </div>
 
-          {/* ── BOTTOM BAR ── */}
-          <div className="flex items-center bg-black px-4" style={{ height: 34 }}>
-            <span style={{ color: "#fff", fontWeight: 700, fontSize: LABEL_SZ }}>
-              {tournamentName}
-            </span>
+          {/* ── EXTERNAL ARROW COLUMN (outside the card) ── */}
+          <div className="flex flex-col" style={{ width: ARROW_W }}>
+            {/* Spacer aligning with top bar */}
+            <div style={{ height: TOP_H }} />
+            {/* Player A arrow */}
+            <div
+              className="flex items-center justify-center"
+              style={{
+                height: ROW_H,
+                background: currentThrower === "A" ? MAROON : "transparent",
+              }}
+            >
+              {currentThrower === "A" && (
+                <span style={{ color: "#fff", fontWeight: 700, fontSize: 20 }}>◀</span>
+              )}
+            </div>
+            {/* Player B arrow */}
+            <div
+              className="flex items-center justify-center"
+              style={{
+                height: ROW_H,
+                background: currentThrower === "B" ? MAROON : "transparent",
+              }}
+            >
+              {currentThrower === "B" && (
+                <span style={{ color: "#fff", fontWeight: 700, fontSize: 20 }}>◀</span>
+              )}
+            </div>
+            {/* Spacer aligning with bottom bar */}
+            <div style={{ height: BOTTOM_H }} />
           </div>
 
         </div>
