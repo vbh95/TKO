@@ -999,7 +999,7 @@ export default function TournamentDetail() {
             ) : (
               <TabsTrigger value="knockout" data-testid="tab-knockout">Matches</TabsTrigger>
             )}
-            {isMultiStage || tournament.type === 'KNOCKOUT' || tournament.type === 'DOUBLE_ELIMINATION' ? null : <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>}
+            {tournament.type === 'ROUND_ROBIN' && <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>}
             <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
           </TabsList>
 
