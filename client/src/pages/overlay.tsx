@@ -1,6 +1,5 @@
 import { useParams } from "wouter";
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
 
 interface LiveOverlayData {
   matchId: number;
@@ -54,7 +53,7 @@ export default function OverlayPage() {
 
   if (error) {
     return (
-      <div style={{ background: "transparent" }} className="w-screen h-screen flex items-end justify-center pb-12">
+      <div style={{ background: "transparent" }} className="w-screen h-screen flex items-center justify-center">
         <div className="bg-black/80 text-white px-8 py-4 rounded-lg text-lg font-bold">
           Match not found
         </div>
@@ -64,18 +63,14 @@ export default function OverlayPage() {
 
   if (!data) return <div style={{ background: "transparent" }} className="w-screen h-screen" />;
 
-  const { tournamentName, roundLabel, formatLabel, playerA, playerB, scoreA, scoreB, live, status } = data;
-  const isComplete = status === "COMPLETED";
+  const { tournamentName, roundLabel, formatLabel, playerA, playerB, scoreA, scoreB, live } = data;
 
-  const remainingA = live?.remainingA ?? null;
-  const remainingB = live?.remainingB ?? null;
-  const currentThrower = live?.currentThrower ?? null;
+  const remainingA = live?.remainingA ?? 0;
+  const remainingB = live?.remainingB ?? 0;
   const legsWonA = live?.legsWonA ?? 0;
   const legsWonB = live?.legsWonB ?? 0;
   const avgA = live?.avgA ?? "-";
   const avgB = live?.avgB ?? "-";
-  const lastScoreA = live?.lastScoreA ?? null;
-  const lastScoreB = live?.lastScoreB ?? null;
 
   const playerAName = playerA?.name ?? "Player A";
   const playerBName = playerB?.name ?? "Player B";
@@ -85,150 +80,73 @@ export default function OverlayPage() {
       <title>{`Overlay – ${playerAName} vs ${playerBName}`}</title>
       <div
         style={{ background: "transparent" }}
-        className="w-screen h-screen flex flex-col items-center justify-end"
+        className="w-screen h-screen flex items-center justify-center"
       >
-        <div className="w-full max-w-[1400px] px-10 pb-10 flex flex-col gap-0">
-          {isComplete && (
-            <div className="flex justify-center mb-3">
-              <div className="bg-amber-500 text-black font-black text-xl px-8 py-2 rounded-sm tracking-widest uppercase shadow-2xl">
-                Match Complete
+        <div className="flex flex-col gap-0 shadow-2xl" style={{ width: "900px" }}>
+          {/* Top Bar - Format Label */}
+          <div className="flex items-center justify-between bg-black px-8 py-3">
+            <div className="text-white text-2xl font-bold tracking-wider">{formatLabel}</div>
+            <div className="text-white text-xl font-bold tracking-wider">
+              <span className="mr-16">Sets</span>
+              <span>Legs</span>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="flex items-stretch bg-white/95">
+            {/* Left Sidebar - Tournament Info */}
+            <div className="bg-amber-900 px-4 py-6 flex flex-col items-center justify-center min-w-[120px]">
+              <div className="text-white text-center font-bold text-sm tracking-wider leading-tight">
+                <div>T20</div>
+                <div>T20</div>
+                <div>BULL</div>
               </div>
             </div>
-          )}
 
-          <div className="flex flex-col gap-0 shadow-2xl rounded-sm overflow-hidden">
-            <div className="flex items-center justify-between bg-black/90 px-5 py-2">
-              <span className="text-white/70 text-sm font-bold uppercase tracking-widest truncate">{tournamentName}</span>
-              <span className="text-amber-400 text-sm font-black uppercase tracking-widest shrink-0 ml-4">{roundLabel}</span>
+            {/* Center - Player Names */}
+            <div className="flex-1 flex flex-col justify-around px-8 py-4">
+              <div className="text-gray-800 text-3xl font-bold">{playerAName}</div>
+              <div className="text-gray-800 text-3xl font-bold">{playerBName}</div>
             </div>
 
-            <div className="flex items-stretch">
-              <PlayerPanel
-                name={playerAName}
-                remaining={remainingA}
-                legsWon={legsWonA}
-                matchScore={scoreA}
-                avg={avgA}
-                lastScore={lastScoreA}
-                isActive={currentThrower === "A"}
-                side="left"
-              />
+            {/* Indicator Dot */}
+            <div className="flex items-center px-4">
+              <div className="w-3 h-3 rounded-full bg-red-600"></div>
+            </div>
 
-              <div className="flex flex-col items-center justify-center bg-black/95 px-6 py-4 shrink-0 min-w-[140px]">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className={cn("text-5xl font-black tabular-nums", scoreA >= scoreB ? "text-white" : "text-white/40")}>
-                    {scoreA}
-                  </span>
-                  <span className="text-white/30 text-2xl font-black">:</span>
-                  <span className={cn("text-5xl font-black tabular-nums", scoreB >= scoreA ? "text-white" : "text-white/40")}>
-                    {scoreB}
-                  </span>
-                </div>
-                <span className="text-white/40 text-[11px] font-bold uppercase tracking-widest text-center leading-tight">
-                  {formatLabel}
-                </span>
-                {live && (
-                  <div className="mt-2 flex items-center gap-2 text-[11px] text-white/50 font-bold uppercase tracking-wider">
-                    <span>{legsWonA}</span>
-                    <span className="text-white/20">–</span>
-                    <span>{legsWonB}</span>
-                  </div>
-                )}
+            {/* Right Stats - Green Panel */}
+            <div className="bg-green-600 px-6 py-4 flex items-stretch gap-6">
+              {/* Sets Column */}
+              <div className="flex flex-col justify-around text-center">
+                <div className="text-white font-bold text-sm">{scoreA}</div>
+                <div className="text-white font-bold text-sm">{scoreB}</div>
               </div>
 
-              <PlayerPanel
-                name={playerBName}
-                remaining={remainingB}
-                legsWon={legsWonB}
-                matchScore={scoreB}
-                avg={avgB}
-                lastScore={lastScoreB}
-                isActive={currentThrower === "B"}
-                side="right"
-              />
+              {/* Legs Column */}
+              <div className="flex flex-col justify-around text-center">
+                <div className="text-white font-bold text-sm">{legsWonA}</div>
+                <div className="text-white font-bold text-sm">{legsWonB}</div>
+              </div>
+
+              {/* Remaining Column */}
+              <div className="flex flex-col justify-around text-center">
+                <div className="text-white font-bold text-xl">{remainingA}</div>
+                <div className="text-white font-bold text-xl">{remainingB}</div>
+              </div>
             </div>
+
+            {/* Right Arrow */}
+            <div className="bg-amber-900 px-3 py-4 flex items-center justify-center">
+              <div className="text-white text-2xl font-bold">◀</div>
+            </div>
+          </div>
+
+          {/* Bottom Bar - Competition Name */}
+          <div className="bg-black px-8 py-3 text-white text-xl font-bold text-center tracking-wider">
+            {tournamentName}
           </div>
         </div>
       </div>
     </>
-  );
-}
-
-function PlayerPanel({
-  name,
-  remaining,
-  legsWon,
-  matchScore,
-  avg,
-  lastScore,
-  isActive,
-  side,
-}: {
-  name: string;
-  remaining: number | null;
-  legsWon: number;
-  matchScore: number;
-  avg: string;
-  lastScore: number | null;
-  isActive: boolean;
-  side: "left" | "right";
-}) {
-  const isLeft = side === "left";
-
-  return (
-    <div
-      className={cn(
-        "flex-1 flex flex-col justify-between py-4 px-6 relative transition-all duration-300",
-        isActive
-          ? "bg-[#1a1a2e]/95 border-t-4 border-amber-400"
-          : "bg-black/90 border-t-4 border-transparent"
-      )}
-    >
-      {isActive && (
-        <div
-          className={cn(
-            "absolute top-0 w-3 h-3 bg-amber-400 rounded-full mt-[-2px]",
-            isLeft ? "left-4" : "right-4"
-          )}
-        />
-      )}
-
-      <div className={cn("flex items-start gap-3", isLeft ? "flex-row" : "flex-row-reverse")}>
-        <div className={cn("flex-1", isLeft ? "text-left" : "text-right")}>
-          <p className={cn(
-            "text-xl font-black uppercase tracking-tight truncate",
-            isActive ? "text-white" : "text-white/60"
-          )}>
-            {name}
-          </p>
-          <p className={cn(
-            "text-6xl font-black tabular-nums leading-none mt-1",
-            isActive ? "text-amber-400" : "text-white/50"
-          )}>
-            {remaining !== null ? remaining : "—"}
-          </p>
-        </div>
-      </div>
-
-      <div className={cn(
-        "flex items-center gap-4 mt-3 text-xs font-bold uppercase tracking-widest",
-        isLeft ? "flex-row" : "flex-row-reverse"
-      )}>
-        <div className={cn("text-center", isLeft ? "text-left" : "text-right")}>
-          <p className="text-white/30 text-[9px] mb-0.5">Avg</p>
-          <p className={cn("text-base font-black tabular-nums", isActive ? "text-white/80" : "text-white/30")}>
-            {avg}
-          </p>
-        </div>
-        {lastScore !== null && (
-          <div className={cn("text-center", isLeft ? "text-left" : "text-right")}>
-            <p className="text-white/30 text-[9px] mb-0.5">Last</p>
-            <p className={cn("text-base font-black tabular-nums", isActive ? "text-green-400" : "text-white/30")}>
-              +{lastScore}
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
