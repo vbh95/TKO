@@ -35,12 +35,13 @@ const MAROON       = "#7B1818";
 const GREEN        = "#4B9B3E";
 const CHECKOUT_RED = "#8B1A1A";
 
-const COL        = { sets: 70, legs: 70, rem: 110 };
-const ARROW_W    = 44;
-const ROW_H      = 76;
-const TOP_H      = 46;
-const BOTTOM_H   = 42;
-const CHECKOUT_W = 240;
+const COL         = { sets: 70, legs: 70, rem: 110 };
+const NAME_COL_W  = 320;
+const ARROW_W     = 44;
+const ROW_H       = 76;
+const TOP_H       = 46;
+const BOTTOM_H    = 42;
+const CHECKOUT_W  = 240;
 
 const NAME_SZ  = 34;
 const STAT_SZ  = 24;
@@ -151,41 +152,41 @@ export default function OverlayPage() {
           </div>
 
           {/* ── MAIN CARD ── */}
-          <div className="flex flex-col shadow-2xl">
+          <div className="flex flex-col shadow-2xl" style={{ flexShrink: 0 }}>
 
             {/* TOP BAR */}
             <div className="flex items-center bg-black" style={{ height: TOP_H }}>
-              <div className="flex-1 px-4">
-                <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>
+              <div style={{ width: NAME_COL_W, flexShrink: 0, paddingLeft: 16, paddingRight: 8, overflow: "hidden" }}>
+                <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
                   {topLabel}
                 </span>
               </div>
               {useSets && (
-                <div style={{ width: COL.sets, textAlign: "center" }}>
+                <div style={{ width: COL.sets, flexShrink: 0, textAlign: "center" }}>
                   <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>Sets</span>
                 </div>
               )}
-              <div style={{ width: COL.legs, textAlign: "center" }}>
+              <div style={{ width: COL.legs, flexShrink: 0, textAlign: "center" }}>
                 <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>Legs</span>
               </div>
-              <div style={{ width: COL.rem }} />
+              <div style={{ width: COL.rem, flexShrink: 0 }} />
             </div>
 
             {/* MIDDLE ROW */}
             <div className="flex items-stretch">
 
               {/* Player names */}
-              <div className="flex-1 flex flex-col" style={{ background: "#fff", minWidth: 260 }}>
-                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 180 }}>
-                  <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1.4 }} className="truncate">
+              <div className="flex flex-col" style={{ background: "#fff", width: NAME_COL_W, flexShrink: 0, overflow: "hidden" }}>
+                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 16, overflow: "hidden" }}>
+                  <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
                     {playerAName}
                   </span>
                   {legStartingThrower === "A" && (
                     <span style={{ flexShrink: 0, width: 14, height: 14, borderRadius: "50%", background: "#C41E3A", marginLeft: 14, display: "inline-block" }} />
                   )}
                 </div>
-                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 180 }}>
-                  <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1.4 }} className="truncate">
+                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 16, overflow: "hidden" }}>
+                  <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
                     {playerBName}
                   </span>
                   {legStartingThrower === "B" && (
@@ -199,7 +200,7 @@ export default function OverlayPage() {
 
                 {/* Sets */}
                 {useSets && (
-                  <div className="flex flex-col" style={{ width: COL.sets }}>
+                  <div className="flex flex-col" style={{ width: COL.sets, flexShrink: 0 }}>
                     <div className="flex items-center justify-center" style={{ height: ROW_H }}>
                       <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{scoreA}</span>
                     </div>
@@ -210,7 +211,7 @@ export default function OverlayPage() {
                 )}
 
                 {/* Legs */}
-                <div className="flex flex-col" style={{ width: COL.legs }}>
+                <div className="flex flex-col" style={{ width: COL.legs, flexShrink: 0 }}>
                   <div className="flex items-center justify-center" style={{ height: ROW_H }}>
                     <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{legsWonA}</span>
                   </div>
@@ -220,7 +221,7 @@ export default function OverlayPage() {
                 </div>
 
                 {/* Remaining */}
-                <div className="flex flex-col" style={{ width: COL.rem }}>
+                <div className="flex flex-col" style={{ width: COL.rem, flexShrink: 0 }}>
                   <div className="flex items-center justify-center" style={{ height: ROW_H }}>
                     <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{remainingA}</span>
                   </div>
