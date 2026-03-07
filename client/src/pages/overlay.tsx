@@ -19,6 +19,7 @@ interface LiveOverlayData {
     remainingA: number;
     remainingB: number;
     currentThrower: "A" | "B";
+    legStartingThrower: "A" | "B" | null;
     legsWonA: number;
     legsWonB: number;
     avgA: string;
@@ -115,11 +116,12 @@ export default function OverlayPage() {
 
   const { tournamentName, roundLabel, bestOf, matchNumber, useSets, playerA, playerB, scoreA, scoreB, live } = data;
 
-  const remainingA     = live?.remainingA     ?? 501;
-  const remainingB     = live?.remainingB     ?? 501;
-  const currentThrower = live?.currentThrower ?? null;
-  const legsWonA       = live?.legsWonA       ?? 0;
-  const legsWonB       = live?.legsWonB       ?? 0;
+  const remainingA          = live?.remainingA          ?? 501;
+  const remainingB          = live?.remainingB          ?? 501;
+  const currentThrower      = live?.currentThrower      ?? null;
+  const legStartingThrower  = live?.legStartingThrower  ?? null;
+  const legsWonA            = live?.legsWonA            ?? 0;
+  const legsWonB            = live?.legsWonB            ?? 0;
   const playerAName    = playerA?.name        ?? "Player A";
   const playerBName    = playerB?.name        ?? "Player B";
 
@@ -178,11 +180,17 @@ export default function OverlayPage() {
                   <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1.4 }} className="truncate">
                     {playerAName}
                   </span>
+                  {legStartingThrower === "A" && (
+                    <span style={{ flexShrink: 0, width: 14, height: 14, borderRadius: "50%", background: "#C41E3A", marginLeft: 14, display: "inline-block" }} />
+                  )}
                 </div>
                 <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 180 }}>
                   <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1.4 }} className="truncate">
                     {playerBName}
                   </span>
+                  {legStartingThrower === "B" && (
+                    <span style={{ flexShrink: 0, width: 14, height: 14, borderRadius: "50%", background: "#C41E3A", marginLeft: 14, display: "inline-block" }} />
+                  )}
                 </div>
               </div>
 

@@ -823,8 +823,9 @@ export default function ScorerPage() {
       dartsB: vB.length * 3,
       lastScoreA: vA.length > 0 ? vA[vA.length - 1].score : null,
       lastScoreB: vB.length > 0 ? vB[vB.length - 1].score : null,
+      legStartingThrower,
     });
-  }, [activeMatchId, data, legVisits]);
+  }, [activeMatchId, data, legVisits, legStartingThrower]);
 
   const handleScoreSubmit = (score: number) => {
     if (activeMatchId === null) return;

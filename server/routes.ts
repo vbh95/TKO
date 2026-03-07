@@ -2740,6 +2740,7 @@ export async function registerRoutes(
           remainingA: liveData.remainingA,
           remainingB: liveData.remainingB,
           currentThrower: liveData.currentThrower,
+          legStartingThrower: liveData.legStartingThrower ?? null,
           legsWonA: liveData.legsWonA,
           legsWonB: liveData.legsWonB,
           avgA: liveData.avgA,
