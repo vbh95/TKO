@@ -89,7 +89,7 @@ export default function OverlayPage() {
   return (
     <>
       <title>{`Overlay – ${playerAName} vs ${playerBName}`}</title>
-      <div style={{ background: "transparent" }} className="w-screen h-screen flex items-center justify-center">
+      <div style={{ background: "transparent", position: "fixed", bottom: 20, right: 20 }} className="flex">
 
         {/* Outer flex row: [main card] [external arrow column] */}
         <div className="flex items-stretch">
