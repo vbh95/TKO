@@ -999,7 +999,7 @@ export default function TournamentDetail() {
             ) : (
               <TabsTrigger value="knockout" data-testid="tab-knockout">Matches</TabsTrigger>
             )}
-            {isMultiStage ? null : <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>}
+            {isMultiStage || tournament.type === 'KNOCKOUT' || tournament.type === 'DOUBLE_ELIMINATION' ? null : <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>}
             <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
           </TabsList>
 
@@ -2032,11 +2032,117 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, 
           </DialogDescription>
         </DialogHeader>
 
-        {groups.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-sm text-muted-foreground">No groups found. Start the tournament to generate boards.</p>
-          </div>
-        ) : (
+        {groups.length === 0 ? (() => {
+          const koRoundLabels: Record<string, string> = { QF: 'Quarter Final', SF: 'Semi Final', F: 'Final', GF: 'Grand Final', R64: 'R64', R32: 'R32', R16: 'R16' };
+          const knockoutMatches = [...matches].filter((m: any) => !m.groupId).sort((a: any, b: any) => a.order - b.order);
+          const roundOrder: string[] = [];
+          knockoutMatches.forEach((m: any) => { if (!roundOrder.includes(m.roundKey)) roundOrder.push(m.roundKey); });
+          const currentRoundKey = roundOrder.find(rk => knockoutMatches.filter((m: any) => m.roundKey === rk).some((m: any) => m.status !== 'COMPLETED')) || roundOrder[0];
+          const currentRoundMatches = knockoutMatches.filter((m: any) => m.roundKey === currentRoundKey);
+          const roundLabel = currentRoundKey ? (koRoundLabels[currentRoundKey] || currentRoundKey) : '';
+
+          if (currentRoundMatches.length === 0) {
+            return (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground">No matches found. Start the tournament to generate boards.</p>
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                Current Round: {roundLabel}
+              </p>
+              {currentRoundMatches.map((match: any, idx: number) => {
+                const boardNumber = idx + 1;
+                const session = boardSessions.find((s: any) => s.boardNumber === boardNumber);
+                const isPaired = session?.pairedAt != null;
+                const pairUrl = session ? `${window.location.origin}/pair?token=${session.pairingToken}` : null;
+                const playerAName = match.playerA?.name || 'TBD';
+                const playerBName = match.playerB?.name || 'TBD';
+                const overlayUrl = `${window.location.origin}/overlay/${match.id}`;
+
+                return (
+                  <div key={match.id} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${boardNumber}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold text-sm">Board {boardNumber}</h3>
+                        <p className="text-xs text-muted-foreground">{playerAName} vs {playerBName}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isPaired && boardStatuses[boardNumber] && (
+                          <Badge variant="outline" className="text-xs text-green-600 border-green-300 gap-1">
+                            <Wifi className="w-3 h-3" /> Online
+                          </Badge>
+                        )}
+                        {isPaired && !boardStatuses[boardNumber] && (
+                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 gap-1">
+                            <WifiOff className="w-3 h-3" /> Paired
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-xs">
+                          <Target className="w-3 h-3 mr-1" />
+                          Board {boardNumber}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {session && pairUrl ? (
+                      <div className="space-y-3">
+                        <div className="flex justify-center bg-white rounded-lg p-4">
+                          <QRCodeSVG value={pairUrl} size={160} level="M" />
+                        </div>
+                        <p className="text-xs text-center text-muted-foreground">
+                          {isPaired ? "Tablet is paired. Scan again to re-pair a new device." : "Scan this QR code on the scorer tablet to pair it."}
+                        </p>
+                        <div className="flex gap-2">
+                          <Input readOnly value={pairUrl} className="text-xs h-8" data-testid={`input-pair-url-${boardNumber}`} />
+                          <Button size="icon" variant="outline" className="h-8 w-8 shrink-0"
+                            onClick={() => { navigator.clipboard.writeText(pairUrl); toast({ title: `Pairing link copied!` }); }}
+                            data-testid={`button-copy-pair-${boardNumber}`}
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                          <Button size="icon" variant="outline" className="h-8 w-8 shrink-0 text-destructive"
+                            onClick={() => deleteSession.mutate(session.id)}
+                            data-testid={`button-delete-session-${boardNumber}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button className="w-full" variant="outline"
+                        onClick={() => createSession.mutate(boardNumber)}
+                        disabled={createSession.isPending}
+                        data-testid={`button-create-scorer-${boardNumber}`}
+                      >
+                        {createSession.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <QrCode className="w-4 h-4 mr-2" />}
+                        Create Scorer Tablet for Board {boardNumber}
+                      </Button>
+                    )}
+
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                        <Radio className="w-3 h-3" /> OBS Overlay
+                      </p>
+                      <div className="flex gap-2">
+                        <Input readOnly value={overlayUrl} className="text-xs h-8" data-testid={`input-overlay-url-${boardNumber}`} />
+                        <Button size="icon" variant="outline" className="h-8 w-8 shrink-0"
+                          onClick={() => { navigator.clipboard.writeText(overlayUrl); toast({ title: "OBS URL copied!", description: "Paste this into OBS as a Browser Source." }); }}
+                          data-testid={`button-copy-overlay-${boardNumber}`}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })() : (
           <div className="space-y-4">
             {sortedGroups.map((group: any, idx: number) => {
               const boardNumber = idx + 1;
