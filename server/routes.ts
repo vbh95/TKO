@@ -1736,17 +1736,63 @@ export async function registerRoutes(
       ]);
 
       const sortedGroups = groupsList.sort((a, b) => a.name.localeCompare(b.name));
-      const group = sortedGroups[boardNumber - 1];
+      const isKnockoutOnly = sortedGroups.length === 0;
+
+      // For knockout-only tournaments there are no groups – use a synthetic one so the
+      // client can render without changes.  For group-stage tournaments, look up the
+      // group that corresponds to this board number.
+      const group = isKnockoutOnly
+        ? { id: 0, name: `Board ${boardNumber}` }
+        : sortedGroups[boardNumber - 1];
+
       if (!group) return res.status(404).json({ message: "Board not found" });
 
-      const groupMatches = allMatches.filter(m => m.groupId === group.id);
-      const knockoutBoardMatches = allMatches.filter(m => m.stage === 'KNOCKOUT' && (m as any).boardNumber === boardNumber);
+      const groupMatches = group.id !== 0
+        ? allMatches.filter(m => m.groupId === group.id)
+        : [];
+
+      let knockoutBoardMatches: typeof allMatches;
+      let totalBoards: number;
+
+      if (isKnockoutOnly) {
+        // Board N = the Nth match (0-indexed) within each round, grouped by roundKey.
+        // This mirrors the admin dialog which assigns boardNumber = idx + 1 per match
+        // in the current round.
+        const sortedKO = allMatches
+          .filter(m => m.stage === 'KNOCKOUT')
+          .sort((a: any, b: any) => a.order - b.order);
+
+        const roundGroups = new Map<string, typeof allMatches>();
+        for (const m of sortedKO) {
+          if (!roundGroups.has(m.roundKey)) roundGroups.set(m.roundKey, []);
+          roundGroups.get(m.roundKey)!.push(m);
+        }
+
+        knockoutBoardMatches = [];
+        for (const roundMatches of roundGroups.values()) {
+          const match = roundMatches[boardNumber - 1];
+          if (match) knockoutBoardMatches.push(match);
+        }
+
+        // totalBoards = number of matches in the current active round
+        const currentRoundMatches = Array.from(roundGroups.values()).find(
+          rms => rms.some(m => m.status !== 'COMPLETED')
+        ) || Array.from(roundGroups.values())[0] || [];
+        totalBoards = currentRoundMatches.length || boardNumber;
+      } else {
+        knockoutBoardMatches = allMatches.filter(
+          m => m.stage === 'KNOCKOUT' && (m as any).boardNumber === boardNumber
+        );
+        totalBoards = sortedGroups.length;
+      }
+
       const boardMatches = [...groupMatches, ...knockoutBoardMatches];
 
-      const groupMembershipPlayerIds = allMemberships
-        .filter(m => m.groupId === group.id)
-        .map(m => m.playerId);
-      const knockoutPlayerIds = knockoutBoardMatches.flatMap(m => [m.playerAId, m.playerBId].filter(Boolean)) as number[];
+      const groupMembershipPlayerIds = group.id !== 0
+        ? allMemberships.filter(m => m.groupId === group.id).map(m => m.playerId)
+        : [];
+      const knockoutPlayerIds = knockoutBoardMatches
+        .flatMap(m => [m.playerAId, m.playerBId].filter(Boolean)) as number[];
       const allRelevantPlayerIds = new Set([...groupMembershipPlayerIds, ...knockoutPlayerIds]);
       const boardPlayers = playersList.filter(p => allRelevantPlayerIds.has(p.id));
 
@@ -1754,7 +1800,7 @@ export async function registerRoutes(
         tournament,
         group,
         boardNumber,
-        totalBoards: sortedGroups.length,
+        totalBoards,
         players: boardPlayers,
         matches: boardMatches,
         accessToken: req.cookies?.boardAccessToken,
@@ -1782,18 +1828,52 @@ export async function registerRoutes(
       const allMatches = await storage.getMatchesByTournamentId(tournamentId);
       const boardGroups = await storage.getGroupsByTournamentId(tournamentId);
       const sortedGroups = boardGroups.sort((a, b) => a.name.localeCompare(b.name));
-      const boardGroup = sortedGroups[boardNumber - 1];
-      if (!boardGroup) {
-        return res.status(404).json({ message: "Board group not found" });
+      const boardGroup = sortedGroups.length > 0 ? sortedGroups[boardNumber - 1] : null;
+
+      const isKnockoutOnly = sortedGroups.length === 0;
+      const isGroupMatch = boardGroup ? match.groupId === boardGroup.id : false;
+
+      let isKnockoutOnBoard: boolean;
+      if (isKnockoutOnly && match.stage === 'KNOCKOUT') {
+        // No boardNumber stored on matches – verify by positional index within the round
+        const matchesInRound = allMatches
+          .filter(m => m.stage === 'KNOCKOUT' && m.roundKey === match.roundKey)
+          .sort((a: any, b: any) => a.order - b.order);
+        const matchIdxInRound = matchesInRound.findIndex(m => m.id === matchId);
+        isKnockoutOnBoard = matchIdxInRound === boardNumber - 1;
+      } else {
+        isKnockoutOnBoard = match.stage === 'KNOCKOUT' && (match as any).boardNumber === boardNumber;
       }
-      const isGroupMatch = match.groupId === boardGroup.id;
-      const isKnockoutOnBoard = match.stage === 'KNOCKOUT' && (match as any).boardNumber === boardNumber;
+
       if (!isGroupMatch && !isKnockoutOnBoard) {
         return res.status(403).json({ message: "Match is not assigned to this board" });
       }
+
+      // Build list of all matches on this board to check for concurrent in-progress matches
+      let boardKOMatches: typeof allMatches;
+      if (isKnockoutOnly) {
+        const sortedKO = allMatches
+          .filter(m => m.stage === 'KNOCKOUT')
+          .sort((a: any, b: any) => a.order - b.order);
+        const roundGroups = new Map<string, typeof allMatches>();
+        for (const m of sortedKO) {
+          if (!roundGroups.has(m.roundKey)) roundGroups.set(m.roundKey, []);
+          roundGroups.get(m.roundKey)!.push(m);
+        }
+        boardKOMatches = [];
+        for (const roundMatches of roundGroups.values()) {
+          const m = roundMatches[boardNumber - 1];
+          if (m) boardKOMatches.push(m);
+        }
+      } else {
+        boardKOMatches = allMatches.filter(
+          m => m.stage === 'KNOCKOUT' && (m as any).boardNumber === boardNumber
+        );
+      }
+
       const boardMatches = [
-        ...allMatches.filter(m => m.groupId === boardGroup.id),
-        ...allMatches.filter(m => m.stage === 'KNOCKOUT' && (m as any).boardNumber === boardNumber),
+        ...(boardGroup ? allMatches.filter(m => m.groupId === boardGroup.id) : []),
+        ...boardKOMatches,
       ];
       const existingInProgress = boardMatches.find(m => m.status === 'IN_PROGRESS' && m.id !== matchId);
       if (existingInProgress) {
