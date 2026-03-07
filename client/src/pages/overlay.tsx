@@ -139,15 +139,15 @@ function WinnerPanel({
           alignItems: "center",
           justifyContent: "center",
           gap: 10,
-          borderLeft: "4px solid #C41E3A",
-          borderRight: "4px solid #C41E3A",
+          borderLeft: "4px solid #4B9B3E",
+          borderRight: "4px solid #4B9B3E",
         }}
       >
         <span
           style={{
-            color: "#C41E3A",
+            color: "#4B9B3E",
             fontWeight: 800,
-            fontSize: 22,
+            fontSize: 26,
             letterSpacing: "0.25em",
             textTransform: "uppercase",
             lineHeight: 1,
@@ -159,7 +159,7 @@ function WinnerPanel({
           style={{
             color: "#fff",
             fontWeight: 800,
-            fontSize: 44,
+            fontSize: 52,
             lineHeight: 1.15,
             textAlign: "center",
             paddingLeft: 24,
