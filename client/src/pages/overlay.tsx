@@ -36,7 +36,7 @@ const GREEN        = "#4B9B3E";
 const CHECKOUT_RED = "#8B1A1A";
 
 const COL         = { sets: 70, legs: 70, rem: 110 };
-const NAME_COL_W  = 320;
+const NAME_COL_W  = 260;
 const ARROW_W     = 44;
 const ROW_H       = 76;
 const TOP_H       = 46;
