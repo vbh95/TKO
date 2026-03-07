@@ -995,11 +995,13 @@ export default function TournamentDetail() {
                 <TabsTrigger value="knockout" data-testid="tab-knockout">Knockout</TabsTrigger>
               </>
             ) : tournament.type === 'ROUND_ROBIN' ? (
-              <TabsTrigger value="groups" data-testid="tab-groups">Matches</TabsTrigger>
+              <>
+                <TabsTrigger value="groups" data-testid="tab-groups">Matches</TabsTrigger>
+                <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
+              </>
             ) : (
               <TabsTrigger value="knockout" data-testid="tab-knockout">Matches</TabsTrigger>
             )}
-            {tournament.type === 'ROUND_ROBIN' && <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>}
             <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
           </TabsList>
 
