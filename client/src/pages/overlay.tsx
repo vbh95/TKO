@@ -119,13 +119,13 @@ export default function OverlayPage() {
 
               {/* Player names (white) – paddingRight creates breathing room before green stats */}
               <div className="flex-1 flex flex-col" style={{ background: "#fff", minWidth: 260 }}>
-                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 80 }}>
-                  <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1 }} className="truncate">
+                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 180 }}>
+                  <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1.4 }} className="truncate">
                     {playerAName}
                   </span>
                 </div>
-                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 80 }}>
-                  <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1 }} className="truncate">
+                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 180 }}>
+                  <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1.4 }} className="truncate">
                     {playerBName}
                   </span>
                 </div>
