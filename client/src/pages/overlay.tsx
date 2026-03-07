@@ -201,10 +201,12 @@ export default function OverlayPage() {
   const [data, setData] = useState<LiveOverlayData | null>(null);
   const [nextData, setNextData] = useState<LiveOverlayData | null>(null);
   const [error, setError] = useState(false);
-  // Once we've switched to displaying the next match, stay there even after
-  // its live cache is cleared on completion (otherwise we'd snap back to the
-  // primary match's winner screen when the next match ends).
+  // committedToNext — true once bull is selected for the current "next" match.
   const [committedToNext, setCommittedToNext] = useState(false);
+  // frozenDisplayData — snapshot of the last match we were committed to.
+  // This persists even when nextMatchId changes so we never flash back to the
+  // original primary match's winner panel once we've moved beyond it.
+  const [frozenDisplayData, setFrozenDisplayData] = useState<LiveOverlayData | null>(null);
   const prevNextMatchIdRef = useRef<number | null>(null);
 
   // Primary poll — the original match
@@ -223,28 +225,23 @@ export default function OverlayPage() {
     return () => clearInterval(interval);
   }, [matchId]);
 
-  // Secondary poll — starts when the primary match completes and a next match exists.
+  // Secondary poll — tracks the next in-progress match while committed to it.
   const nextMatchId = data?.nextMatchId ?? null;
 
-  // When nextMatchId changes to a new non-null value, reset the commitment so
-  // we wait for bull selection in the new match before switching the display.
-  // When nextMatchId goes null (next match just finished, no new one yet) we
-  // intentionally keep nextData and committedToNext intact so the winner screen
-  // of the just-completed match stays visible.
+  // When nextMatchId changes to a new non-null value a fresh match has become
+  // the "next" — reset commitment so we wait for bull selection again.
+  // When nextMatchId goes null (just-completed match, no replacement yet) we
+  // leave everything as-is: frozenDisplayData keeps the winner visible.
   useEffect(() => {
     const prev = prevNextMatchIdRef.current;
     prevNextMatchIdRef.current = nextMatchId;
     if (nextMatchId !== null && nextMatchId !== prev) {
-      // Moved to a brand-new next match — reset commitment and clear stale data.
       setCommittedToNext(false);
       setNextData(null);
     }
-    // If nextMatchId went null: do nothing — preserve the last winner screen.
   }, [nextMatchId]);
 
   useEffect(() => {
-    // Stop polling when there is no next match, but do NOT clear nextData so
-    // the winner of the last polled match stays on screen.
     if (!nextMatchId) return;
     const fetchNext = async () => {
       try {
@@ -258,14 +255,25 @@ export default function OverlayPage() {
     return () => clearInterval(interval);
   }, [nextMatchId]);
 
-  // Switch to displaying the next match as soon as its bull winner is chosen,
-  // and stay there even after that match completes (live cache clears).
+  // Commit to showing the next match the moment its bull thrower is selected.
   const bullSelected = nextData?.live?.legStartingThrower != null;
   useEffect(() => {
     if (bullSelected) setCommittedToNext(true);
   }, [bullSelected]);
 
-  const displayData = (committedToNext && nextData) ? nextData : data;
+  // While committed, keep frozenDisplayData current so it captures the final
+  // COMPLETED state (with winnerId) when the match ends and cache is cleared.
+  useEffect(() => {
+    if (committedToNext && nextData) {
+      setFrozenDisplayData(nextData);
+    }
+  }, [committedToNext, nextData]);
+
+  // Resolution order:
+  //   1. Actively committed to a next match → show live nextData
+  //   2. Previously committed (frozen) → show last known match data (winner or scoreboard)
+  //   3. Fallback → primary match data
+  const displayData = (committedToNext && nextData) ? nextData : (frozenDisplayData ?? data);
 
   if (error) {
     return (
