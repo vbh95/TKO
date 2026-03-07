@@ -2051,22 +2051,29 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, 
             );
           }
 
+          const configuredBoards: number = (tournament.settings as any)?.numBoards || currentRoundMatches.length;
+
           return (
             <div className="space-y-4">
               <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
                 Current Round: {roundLabel}
               </p>
-              {currentRoundMatches.map((match: any, idx: number) => {
-                const boardNumber = idx + 1;
+              {Array.from({ length: configuredBoards }, (_, i) => i + 1).map((boardNumber: number) => {
+                // Per-round modular: board N owns matches at positions N-1, N-1+numBoards, …
+                const boardRoundMatches = currentRoundMatches.filter((_m: any, i: number) => (i % configuredBoards) + 1 === boardNumber);
+                const match = boardRoundMatches.find((m: any) => m.status === 'IN_PROGRESS')
+                  || boardRoundMatches.find((m: any) => m.playerAId && m.playerBId)
+                  || boardRoundMatches[0]
+                  || null;
                 const session = boardSessions.find((s: any) => s.boardNumber === boardNumber);
                 const isPaired = session?.pairedAt != null;
                 const pairUrl = session ? `${window.location.origin}/pair?token=${session.pairingToken}` : null;
-                const playerAName = match.playerA?.name || 'TBD';
-                const playerBName = match.playerB?.name || 'TBD';
-                const overlayUrl = `${window.location.origin}/overlay/${match.id}`;
+                const playerAName = match?.playerA?.name || 'TBD';
+                const playerBName = match?.playerB?.name || 'TBD';
+                const overlayUrl = match ? `${window.location.origin}/overlay/${match.id}` : null;
 
                 return (
-                  <div key={match.id} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${boardNumber}`}>
+                  <div key={boardNumber} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${boardNumber}`}>
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-bold text-sm">Board {boardNumber}</h3>
@@ -2125,20 +2132,22 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, 
                       </Button>
                     )}
 
-                    <div className="pt-2 border-t">
-                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                        <Radio className="w-3 h-3" /> OBS Overlay
-                      </p>
-                      <div className="flex gap-2">
-                        <Input readOnly value={overlayUrl} className="text-xs h-8" data-testid={`input-overlay-url-${boardNumber}`} />
-                        <Button size="icon" variant="outline" className="h-8 w-8 shrink-0"
-                          onClick={() => { navigator.clipboard.writeText(overlayUrl); toast({ title: "OBS URL copied!", description: "Paste this into OBS as a Browser Source." }); }}
-                          data-testid={`button-copy-overlay-${boardNumber}`}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </Button>
+                    {overlayUrl && (
+                      <div className="pt-2 border-t">
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <Radio className="w-3 h-3" /> OBS Overlay
+                        </p>
+                        <div className="flex gap-2">
+                          <Input readOnly value={overlayUrl} className="text-xs h-8" data-testid={`input-overlay-url-${boardNumber}`} />
+                          <Button size="icon" variant="outline" className="h-8 w-8 shrink-0"
+                            onClick={() => { navigator.clipboard.writeText(overlayUrl); toast({ title: "OBS URL copied!", description: "Paste this into OBS as a Browser Source." }); }}
+                            data-testid={`button-copy-overlay-${boardNumber}`}
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
