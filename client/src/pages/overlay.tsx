@@ -1,6 +1,7 @@
 import { useParams } from "wouter";
 import { useEffect, useState } from "react";
 import { getCheckoutSuggestion } from "@/lib/checkout";
+import tkoLogoWhite from "@assets/TKO_White-04_1771796486840.png";
 
 interface LiveOverlayData {
   matchId: number;
@@ -178,6 +179,7 @@ function WinnerPanel({
           background: "#000",
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           paddingLeft: 20,
           paddingRight: 20,
         }}
@@ -185,6 +187,10 @@ function WinnerPanel({
         <span style={{ color: "#aaa", fontWeight: 700, fontSize: STAT_SZ }}>
           {tournamentName}
         </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ color: "#666", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Powered by</span>
+          <img src={tkoLogoWhite} alt="TKO" style={{ height: 16, opacity: 0.7 }} />
+        </div>
       </div>
     </div>
   );
@@ -395,10 +401,14 @@ export default function OverlayPage() {
             </div>
 
             {/* Bottom bar */}
-            <div className="flex items-center bg-black px-4" style={{ height: BOTTOM_H }}>
+            <div className="flex items-center justify-between bg-black px-4" style={{ height: BOTTOM_H }}>
               <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>
                 {tournamentName}
               </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "#666", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Powered by</span>
+                <img src={tkoLogoWhite} alt="TKO" style={{ height: 16, opacity: 0.7 }} />
+              </div>
             </div>
 
           </div>
