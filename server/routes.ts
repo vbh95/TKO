@@ -2603,12 +2603,20 @@ export async function registerRoutes(
 
       const liveData = liveScoringCache.get(matchId) || null;
 
+      const allTournamentMatches = await storage.getMatchesByTournamentId(match.tournamentId);
+      const roundMatches = allTournamentMatches
+        .filter(m => m.roundKey === match.roundKey)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const matchNumber = roundMatches.findIndex(m => m.id === match.id) + 1;
+
       res.json({
         matchId: match.id,
         status: match.status,
         tournamentName: tournament?.name || "Tournament",
         roundLabel: getRoundLabel(match.roundKey || ""),
         formatLabel: getFormatLabel(match.bestOf),
+        bestOf: match.bestOf,
+        matchNumber,
         playerA: playerA ? { id: playerA.id, name: playerA.name } : null,
         playerB: playerB ? { id: playerB.id, name: playerB.name } : null,
         scoreA: match.scoreA || 0,
