@@ -1536,6 +1536,7 @@ export default function TournamentDetail() {
           onOpenChange={setIsDevicesDialogOpen}
           tournament={tournament}
           groups={groups}
+          matches={matches}
           enableShare={enableShare}
           toast={toast}
           boardStatuses={boardStatuses}
@@ -1972,11 +1973,12 @@ function TournamentSettingsDialog({
   );
 }
 
-function BoardSessionsDialog({ open, onOpenChange, tournament, groups, enableShare, toast, boardStatuses }: {
+function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, enableShare, toast, boardStatuses }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tournament: any;
   groups: any[];
+  matches: any[];
   enableShare: any;
   toast: any;
   boardStatuses: Record<number, boolean>;
@@ -2044,6 +2046,16 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, enableSha
               const spectatorUrl = tournament.shareEnabled && tournament.shareToken
                 ? `${window.location.origin}/public/t/${tournament.shareToken}/board/${boardNumber}`
                 : null;
+
+              const groupMatches = matches.filter((m: any) => m.groupId === group.id);
+              const knockoutMatchesOnBoard = matches.filter((m: any) => !m.groupId && m.boardNumber === boardNumber);
+              const overlayMatch =
+                groupMatches.find((m: any) => m.status === 'IN_PROGRESS') ||
+                groupMatches.find((m: any) => m.status === 'PENDING' && m.playerAId && m.playerBId) ||
+                knockoutMatchesOnBoard.find((m: any) => m.status === 'IN_PROGRESS') ||
+                knockoutMatchesOnBoard.find((m: any) => m.status === 'PENDING' && m.playerAId && m.playerBId) ||
+                null;
+              const overlayUrl = overlayMatch ? `${window.location.origin}/overlay/${overlayMatch.id}` : null;
 
               return (
                 <div key={group.id} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${boardNumber}`}>
@@ -2123,6 +2135,7 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, enableSha
                           </div>
                         </div>
                       )}
+
                     </div>
                   ) : (
                     <Button
@@ -2140,6 +2153,31 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, enableSha
                       Create Scorer Tablet for Board {boardNumber}
                     </Button>
                   )}
+
+                  <div className="pt-2 border-t">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                      <Radio className="w-3 h-3" /> OBS Overlay
+                    </p>
+                    {overlayUrl ? (
+                      <div className="flex gap-2">
+                        <Input readOnly value={overlayUrl} className="text-xs h-8" data-testid={`input-overlay-url-${boardNumber}`} />
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => {
+                            navigator.clipboard.writeText(overlayUrl);
+                            toast({ title: "OBS URL copied!", description: "Paste this into OBS as a Browser Source." });
+                          }}
+                          data-testid={`button-copy-overlay-${boardNumber}`}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground/60 italic">No active match on this board yet</p>
+                    )}
+                  </div>
                 </div>
               );
             })}
