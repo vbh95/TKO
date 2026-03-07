@@ -5,7 +5,7 @@ import { storage } from "./storage";
 let io: SocketIOServer | null = null;
 
 const boardSocketCounts = new Map<string, number>();
-const liveScoringCache = new Map<number, any>();
+export const liveScoringCache = new Map<number, any>();
 let connectedSocketCount = 0;
 
 interface ConnectedUserInfo {

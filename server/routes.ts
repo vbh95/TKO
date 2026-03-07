@@ -10,7 +10,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { generateMatches, regenerateGroupMatchesFromMemberships } from "./match-generator";
 import type { TournamentSettings } from "@shared/schema";
-import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament } from "./socket";
+import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament, liveScoringCache } from "./socket";
 import rateLimit from "express-rate-limit";
 
 const authLimiter = rateLimit({
@@ -2566,6 +2566,71 @@ export async function registerRoutes(
       })),
       playerMatches,
     });
+  });
+
+  function getRoundLabel(roundKey: string): string {
+    const labels: Record<string, string> = {
+      QF: "Quarter Final",
+      SF: "Semi Final",
+      F: "Final",
+      GF: "Grand Final",
+      group: "Group Stage",
+      R64: "Round of 64",
+      R32: "Round of 32",
+      R16: "Round of 16",
+    };
+    return labels[roundKey] || roundKey;
+  }
+
+  function getFormatLabel(bestOf: number | null | undefined): string {
+    if (!bestOf) return "Match";
+    return `First to ${Math.ceil(bestOf / 2)}`;
+  }
+
+  app.get('/api/matches/:matchId/live', async (req, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId, 10);
+      if (isNaN(matchId)) return res.status(400).json({ message: "Invalid match ID" });
+
+      const match = await storage.getMatch(matchId);
+      if (!match) return res.status(404).json({ message: "Match not found" });
+
+      const tournament = await storage.getTournament(match.tournamentId);
+      const players = await storage.getPlayersByTournamentId(match.tournamentId);
+
+      const playerA = match.playerAId ? players.find(p => p.id === match.playerAId) || null : null;
+      const playerB = match.playerBId ? players.find(p => p.id === match.playerBId) || null : null;
+
+      const liveData = liveScoringCache.get(matchId) || null;
+
+      res.json({
+        matchId: match.id,
+        status: match.status,
+        tournamentName: tournament?.name || "Tournament",
+        roundLabel: getRoundLabel(match.roundKey || ""),
+        formatLabel: getFormatLabel(match.bestOf),
+        playerA: playerA ? { id: playerA.id, name: playerA.name } : null,
+        playerB: playerB ? { id: playerB.id, name: playerB.name } : null,
+        scoreA: match.scoreA || 0,
+        scoreB: match.scoreB || 0,
+        live: liveData ? {
+          remainingA: liveData.remainingA,
+          remainingB: liveData.remainingB,
+          currentThrower: liveData.currentThrower,
+          legsWonA: liveData.legsWonA,
+          legsWonB: liveData.legsWonB,
+          avgA: liveData.avgA,
+          avgB: liveData.avgB,
+          lastScoreA: liveData.lastScoreA ?? null,
+          lastScoreB: liveData.lastScoreB ?? null,
+          dartsA: liveData.dartsA,
+          dartsB: liveData.dartsB,
+        } : null,
+      });
+    } catch (err) {
+      console.error("Live overlay error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
   });
 
   backfillKnockoutScorers();

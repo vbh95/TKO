@@ -22,6 +22,7 @@ import ScorerPage from "@/pages/scorer";
 import CompleteProfile from "@/pages/complete-profile";
 import PublicLeague from "@/pages/public-league";
 import AdminDashboard from "@/pages/admin-dashboard";
+import OverlayPage from "@/pages/overlay";
 
 function isProfileComplete(user: any): boolean {
   return !!user.dateOfBirth && !!user.hasMemorableWord;
@@ -53,6 +54,7 @@ function Router() {
   return (
     <Switch>
       {/* Public Routes */}
+      <Route path="/overlay/:matchId" component={OverlayPage} />
       <Route path="/scorer/:tournamentId/:boardNumber" component={ScorerPage} />
       <Route path="/scorer" component={ScorerPage} />
       <Route path="/public/t/:shareToken/board/:boardNumber" component={BoardView} />

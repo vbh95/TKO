@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ArrowLeft,
   Check,
+  Copy,
   Crosshair,
   Delete,
   Grid2x2,
@@ -1384,6 +1385,19 @@ export default function ScorerPage() {
               <img src={tkoLogoWhite} alt="TKO" className="h-5 md:h-7 pointer-events-auto" />
             </div>
             <div className="ml-auto flex items-center gap-1.5 md:gap-3 z-10">
+              {activeMatchId && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.origin + "/overlay/" + activeMatchId);
+                    toast({ title: "OBS URL copied!", description: "Paste this URL into OBS as a Browser Source." });
+                  }}
+                  className="p-1 rounded hover:bg-white/10 transition-colors"
+                  title="Copy OBS overlay URL"
+                  data-testid="button-copy-obs-url"
+                >
+                  <Copy className="w-3 h-3 text-primary-foreground" />
+                </button>
+              )}
               <button
                 onClick={() => window.location.reload()}
                 className="p-1 rounded hover:bg-white/10 transition-colors"
