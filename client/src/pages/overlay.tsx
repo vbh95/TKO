@@ -112,8 +112,8 @@ export default function OverlayPage() {
           <div className="flex items-stretch">
 
             {/* Player names (white) */}
-            <div className="flex-1 flex flex-col" style={{ background: "#fff" }}>
-              <div className="flex items-center px-4" style={{ height: ROW_H }}>
+            <div className="flex-1 flex flex-col" style={{ background: "#fff", minWidth: 260 }}>
+              <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 48 }}>
                 <span style={{ fontWeight: 700, fontSize: 26, color: "#111", lineHeight: 1 }} className="truncate">
                   {playerAName}
                 </span>
@@ -121,7 +121,7 @@ export default function OverlayPage() {
                   <span style={{ color: "#b00000", fontSize: 18, lineHeight: 1, marginLeft: 8 }}>•</span>
                 )}
               </div>
-              <div className="flex items-center px-4" style={{ height: ROW_H }}>
+              <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 48 }}>
                 <span style={{ fontWeight: 700, fontSize: 26, color: "#111", lineHeight: 1 }} className="truncate">
                   {playerBName}
                 </span>
