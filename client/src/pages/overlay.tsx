@@ -1,5 +1,5 @@
 import { useParams } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCheckoutSuggestion } from "@/lib/checkout";
 import tkoLogoWhite from "@assets/TKO_White-04_1771796486840.png";
 
@@ -201,6 +201,11 @@ export default function OverlayPage() {
   const [data, setData] = useState<LiveOverlayData | null>(null);
   const [nextData, setNextData] = useState<LiveOverlayData | null>(null);
   const [error, setError] = useState(false);
+  // Once we've switched to displaying the next match, stay there even after
+  // its live cache is cleared on completion (otherwise we'd snap back to the
+  // primary match's winner screen when the next match ends).
+  const [committedToNext, setCommittedToNext] = useState(false);
+  const prevNextMatchIdRef = useRef<number | null>(null);
 
   // Primary poll — the original match
   useEffect(() => {
@@ -219,8 +224,17 @@ export default function OverlayPage() {
   }, [matchId]);
 
   // Secondary poll — starts when the primary match completes and a next match exists.
-  // Stops (and clears nextData) when the next match's live data shows bull selected.
   const nextMatchId = data?.nextMatchId ?? null;
+
+  // Reset committed flag whenever the next match ID changes (overlay has moved on).
+  useEffect(() => {
+    if (nextMatchId !== prevNextMatchIdRef.current) {
+      prevNextMatchIdRef.current = nextMatchId;
+      setCommittedToNext(false);
+      if (!nextMatchId) setNextData(null);
+    }
+  }, [nextMatchId]);
+
   useEffect(() => {
     if (!nextMatchId) { setNextData(null); return; }
     const fetchNext = async () => {
@@ -235,9 +249,14 @@ export default function OverlayPage() {
     return () => clearInterval(interval);
   }, [nextMatchId]);
 
-  // Switch to displaying the next match as soon as its bull winner is chosen
+  // Switch to displaying the next match as soon as its bull winner is chosen,
+  // and stay there even after that match completes (live cache clears).
   const bullSelected = nextData?.live?.legStartingThrower != null;
-  const displayData  = bullSelected ? nextData : data;
+  useEffect(() => {
+    if (bullSelected) setCommittedToNext(true);
+  }, [bullSelected]);
+
+  const displayData = (committedToNext && nextData) ? nextData : data;
 
   if (error) {
     return (
