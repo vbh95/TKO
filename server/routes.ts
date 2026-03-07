@@ -1762,18 +1762,31 @@ export async function registerRoutes(
           .filter(m => m.stage === 'KNOCKOUT')
           .sort((a: any, b: any) => a.order - b.order);
 
+        // Group matches by round (Map preserves insertion order: QF → SF → F)
+        const roundGroups = new Map<string, typeof allMatches>();
+        for (const m of sortedKO) {
+          if (!roundGroups.has(m.roundKey)) roundGroups.set(m.roundKey, []);
+          roundGroups.get(m.roundKey)!.push(m);
+        }
+
         if (configuredBoards && configuredBoards > 0) {
-          // Global sequential assignment: board N owns every Nth match across all rounds
-          knockoutBoardMatches = sortedKO.filter((_m, idx) => (idx % configuredBoards) + 1 === boardNumber);
+          // Per-round modular assignment:
+          //   Within each round, board N owns positions (N-1), (N-1+numBoards), (N-1+2*numBoards), …
+          // Examples with 4 QF, 2 SF, 1 F:
+          //   numBoards=4 → Board1: QF1,SF1,F  Board2: QF2,SF2  Board3: QF3  Board4: QF4
+          //   numBoards=2 → Board1: QF1,QF3,SF1,F  Board2: QF2,QF4,SF2
+          //   numBoards=1 → Board1: all matches
+          knockoutBoardMatches = [];
+          for (const roundMatches of roundGroups.values()) {
+            for (let i = 0; i < roundMatches.length; i++) {
+              if ((i % configuredBoards) + 1 === boardNumber) {
+                knockoutBoardMatches.push(roundMatches[i]);
+              }
+            }
+          }
           totalBoards = configuredBoards;
         } else {
-          // Default: Board N = the Nth match (0-indexed) within each round, grouped by roundKey.
-          const roundGroups = new Map<string, typeof allMatches>();
-          for (const m of sortedKO) {
-            if (!roundGroups.has(m.roundKey)) roundGroups.set(m.roundKey, []);
-            roundGroups.get(m.roundKey)!.push(m);
-          }
-
+          // Default: Board N = the Nth match (0-indexed) within each round.
           knockoutBoardMatches = [];
           for (const roundMatches of roundGroups.values()) {
             const match = roundMatches[boardNumber - 1];
@@ -1848,14 +1861,14 @@ export async function registerRoutes(
         const sortedKO = allMatches
           .filter(m => m.stage === 'KNOCKOUT')
           .sort((a: any, b: any) => a.order - b.order);
+        // Find match's position within its own round
+        const matchesInRound = sortedKO.filter(m => m.roundKey === match.roundKey);
+        const matchIdxInRound = matchesInRound.findIndex(m => m.id === matchId);
         if (configuredBoards && configuredBoards > 0) {
-          // Global sequential assignment
-          const globalIdx = sortedKO.findIndex(m => m.id === matchId);
-          isKnockoutOnBoard = (globalIdx % configuredBoards) + 1 === boardNumber;
+          // Per-round modular assignment
+          isKnockoutOnBoard = (matchIdxInRound % configuredBoards) + 1 === boardNumber;
         } else {
           // Default: positional index within the round
-          const matchesInRound = sortedKO.filter(m => m.roundKey === match.roundKey);
-          const matchIdxInRound = matchesInRound.findIndex(m => m.id === matchId);
           isKnockoutOnBoard = matchIdxInRound === boardNumber - 1;
         }
       } else {
@@ -1869,21 +1882,21 @@ export async function registerRoutes(
       // Build list of all matches on this board to check for concurrent in-progress matches
       let boardKOMatches: typeof allMatches;
       if (isKnockoutOnly) {
-        const sortedKO = allMatches
+        const sortedKO2 = allMatches
           .filter(m => m.stage === 'KNOCKOUT')
           .sort((a: any, b: any) => a.order - b.order);
-        if (configuredBoards && configuredBoards > 0) {
-          boardKOMatches = sortedKO.filter((_m, idx) => (idx % configuredBoards) + 1 === boardNumber);
-        } else {
-          const roundGroups = new Map<string, typeof allMatches>();
-          for (const m of sortedKO) {
-            if (!roundGroups.has(m.roundKey)) roundGroups.set(m.roundKey, []);
-            roundGroups.get(m.roundKey)!.push(m);
-          }
-          boardKOMatches = [];
-          for (const roundMatches of roundGroups.values()) {
-            const m = roundMatches[boardNumber - 1];
-            if (m) boardKOMatches.push(m);
+        const roundGroups2 = new Map<string, typeof allMatches>();
+        for (const m of sortedKO2) {
+          if (!roundGroups2.has(m.roundKey)) roundGroups2.set(m.roundKey, []);
+          roundGroups2.get(m.roundKey)!.push(m);
+        }
+        boardKOMatches = [];
+        for (const roundMatches of roundGroups2.values()) {
+          for (let i = 0; i < roundMatches.length; i++) {
+            const numB = configuredBoards && configuredBoards > 0 ? configuredBoards : roundMatches.length;
+            if ((i % numB) + 1 === boardNumber) {
+              boardKOMatches.push(roundMatches[i]);
+            }
           }
         }
       } else {
