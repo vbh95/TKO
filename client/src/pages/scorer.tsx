@@ -1856,6 +1856,10 @@ export default function ScorerPage() {
               <p className="text-primary-foreground/80 text-sm">
                 {group.name} — Board {boardNumber} Scorer
               </p>
+              <div className="flex items-center gap-1 mt-1.5 opacity-60">
+                <span className="text-[10px] text-primary-foreground/70 uppercase tracking-wide">Powered by</span>
+                <img src={tkoLogoWhite} alt="TKO" className="h-3.5" />
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
