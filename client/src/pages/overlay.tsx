@@ -38,7 +38,7 @@ const ARROW_W    = 44;
 const ROW_H      = 76;
 const TOP_H      = 46;
 const BOTTOM_H   = 42;
-const CHECKOUT_W = 200;
+const CHECKOUT_W = 240;
 
 const NAME_SZ  = 34;
 const STAT_SZ  = 24;
@@ -61,23 +61,22 @@ function PlayerCheckoutRow({ darts, visible }: { darts: string[] | null; visible
           willChange: "transform",
         }}
       >
-        {(darts ?? []).map((dart, i) => {
-          const isFinal = i === ((darts?.length ?? 1) - 1);
-          return (
-            <span
-              key={i}
-              style={{
-                color: isFinal ? "#FFE066" : "#fff",
-                fontWeight: 800,
-                fontSize: DART_SZ,
-                letterSpacing: "0.02em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {dart}
-            </span>
-          );
-        })}
+        {(darts ?? []).map((dart, i) => (
+          <span
+            key={i}
+            style={{
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: DART_SZ,
+              letterSpacing: "0.02em",
+              whiteSpace: "nowrap",
+              flex: 1,
+              textAlign: "center",
+            }}
+          >
+            {dart}
+          </span>
+        ))}
       </div>
     </div>
   );
