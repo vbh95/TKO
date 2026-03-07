@@ -12,6 +12,7 @@ interface LiveOverlayData {
   matchNumber: number;
   useSets: boolean;
   winnerId: number | null;
+  nextMatchId: number | null;
   playerA: { id: number; name: string } | null;
   playerB: { id: number; name: string } | null;
   scoreA: number;
@@ -192,8 +193,10 @@ function WinnerPanel({
 export default function OverlayPage() {
   const { matchId } = useParams<{ matchId: string }>();
   const [data, setData] = useState<LiveOverlayData | null>(null);
+  const [nextData, setNextData] = useState<LiveOverlayData | null>(null);
   const [error, setError] = useState(false);
 
+  // Primary poll — the original match
   useEffect(() => {
     if (!matchId) return;
     const fetchData = async () => {
@@ -209,6 +212,27 @@ export default function OverlayPage() {
     return () => clearInterval(interval);
   }, [matchId]);
 
+  // Secondary poll — starts when the primary match completes and a next match exists.
+  // Stops (and clears nextData) when the next match's live data shows bull selected.
+  const nextMatchId = data?.nextMatchId ?? null;
+  useEffect(() => {
+    if (!nextMatchId) { setNextData(null); return; }
+    const fetchNext = async () => {
+      try {
+        const res = await fetch(`/api/matches/${nextMatchId}/live`);
+        if (!res.ok) return;
+        setNextData(await res.json());
+      } catch { /* ignore */ }
+    };
+    fetchNext();
+    const interval = setInterval(fetchNext, 1000);
+    return () => clearInterval(interval);
+  }, [nextMatchId]);
+
+  // Switch to displaying the next match as soon as its bull winner is chosen
+  const bullSelected = nextData?.live?.legStartingThrower != null;
+  const displayData  = bullSelected ? nextData : data;
+
   if (error) {
     return (
       <div style={{ background: "transparent" }} className="w-screen h-screen flex items-center justify-center">
@@ -217,13 +241,13 @@ export default function OverlayPage() {
     );
   }
 
-  if (!data) return <div style={{ background: "transparent" }} className="w-screen h-screen" />;
+  if (!displayData) return <div style={{ background: "transparent" }} className="w-screen h-screen" />;
 
-  const { tournamentName, roundLabel, bestOf, matchNumber, useSets, winnerId, playerA, playerB, scoreA, scoreB, live } = data;
+  const { tournamentName, roundLabel, bestOf, matchNumber, useSets, winnerId, playerA, playerB, scoreA, scoreB, live } = displayData;
 
   const overlayMode: OverlayMode =
-    data.status === "IN_PROGRESS" ? "live" :
-    data.status === "COMPLETED"   ? "winner" :
+    displayData.status === "IN_PROGRESS" ? "live" :
+    displayData.status === "COMPLETED"   ? "winner" :
     "idle";
 
   const remainingA         = live?.remainingA         ?? 501;

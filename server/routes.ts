@@ -2723,6 +2723,10 @@ export async function registerRoutes(
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       const matchNumber = roundMatches.findIndex(m => m.id === match.id) + 1;
 
+      const nextMatchId = match.status === 'COMPLETED'
+        ? (allTournamentMatches.find(m => m.status === 'IN_PROGRESS')?.id ?? null)
+        : null;
+
       res.json({
         matchId: match.id,
         status: match.status,
@@ -2733,6 +2737,7 @@ export async function registerRoutes(
         matchNumber,
         useSets: !!(tournament?.settings as any)?.useSets,
         winnerId: match.winnerId ?? null,
+        nextMatchId,
         playerA: playerA ? { id: playerA.id, name: playerA.name } : null,
         playerB: playerB ? { id: playerB.id, name: playerB.name } : null,
         scoreA: match.scoreA || 0,
