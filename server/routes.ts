@@ -2731,6 +2731,7 @@ export async function registerRoutes(
         formatLabel: getFormatLabel(match.bestOf),
         bestOf: match.bestOf,
         matchNumber,
+        useSets: !!(tournament?.settings as any)?.useSets,
         playerA: playerA ? { id: playerA.id, name: playerA.name } : null,
         playerB: playerB ? { id: playerB.id, name: playerB.name } : null,
         scoreA: match.scoreA || 0,

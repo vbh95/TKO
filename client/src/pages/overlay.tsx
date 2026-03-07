@@ -10,6 +10,7 @@ interface LiveOverlayData {
   formatLabel: string;
   bestOf: number;
   matchNumber: number;
+  useSets: boolean;
   playerA: { id: number; name: string } | null;
   playerB: { id: number; name: string } | null;
   scoreA: number;
@@ -112,7 +113,7 @@ export default function OverlayPage() {
 
   if (!data) return <div style={{ background: "transparent" }} className="w-screen h-screen" />;
 
-  const { tournamentName, roundLabel, bestOf, matchNumber, playerA, playerB, scoreA, scoreB, live } = data;
+  const { tournamentName, roundLabel, bestOf, matchNumber, useSets, playerA, playerB, scoreA, scoreB, live } = data;
 
   const remainingA     = live?.remainingA     ?? 501;
   const remainingB     = live?.remainingB     ?? 501;
@@ -157,9 +158,11 @@ export default function OverlayPage() {
                   {topLabel}
                 </span>
               </div>
-              <div style={{ width: COL.sets, textAlign: "center" }}>
-                <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>Sets</span>
-              </div>
+              {useSets && (
+                <div style={{ width: COL.sets, textAlign: "center" }}>
+                  <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>Sets</span>
+                </div>
+              )}
               <div style={{ width: COL.legs, textAlign: "center" }}>
                 <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>Legs</span>
               </div>
@@ -187,14 +190,16 @@ export default function OverlayPage() {
               <div className="flex" style={{ background: GREEN }}>
 
                 {/* Sets */}
-                <div className="flex flex-col" style={{ width: COL.sets }}>
-                  <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                    <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{scoreA}</span>
+                {useSets && (
+                  <div className="flex flex-col" style={{ width: COL.sets }}>
+                    <div className="flex items-center justify-center" style={{ height: ROW_H }}>
+                      <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{scoreA}</span>
+                    </div>
+                    <div className="flex items-center justify-center" style={{ height: ROW_H }}>
+                      <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{scoreB}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                    <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{scoreB}</span>
-                  </div>
-                </div>
+                )}
 
                 {/* Legs */}
                 <div className="flex flex-col" style={{ width: COL.legs }}>
