@@ -34,12 +34,12 @@ const GREEN  = "#4B9B3E";
 // Column widths
 const COL     = { sets: 70, legs: 70, rem: 110 };
 const ARROW_W = 44;
-// Row height for each player
-const ROW_H   = 58;
+// Row height for each player – tall enough that NAME_SZ text never clips
+const ROW_H   = 76;
 // Font sizes
 const NAME_SZ  = 34;  // player names – largest text on the overlay
-const STAT_SZ  = 24;  // sets, legs numbers + column headers + top/bottom bar labels
-const REM_SZ   = 32;  // remaining score – slightly larger for emphasis
+const STAT_SZ  = 24;  // column headers + top/bottom bar labels
+const SCORE_SZ = 32;  // sets, legs AND remaining – all the same size
 
 export default function OverlayPage() {
   const { matchId } = useParams<{ matchId: string }>();
@@ -117,14 +117,14 @@ export default function OverlayPage() {
             {/* ── MIDDLE ROW ── */}
             <div className="flex items-stretch">
 
-              {/* Player names (white) – paddingRight adds 48px gap before stats */}
+              {/* Player names (white) – paddingRight creates breathing room before green stats */}
               <div className="flex-1 flex flex-col" style={{ background: "#fff", minWidth: 260 }}>
-                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 48 }}>
+                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 80 }}>
                   <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1 }} className="truncate">
                     {playerAName}
                   </span>
                 </div>
-                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 48 }}>
+                <div className="flex items-center" style={{ height: ROW_H, paddingLeft: 16, paddingRight: 80 }}>
                   <span style={{ fontWeight: 700, fontSize: NAME_SZ, color: "#111", lineHeight: 1 }} className="truncate">
                     {playerBName}
                   </span>
@@ -137,30 +137,30 @@ export default function OverlayPage() {
                 {/* Sets */}
                 <div className="flex flex-col" style={{ width: COL.sets }}>
                   <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                    <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>{scoreA}</span>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{scoreA}</span>
                   </div>
                   <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                    <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>{scoreB}</span>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{scoreB}</span>
                   </div>
                 </div>
 
                 {/* Legs */}
                 <div className="flex flex-col" style={{ width: COL.legs }}>
                   <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                    <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>{legsWonA}</span>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{legsWonA}</span>
                   </div>
                   <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                    <span style={{ color: "#fff", fontWeight: 700, fontSize: STAT_SZ }}>{legsWonB}</span>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{legsWonB}</span>
                   </div>
                 </div>
 
                 {/* Remaining */}
                 <div className="flex flex-col" style={{ width: COL.rem }}>
                   <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                    <span style={{ color: "#fff", fontWeight: 700, fontSize: REM_SZ }}>{remainingA}</span>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{remainingA}</span>
                   </div>
                   <div className="flex items-center justify-center" style={{ height: ROW_H }}>
-                    <span style={{ color: "#fff", fontWeight: 700, fontSize: REM_SZ }}>{remainingB}</span>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: SCORE_SZ }}>{remainingB}</span>
                   </div>
                 </div>
 
