@@ -1,0 +1,164 @@
+I want to add a "Suggested Checkout" feature to my darts streaming overlay.
+
+The overlay already displays:
+
+- match format (example: First to 7)
+- player names
+- sets
+- legs
+- remaining score
+- active player indicator
+
+I want to add a PDC-style "checkout suggestion panel" that slides out from the side of the scoreboard when a player has a possible finish.
+
+REFERENCE BEHAVIOUR
+
+The panel should work exactly like the red suggestion box used in televised PDC darts broadcasts.
+
+When a player reaches a finish between 170 and 2, the overlay should display the recommended checkout route.
+
+Example:
+
+Score: 170  
+Display: T20 T20 Bull
+
+Score: 121  
+Display: T20 T11 D14
+
+Score: 100  
+Display: T20 20 D20
+
+Score: 40  
+Display: D20
+
+The suggestion should always show the recommended route for finishing in **3 darts or fewer**.
+
+If the score is above 170, the panel should stay hidden.
+
+SLIDING PANEL BEHAVIOUR
+
+The checkout suggestion should appear inside a **red box panel that slides out from behind the overlay**.
+
+Animation behaviour:
+
+• panel starts hidden behind the right side of the scoreboard  
+• when a checkout becomes available (170 or less) it slides out  
+• when the score goes above 170 again it slides back behind the overlay  
+
+Animation requirements:
+
+• smooth slide animation (CSS transform or translateX)
+• animation time around 300ms
+• no flashing or jumping
+
+LAYOUT OF THE PANEL
+
+The red checkout panel should display the suggestion like this:
+
+[T20] [T20] [Bull]
+
+or
+
+[T20] [T11] [D14]
+
+Each dart suggestion should appear in its own small box or spaced text.
+
+Use clear dart notation:
+
+T = triple  
+D = double  
+Bull = bullseye  
+25 = outer bull
+
+CHECKOUT DATA SOURCE
+
+Use the standard checkout table used in professional darts.
+
+Use the checkout combinations for all scores between **170 and 2**.
+
+Examples include:
+
+170 → T20 T20 Bull  
+167 → T20 T19 Bull  
+164 → T20 T18 Bull  
+160 → T20 T20 D20  
+158 → T20 T20 D19  
+157 → T20 T19 D20  
+156 → T20 T20 D18  
+
+Continue for all finishes down to:
+
+100 → T20 20 D20  
+99 → T19 10 D16  
+90 → T20 D15  
+80 → T20 D10  
+60 → 20 D20  
+50 → 10 D20  
+40 → D20  
+32 → D16  
+24 → D12  
+16 → D8  
+8 → D4  
+2 → D1
+
+Create a JavaScript object or lookup table that maps the score to the suggested checkout.
+
+Example structure:
+
+const checkoutTable = {
+170: ["T20","T20","Bull"],
+167: ["T20","T19","Bull"],
+164: ["T20","T18","Bull"],
+160: ["T20","T20","D20"],
+121: ["T20","T11","D14"],
+100: ["T20","20","D20"],
+40: ["D20"],
+32: ["D16"],
+2: ["D1"]
+}
+
+LOGIC
+
+The overlay should:
+
+1. detect the current player's remaining score
+2. check if that score exists in the checkout table
+3. if yes → show the checkout suggestion panel
+4. if no → hide the panel
+
+Only show checkout suggestions for the **active player**.
+
+If the player busts or score changes, the suggestion must update instantly.
+
+DESIGN REQUIREMENTS
+
+• red background panel
+• white text
+• bold font
+• clean broadcast-style appearance
+• sized so it is readable on a 1920x1080 stream
+• positioned to slide from behind the scoreboard
+
+TECH REQUIREMENTS
+
+The overlay is a web page used in OBS as a browser source.
+
+Use:
+
+HTML  
+CSS  
+JavaScript or React (depending on the existing overlay code)
+
+The panel must:
+
+• update live when the score updates
+• not reload the page
+• animate smoothly
+
+OPTIONAL ENHANCEMENTS
+
+If possible also support:
+
+• highlighting the final dart (double)  
+• subtle fade-in for the suggestion text  
+• responsive scaling for different overlay sizes

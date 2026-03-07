@@ -1,0 +1,361 @@
+I want you to add a professional televised-style darts “Suggested Checkout” panel to my existing stream overlay.
+
+CONTEXT
+
+I already have a darts stream overlay built into my tournament/scoring software. The overlay is used in OBS as a browser source URL.
+
+The main overlay already shows:
+- match format (example: First to 7)
+- player names
+- sets
+- legs
+- remaining score
+- active player indicator
+
+I now want to add a PDC-style suggested checkout panel that slides out from behind the scoreboard overlay and shows the recommended finish for the ACTIVE player only.
+
+GOAL
+
+Build a red “Suggested Checkout” panel that:
+- only appears when the active player has a finish available
+- uses standard professional checkout routes
+- updates live as the scorer updates the score
+- slides out smoothly from behind the main scoreboard
+- hides when there is no available checkout
+
+VISUAL BEHAVIOUR
+
+The checkout panel should:
+- appear as a red box/panel attached to the side of the existing scoreboard
+- look like a professional TV darts broadcast graphic
+- slide out from behind the scoreboard, not pop in abruptly
+- use white bold text
+- be clean and readable at 1920x1080 in OBS
+- show each suggested dart clearly, for example:
+
+T20   T20   Bull
+
+or
+
+T20   T11   D14
+
+or
+
+D20
+
+ANIMATION REQUIREMENTS
+
+Use a smooth slide animation:
+- hidden state = panel sits behind the side of the scoreboard
+- visible state = panel slides outward
+- use CSS transform / translateX
+- duration around 250ms to 350ms
+- no flicker, no reflow jump, no flashing
+- panel should remain mounted if that makes animation smoother
+
+LOGIC REQUIREMENTS
+
+Only show the checkout for the ACTIVE player.
+
+Logic should be:
+1. detect active player
+2. read that player’s remaining score
+3. look up that score in a checkout table
+4. if a checkout exists, show the panel with the suggested route
+5. if no checkout exists, hide the panel
+
+Important:
+- only show if the score is 170 or below and is a valid finish
+- do not show for scores above 170
+- do not show for impossible checkout numbers like 169, 168, 166, 165, 163, 162, 159
+- do not show if score is less than 2
+- update instantly whenever the score changes
+- if player busts or score changes, the suggested checkout must change immediately
+- if turn changes, update to the new active player’s score
+
+DART NOTATION RULES
+
+Use standard darts notation:
+- T20 = treble 20
+- D20 = double 20
+- Bull = bullseye / 50
+- 25 = outer bull if needed
+- single numbers should appear as plain numbers, for example 20, 18, 10, 9, 6 etc.
+
+DATA SOURCE
+
+Use the following checkout table as the source of truth. Create it as a constant lookup object in the frontend or shared overlay utility.
+
+Use exactly these standard suggested checkout routes:
+
+const CHECKOUT_TABLE = {
+  170: ["T20", "T20", "Bull"],
+  167: ["T20", "T19", "Bull"],
+  164: ["T20", "T18", "Bull"],
+  161: ["T20", "T17", "Bull"],
+  160: ["T20", "T20", "D20"],
+  158: ["T20", "T20", "D19"],
+  157: ["T20", "T19", "D20"],
+  156: ["T20", "T20", "D18"],
+  155: ["T20", "T19", "D19"],
+  154: ["T20", "T18", "D20"],
+  153: ["T20", "T19", "D18"],
+  152: ["T20", "T20", "D16"],
+  151: ["T20", "T17", "D20"],
+  150: ["T20", "T18", "D18"],
+  149: ["T20", "T19", "D16"],
+  148: ["T20", "T16", "D20"],
+  147: ["T20", "T17", "D18"],
+  146: ["T20", "T18", "D16"],
+  145: ["T20", "T15", "D20"],
+  144: ["T20", "T20", "D12"],
+  143: ["T20", "T17", "D16"],
+  142: ["T20", "T14", "D20"],
+  141: ["T20", "T15", "D18"],
+  140: ["T20", "T20", "D10"],
+  139: ["T20", "T19", "D11"],
+  138: ["T20", "T18", "D12"],
+  137: ["T20", "T19", "D10"],
+  136: ["T20", "T20", "D8"],
+  135: ["Bull", "T15", "D20"],
+  134: ["T20", "T14", "D16"],
+  133: ["T20", "T19", "D8"],
+  132: ["Bull", "T14", "D20"],
+  131: ["T20", "T13", "D16"],
+  130: ["T20", "20", "Bull"],
+  129: ["T19", "T16", "D12"],
+  128: ["T18", "T14", "D16"],
+  127: ["T20", "T17", "D8"],
+  126: ["T19", "T19", "Bull"],
+  125: ["25", "T20", "D20"],
+  124: ["T20", "T14", "D11"],
+  123: ["T19", "T16", "D9"],
+  122: ["T18", "T20", "D4"],
+  121: ["T20", "T11", "D14"],
+  120: ["T20", "20", "D20"],
+  119: ["T19", "T12", "D13"],
+  118: ["T20", "18", "D20"],
+  117: ["T20", "17", "D20"],
+  116: ["T20", "16", "D20"],
+  115: ["T20", "15", "D20"],
+  114: ["T18", "20", "D20"],
+  113: ["T19", "16", "D20"],
+  112: ["T20", "12", "D20"],
+  111: ["T20", "11", "D20"],
+  110: ["T20", "10", "D20"],
+  109: ["T20", "9", "D20"],
+  108: ["T18", "14", "D20"],
+  107: ["T19", "10", "D20"],
+  106: ["T20", "14", "D16"],
+  105: ["T20", "13", "D16"],
+  104: ["T19", "15", "D16"],
+  103: ["T19", "10", "D18"],
+  102: ["T20", "10", "D16"],
+  101: ["T20", "9", "D16"],
+  100: ["T20", "D20"],
+  99: ["T19", "10", "D16"],
+  98: ["T20", "D19"],
+  97: ["T19", "D20"],
+  96: ["T20", "D18"],
+  95: ["T19", "D19"],
+  94: ["T18", "D20"],
+  93: ["T19", "D18"],
+  92: ["T20", "D16"],
+  91: ["T17", "D20"],
+  90: ["T20", "D15"],
+  89: ["T19", "D16"],
+  88: ["T16", "D20"],
+  87: ["T17", "D18"],
+  86: ["T18", "D16"],
+  85: ["T15", "D20"],
+  84: ["T20", "D12"],
+  83: ["T17", "D16"],
+  82: ["Bull", "D16"],
+  81: ["T19", "D12"],
+  80: ["T20", "D10"],
+  79: ["T19", "D11"],
+  78: ["T18", "D12"],
+  77: ["T19", "D10"],
+  76: ["T20", "D8"],
+  75: ["T17", "D12"],
+  74: ["T14", "D16"],
+  73: ["T19", "D8"],
+  72: ["T16", "D12"],
+  71: ["T13", "D16"],
+  70: ["T18", "D8"],
+  69: ["T19", "D6"],
+  68: ["T20", "D4"],
+  67: ["T17", "D8"],
+  66: ["T10", "D18"],
+  65: ["25", "D20"],
+  64: ["T16", "D8"],
+  63: ["T13", "D12"],
+  62: ["T10", "D16"],
+  61: ["T15", "D8"],
+  60: ["20", "D20"],
+  59: ["19", "D20"],
+  58: ["18", "D20"],
+  57: ["17", "D20"],
+  56: ["16", "D20"],
+  55: ["15", "D20"],
+  54: ["14", "D20"],
+  53: ["13", "D20"],
+  52: ["20", "D16"],
+  51: ["19", "D16"],
+  50: ["10", "D20"],
+  49: ["9", "D20"],
+  48: ["16", "D16"],
+  47: ["15", "D16"],
+  46: ["14", "D16"],
+  45: ["13", "D16"],
+  44: ["12", "D16"],
+  43: ["11", "D16"],
+  42: ["10", "D16"],
+  41: ["9", "D16"],
+  40: ["D20"],
+  39: ["7", "D16"],
+  38: ["D19"],
+  37: ["5", "D16"],
+  36: ["D18"],
+  35: ["3", "D16"],
+  34: ["D17"],
+  33: ["1", "D16"],
+  32: ["D16"],
+  31: ["15", "D8"],
+  30: ["D15"],
+  29: ["13", "D8"],
+  28: ["D14"],
+  27: ["11", "D8"],
+  26: ["D13"],
+  25: ["9", "D8"],
+  24: ["D12"],
+  23: ["7", "D8"],
+  22: ["D11"],
+  21: ["5", "D8"],
+  20: ["D10"],
+  19: ["3", "D8"],
+  18: ["D9"],
+  17: ["1", "D8"],
+  16: ["D8"],
+  15: ["7", "D4"],
+  14: ["D7"],
+  13: ["5", "D4"],
+  12: ["D6"],
+  11: ["3", "D4"],
+  10: ["D5"],
+  9: ["1", "D4"],
+  8: ["D4"],
+  7: ["3", "D2"],
+  6: ["D3"],
+  5: ["1", "D2"],
+  4: ["D2"],
+  3: ["1", "D1"],
+  2: ["D1"]
+};
+
+IMPORTANT FINISH RULES
+
+A valid visible checkout should only be shown when:
+- score is between 2 and 170
+- the score exists in CHECKOUT_TABLE
+- the player is currently throwing / active
+
+Hide the panel for:
+- score > 170
+- score < 2
+- score values not present in the checkout table
+- inactive player
+
+COMPONENT REQUIREMENTS
+
+Please implement this as a reusable component for my existing overlay.
+
+Suggested structure:
+- a CheckoutSuggestion component
+- receives props like:
+  - score
+  - visible
+  - playerName optional
+  - side optional (left or right)
+- reads the suggestion from CHECKOUT_TABLE
+- renders null or hidden state when there is no valid finish
+- animates between hidden and visible states
+
+Example prop shape:
+<CheckoutSuggestion
+  score={activePlayerScore}
+  visible={hasCheckout}
+  side="right"
+/>
+
+STYLE REQUIREMENTS
+
+Make it look broadcast quality:
+- strong red background
+- white text
+- bold sans-serif font
+- rounded corners only if it suits the existing overlay style
+- spacing between darts should be clean and balanced
+- panel height should visually match the overlay
+- each dart can be its own inline box or evenly spaced text item
+- final dart (usually a double or Bull) should be visually emphasized slightly
+
+For example:
+- slightly brighter box
+- slightly heavier font
+- underline not needed
+- no excessive effects
+
+IMPLEMENTATION REQUIREMENTS
+
+Please:
+1. add the checkout table
+2. build the checkout suggestion component
+3. integrate it into the existing overlay layout
+4. make it attach visually to the side of the current scoreboard
+5. make it update automatically based on the active player’s current score
+6. keep the current overlay functionality intact
+7. do not break OBS browser source compatibility
+8. use the existing frontend framework and styling conventions already used in the project
+9. keep the code clean and production-ready
+10. ensure the background outside the overlay remains transparent for OBS
+
+IF THE PROJECT USES REACT
+
+Use React and the project’s existing styling approach.
+Prefer:
+- a dedicated constants file for CHECKOUT_TABLE if appropriate
+- a dedicated component file for CheckoutSuggestion
+- simple helper function like getCheckoutSuggestion(score)
+
+HELPER FUNCTION
+
+Create a helper like:
+
+function getCheckoutSuggestion(score: number): string[] | null {
+  return CHECKOUT_TABLE[score] ?? null;
+}
+
+And visibility logic like:
+
+function hasValidCheckout(score: number): boolean {
+  return score >= 2 && score <= 170 && !!CHECKOUT_TABLE[score];
+}
+
+INTEGRATION BEHAVIOUR
+
+The component should be driven by the active player state already used in the overlay.
+
+Example logic:
+- determine active player
+- get active player remaining score
+- const suggestion = getCheckoutSuggestion(activePlayerScore)
+- show panel if suggestion exists
+
+If there are two player rows on the overlay and the active player indicator already exists, use the same active-player source of truth for the checkout panel.
+
+QUALITY BAR
+
+This needs to look like a polished televised darts overlay, not a generic tooltip or badge.
+
+Please implement the full feature directly in the correct files, with any new helper/constants/component files needed, and wire it into the current overlay so it works end-to-end.
