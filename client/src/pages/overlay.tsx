@@ -226,17 +226,26 @@ export default function OverlayPage() {
   // Secondary poll — starts when the primary match completes and a next match exists.
   const nextMatchId = data?.nextMatchId ?? null;
 
-  // Reset committed flag whenever the next match ID changes (overlay has moved on).
+  // When nextMatchId changes to a new non-null value, reset the commitment so
+  // we wait for bull selection in the new match before switching the display.
+  // When nextMatchId goes null (next match just finished, no new one yet) we
+  // intentionally keep nextData and committedToNext intact so the winner screen
+  // of the just-completed match stays visible.
   useEffect(() => {
-    if (nextMatchId !== prevNextMatchIdRef.current) {
-      prevNextMatchIdRef.current = nextMatchId;
+    const prev = prevNextMatchIdRef.current;
+    prevNextMatchIdRef.current = nextMatchId;
+    if (nextMatchId !== null && nextMatchId !== prev) {
+      // Moved to a brand-new next match — reset commitment and clear stale data.
       setCommittedToNext(false);
-      if (!nextMatchId) setNextData(null);
+      setNextData(null);
     }
+    // If nextMatchId went null: do nothing — preserve the last winner screen.
   }, [nextMatchId]);
 
   useEffect(() => {
-    if (!nextMatchId) { setNextData(null); return; }
+    // Stop polling when there is no next match, but do NOT clear nextData so
+    // the winner of the last polled match stays on screen.
+    if (!nextMatchId) return;
     const fetchNext = async () => {
       try {
         const res = await fetch(`/api/matches/${nextMatchId}/live`);
