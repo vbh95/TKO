@@ -292,6 +292,13 @@ export default function TournamentDetail() {
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isRecalcConfirmOpen, setIsRecalcConfirmOpen] = useState(false);
   const [resetMatchTarget, setResetMatchTarget] = useState<any>(null);
+  const [pendingBoardAssign, setPendingBoardAssign] = useState<{
+    matchId: number;
+    boardNumber: number | null;
+    playerAName: string;
+    playerBName: string;
+    groupName: string;
+  } | null>(null);
   const [editingKnockoutMatchId, setEditingKnockoutMatchId] = useState<number | null>(null);
   const [liveScorings, setLiveScorings] = useState<Map<number, {
     matchId: number;
@@ -755,7 +762,14 @@ export default function TournamentDetail() {
                                         value={match.boardNumber ? String(match.boardNumber) : "default"}
                                         onValueChange={(val) => {
                                           const bn = val === "default" ? null : parseInt(val);
-                                          handleAssignBoard(match.id, bn);
+                                          const gName = groups.find((g: any) => g.id === match.groupId)?.name || 'Group';
+                                          setPendingBoardAssign({
+                                            matchId: match.id,
+                                            boardNumber: bn,
+                                            playerAName: playerA?.name || 'TBD',
+                                            playerBName: playerB?.name || 'TBD',
+                                            groupName: gName,
+                                          });
                                         }}
                                       >
                                         <SelectTrigger
@@ -1628,6 +1642,37 @@ export default function TournamentDetail() {
                 data-testid="button-confirm-reset-match"
               >
                 Reset Match
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!pendingBoardAssign} onOpenChange={(open) => !open && setPendingBoardAssign(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {pendingBoardAssign?.boardNumber
+                  ? `Send match to Board ${pendingBoardAssign.boardNumber}`
+                  : "Clear board assignment"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingBoardAssign?.boardNumber
+                  ? `${pendingBoardAssign?.playerAName} vs ${pendingBoardAssign?.playerBName} (${pendingBoardAssign?.groupName}) will be queued as the next match on Board ${pendingBoardAssign.boardNumber}'s scorer tablet.`
+                  : `${pendingBoardAssign?.playerAName} vs ${pendingBoardAssign?.playerBName} (${pendingBoardAssign?.groupName}) will return to its default board.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-board-assign">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (pendingBoardAssign) {
+                    handleAssignBoard(pendingBoardAssign.matchId, pendingBoardAssign.boardNumber);
+                  }
+                  setPendingBoardAssign(null);
+                }}
+                data-testid="button-confirm-board-assign"
+              >
+                Confirm
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -1187,7 +1187,15 @@ export default function ScorerPage() {
   const ptsLoss = (tournament.settings as any)?.pointsForLoss ?? 0;
 
   const completedMatches = matches.filter(m => m.status === 'COMPLETED');
-  const pendingMatches = matches.filter(m => m.status === 'PENDING' && m.playerAId && m.playerBId);
+  const pendingMatches = matches
+    .filter(m => m.status === 'PENDING' && m.playerAId && m.playerBId)
+    .sort((a, b) => {
+      const aIsGuest = a.groupId != null && a.groupId !== group.id && typeof a.boardNumber === 'number';
+      const bIsGuest = b.groupId != null && b.groupId !== group.id && typeof b.boardNumber === 'number';
+      if (aIsGuest && !bIsGuest) return -1;
+      if (!aIsGuest && bIsGuest) return 1;
+      return 0;
+    });
   const waitingMatches = matches.filter(m => m.status === 'PENDING' && (!m.playerAId || !m.playerBId));
   const inProgressMatch = matches.find(m => m.status === 'IN_PROGRESS');
 
