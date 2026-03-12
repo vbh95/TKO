@@ -1942,6 +1942,19 @@ export async function registerRoutes(
 
       if (match.status !== 'IN_PROGRESS') {
         if (match.status === 'COMPLETED' && match.scoreA === scoreA && match.scoreB === scoreB) {
+          if (req.body.notes) {
+            try {
+              const noteValues = Object.fromEntries(
+                Object.entries(req.body.notes).filter(([, v]: [string, any]) => v !== undefined)
+              );
+              if (Object.keys(noteValues).length > 0) {
+                await storage.updateMatchNote(matchId, noteValues);
+                console.log(`[NOTES] Saved notes for already-completed match ${matchId} on idempotent retry`);
+              }
+            } catch (noteError) {
+              console.error(`[NOTES ERROR] Failed to save notes for match ${matchId} on idempotent retry:`, noteError);
+            }
+          }
           return res.json(match);
         }
         return res.status(400).json({ message: "Match must be IN_PROGRESS to update scores" });
@@ -1972,13 +1985,14 @@ export async function registerRoutes(
       if (req.body.notes) {
         try {
           const noteValues = Object.fromEntries(
-            Object.entries(req.body.notes).filter(([, v]) => v !== undefined)
+            Object.entries(req.body.notes).filter(([, v]: [string, any]) => v !== undefined)
           );
           if (Object.keys(noteValues).length > 0) {
             await storage.updateMatchNote(matchId, noteValues);
+            console.log(`[NOTES] Saved notes for match ${matchId} (status: ${status})`);
           }
         } catch (noteError) {
-          console.error("Match note save error (non-fatal):", noteError);
+          console.error(`[NOTES ERROR] Failed to save notes for match ${matchId}:`, noteError);
         }
       }
 
