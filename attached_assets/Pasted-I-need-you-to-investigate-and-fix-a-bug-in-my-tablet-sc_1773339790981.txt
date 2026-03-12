@@ -1,0 +1,99 @@
+I need you to investigate and fix a bug in my tablet scorer without breaking any other scoring, match, stats, overlay, or database functionality.
+
+CONTEXT
+- This is a problem with the darts scoring system.
+- The problem is in the tablet scorer and/or the data it sends back to the main site/database.
+- A completed leg produced clearly incorrect 3-dart averages in the saved stats.
+
+Example bad stats from one game:
+- Hallam: 60 darts thrown, displayed 3-dart average = 150.3
+- Brayden: 57 darts thrown, displayed 3-dart average = 138.2
+- Other stats shown:
+  - Hallam checkout % = 40.0%
+  - Highest finish = 20
+  - Highest visit = 104
+  - 180s = 0
+  - 140+ = 0
+  - 100+ = 3
+  - Brayden highest visit = 100
+  - Brayden 100+ = 2
+
+These averages are obviously wrong for a standard 501 leg. The issue is likely that the scorer is calculating 3-dart average from the wrong value, or sending the wrong stat field back to the server.
+
+EXPECTED LOGIC
+For 501:
+- Winner 3-dart average = (pointsScored / dartsThrown) * 3
+- If winner checked out from 501, then pointsScored should usually be 501
+- Losing player 3-dart average = ((startingScore - remainingScore) / dartsThrown) * 3
+- The calculation must use DARTS THROWN, not visits, rounds, turns, or any already-multiplied value
+- Bust logic must remain consistent with however dartsThrown is already intended to work in this app
+
+IMPORTANT
+I do NOT want a broad rewrite.
+I want a minimal, safe fix.
+Do not change UI styling unless absolutely necessary.
+Do not refactor unrelated files.
+Do not change database schema unless absolutely necessary.
+Preserve all existing functionality outside this bug fix.
+
+YOUR TASK
+1. Trace exactly where the tablet scorer calculates, stores, and sends player stats for a leg/match.
+2. Find the source of the incorrect 3-dart average.
+3. Confirm whether the bug is caused by:
+   - using the wrong score variable,
+   - using visits instead of darts,
+   - multiplying by 3 more than once,
+   - counting bust darts inconsistently,
+   - or sending the wrong field to the backend/site.
+4. Apply the smallest possible fix.
+5. Check all connected code paths so the fix does not break:
+   - leg completion
+   - match completion
+   - stat saving
+   - stats rendering on the site
+   - overlay consumption of stats
+   - checkout stats
+   - highest finish / highest visit / 100+ / 140+ / 180 tracking
+6. Add a brief code comment near the fix explaining the correct 3-dart average formula.
+7. After the fix, give me a short summary of:
+   - root cause
+   - files changed
+   - exact formula now used
+   - any assumptions about bust darts or unfinished legs
+
+SAFE DEBUGGING STEPS
+- Search for terms like:
+  - threeDartAverage
+  - average
+  - avg
+  - dartsThrown
+  - turns
+  - visits
+  - rounds
+  - remainingScore
+  - scoreLeft
+  - playerStats
+  - matchStats
+  - submitStats
+  - saveMatchResult
+- If the average is being computed in more than one place, make them consistent and avoid duplicate/conflicting calculations.
+- Prefer deriving average from canonical values:
+  - startingScore
+  - remainingScore
+  - dartsThrown
+  - or a clearly correct accumulated pointsScored value
+- If possible, centralize only the average calculation into one safe helper without large refactors.
+
+VALIDATION
+Before finishing, verify against this example:
+- If a player finishes 501 in 60 darts, average should be 25.05 (or 25.1 if rounded to 1 decimal)
+- If a player scored 481 in 57 darts, average should be 25.32 (or 25.3 if rounded to 1 decimal)
+
+DELIVERABLE
+Make the fix directly in the codebase and then show me:
+1. what was wrong,
+2. what you changed,
+3. why the new logic is correct,
+4. any remaining edge cases I should know about.
+
+Do not ask me repeated follow-up questions unless absolutely necessary. Investigate the existing codebase and make the safest fix possible.
