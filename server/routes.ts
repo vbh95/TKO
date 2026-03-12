@@ -169,23 +169,14 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     );
   };
 
-  if (!isGroupFullyComplete(completedGroupId)) return;
-
-  const standings = calcGroupStandings(completedGroupId);
-  if (standings.length < 2) return;
-
   const groupCount = groupsList.length;
   type Pairing = { aGroupIdx: number; aPos: number; bGroupIdx: number; bPos: number };
   const pairings: Pairing[] = [];
   
   if (groupCount === 4) {
-    // QF1 - 1st Group A vs 2nd Group B
     pairings.push({ aGroupIdx: 0, aPos: 0, bGroupIdx: 1, bPos: 1 });
-    // QF2 - 2nd Group C vs 1st Group D
     pairings.push({ aGroupIdx: 2, aPos: 1, bGroupIdx: 3, bPos: 0 });
-    // QF3 - 1st Group C vs 2nd Group D
     pairings.push({ aGroupIdx: 2, aPos: 0, bGroupIdx: 3, bPos: 1 });
-    // QF4 - 2nd Group A vs 1st Group B
     pairings.push({ aGroupIdx: 0, aPos: 1, bGroupIdx: 1, bPos: 0 });
   } else {
     for (let i = 0; i < groupCount; i += 2) {
@@ -202,6 +193,52 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
       }
     }
   }
+
+  const groupComplete = isGroupFullyComplete(completedGroupId);
+
+  if (!groupComplete) {
+    const updatedQFIds: number[] = [];
+    for (let i = 0; i < firstRoundMatches.length && i < pairings.length; i++) {
+      const pairing = pairings[i];
+      const km = firstRoundMatches[i];
+      if (km.status !== 'PENDING') continue;
+      const clearUpdates: any = {};
+      let needsClear = false;
+      if (pairing.aGroupIdx === completedGroupIdx && km.playerAId !== null) {
+        clearUpdates.playerAId = null;
+        needsClear = true;
+      }
+      if (pairing.bGroupIdx === completedGroupIdx && km.playerBId !== null) {
+        clearUpdates.playerBId = null;
+        needsClear = true;
+      }
+      if (needsClear) {
+        clearUpdates.boardNumber = null;
+        await storage.updateMatch(km.id, clearUpdates);
+        updatedQFIds.push(km.id);
+      }
+    }
+    if (updatedQFIds.length > 0) {
+      try {
+        const updatedKnockouts = await storage.getMatchesByTournamentId(tournamentId);
+        const koMatches = updatedKnockouts.filter(m => m.stage === 'KNOCKOUT');
+        const boardsToNotify = new Set<number>();
+        for (const km of koMatches) {
+          emitMatchUpdate(tournamentId, shareToken, km);
+          if ((km as any).boardNumber) {
+            boardsToNotify.add((km as any).boardNumber);
+          }
+        }
+        Array.from(boardsToNotify).forEach(bn => {
+          emitBoardMatchUpdate(tournamentId, bn, { type: 'knockout_update' });
+        });
+      } catch {}
+    }
+    return;
+  }
+
+  const standings = calcGroupStandings(completedGroupId);
+  if (standings.length < 2) return;
 
   const updatedQFIds: number[] = [];
   for (let i = 0; i < firstRoundMatches.length && i < pairings.length; i++) {
