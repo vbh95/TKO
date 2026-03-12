@@ -2479,7 +2479,8 @@ export async function registerRoutes(
             const checkoutAttempts = isA ? note.checkoutAttemptsA : note.checkoutAttemptsB;
             const checkoutSuccess = isA ? note.checkoutSuccessA : note.checkoutSuccessB;
             stats = {
-              threeDartAvg: totalVisits > 0 ? ((totalScored / totalVisits) * 3).toFixed(1) : null,
+              // 3-dart avg = totalScored / totalVisits (each visit = 3 darts, so no extra *3 needed)
+              threeDartAvg: totalVisits > 0 ? (totalScored / totalVisits).toFixed(1) : null,
               checkoutPct: checkoutAttempts > 0 ? ((checkoutSuccess / checkoutAttempts) * 100).toFixed(1) : null,
               highestFinish: isA ? note.highestFinishA : note.highestFinishB,
               highestVisit: isA ? note.highestVisitA : note.highestVisitB,
@@ -2591,7 +2592,8 @@ export async function registerRoutes(
             const checkoutAttempts = isA ? note.checkoutAttemptsA : note.checkoutAttemptsB;
             const checkoutSuccess = isA ? note.checkoutSuccessA : note.checkoutSuccessB;
             stats = {
-              threeDartAvg: totalVisits > 0 ? ((totalScored / totalVisits) * 3).toFixed(1) : null,
+              // 3-dart avg = totalScored / totalVisits (each visit = 3 darts, so no extra *3 needed)
+              threeDartAvg: totalVisits > 0 ? (totalScored / totalVisits).toFixed(1) : null,
               checkoutPct: checkoutAttempts > 0 ? ((checkoutSuccess / checkoutAttempts) * 100).toFixed(1) : null,
               highestFinish: isA ? note.highestFinishA : note.highestFinishB,
               highestVisit: isA ? note.highestVisitA : note.highestVisitB,

@@ -68,8 +68,9 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
     }
   };
 
-  const threeDartAvgA = notes?.totalVisitsA > 0 ? ((notes.totalScoredA / notes.totalVisitsA) * 3).toFixed(1) : '-';
-  const threeDartAvgB = notes?.totalVisitsB > 0 ? ((notes.totalScoredB / notes.totalVisitsB) * 3).toFixed(1) : '-';
+  // 3-dart avg = totalScored / totalVisits (each visit = 3 darts, so no extra *3 needed)
+  const threeDartAvgA = notes?.totalVisitsA > 0 ? (notes.totalScoredA / notes.totalVisitsA).toFixed(1) : '-';
+  const threeDartAvgB = notes?.totalVisitsB > 0 ? (notes.totalScoredB / notes.totalVisitsB).toFixed(1) : '-';
   const checkoutPctA = notes?.checkoutAttemptsA > 0 ? ((notes.checkoutSuccessA / notes.checkoutAttemptsA) * 100).toFixed(1) + '%' : '-';
   const checkoutPctB = notes?.checkoutAttemptsB > 0 ? ((notes.checkoutSuccessB / notes.checkoutAttemptsB) * 100).toFixed(1) + '%' : '-';
 
@@ -215,8 +216,9 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
     }
   };
 
-  const threeDartAvgA = notes?.totalVisitsA > 0 ? ((notes.totalScoredA / notes.totalVisitsA) * 3).toFixed(1) : '-';
-  const threeDartAvgB = notes?.totalVisitsB > 0 ? ((notes.totalScoredB / notes.totalVisitsB) * 3).toFixed(1) : '-';
+  // 3-dart avg = totalScored / totalVisits (each visit = 3 darts, so no extra *3 needed)
+  const threeDartAvgA = notes?.totalVisitsA > 0 ? (notes.totalScoredA / notes.totalVisitsA).toFixed(1) : '-';
+  const threeDartAvgB = notes?.totalVisitsB > 0 ? (notes.totalScoredB / notes.totalVisitsB).toFixed(1) : '-';
   const checkoutPctA = notes?.checkoutAttemptsA > 0 ? ((notes.checkoutSuccessA / notes.checkoutAttemptsA) * 100).toFixed(1) + '%' : '-';
   const checkoutPctB = notes?.checkoutAttemptsB > 0 ? ((notes.checkoutSuccessB / notes.checkoutAttemptsB) * 100).toFixed(1) + '%' : '-';
   const statRows = notes ? [
