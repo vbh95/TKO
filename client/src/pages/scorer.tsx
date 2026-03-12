@@ -810,7 +810,7 @@ export default function ScorerPage() {
     saveScorerState(state);
   }, [activeMatchId, remainingA, remainingB, currentThrower, legsWonA, legsWonB, legVisits, allMatchVisits, legStartingThrower, swapPlayers]);
 
-  const emitLiveState = useCallback((rA: number, rB: number, thrower: 'A' | 'B', lA: number, lB: number, visits?: Visit[], lstOverride?: 'A' | 'B') => {
+  const emitLiveState = useCallback((rA: number, rB: number, thrower: 'A' | 'B', lA: number, lB: number, visits?: Visit[], lstOverride?: 'A' | 'B', lastLegResult?: { winnerName: string; checkout: number; checkoutDarts: number }) => {
     const activeM = data?.matches.find(m => m.id === activeMatchId);
     const pA = activeM ? data?.players.find(p => p.id === activeM.playerAId) : null;
     const pB = activeM ? data?.players.find(p => p.id === activeM.playerBId) : null;
@@ -833,6 +833,7 @@ export default function ScorerPage() {
       lastScoreA: vA.length > 0 ? vA[vA.length - 1].score : null,
       lastScoreB: vB.length > 0 ? vB[vB.length - 1].score : null,
       legStartingThrower: lstOverride ?? legStartingThrower,
+      lastLegResult: lastLegResult ?? null,
     });
   }, [activeMatchId, data, legVisits, legStartingThrower]);
 
@@ -938,12 +939,19 @@ export default function ScorerPage() {
     setLegsWonA(newLegsA);
     setLegsWonB(newLegsB);
 
+    const legWinnerName = isPlayerA
+      ? (data?.players.find(p => p.id === activeM.playerAId)?.name || 'Player A')
+      : (data?.players.find(p => p.id === activeM.playerBId)?.name || 'Player B');
+
     emitLiveState(
       isPlayerA ? 0 : remainingA,
       !isPlayerA ? 0 : remainingB,
       player,
       newLegsA,
       newLegsB,
+      undefined,
+      undefined,
+      { winnerName: legWinnerName, checkout: checkoutScore, checkoutDarts: dartsAtDouble },
     );
 
     const allVisitsIncludingCurrent = [...allMatchVisits, ...newVisits];

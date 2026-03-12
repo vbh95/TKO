@@ -1,0 +1,118 @@
+I want to enhance the LIVE match display in both:
+1. the admin panel live matches view
+2. the public live matches page
+
+NEW BEHAVIOUR REQUIRED
+When a leg is completed, the live display for that match should temporarily show:
+- the name of the player who won the leg
+- the checkout value
+- the number of darts used on the checkout
+
+This temporary leg-win display should remain visible until:
+- the next score is entered from the tablet scorer for that same match
+OR
+- the next game/match begins on that board/tablet
+
+After that, the live display should return to the normal live match view/state automatically.
+
+EXAMPLES
+If Hallam wins a leg by taking out 72 in 2 darts, the live display should show something like:
+- Leg won: Hallam
+- Checkout: 72
+- Darts used: 2
+
+or a compact equivalent such as:
+- Hallam won leg
+- CO 72 (2 darts)
+
+IMPORTANT SCOPE
+- This is for the live display only
+- It must appear in both the admin live view and the public live page
+- It should be tied to the current live match/board state
+- It should not overwrite historical match stats
+- It should not permanently replace the normal live score display
+- It should only persist until the next score is input or the next game starts
+
+IMPLEMENTATION GOAL
+Add a temporary “last completed leg result” state to the live match data flow.
+
+REQUIRED LOGIC
+When a leg ends:
+- capture and store temporary live-display data for that match/board:
+  - legWinnerName
+  - checkoutValue
+  - checkoutDartsUsed
+  - legCompletedAt or equivalent timestamp/state marker if useful
+
+Keep showing that temporary leg result in the live display until either:
+1. a new score is submitted from the tablet scorer for the same ongoing match
+   - then clear the temporary leg result and resume normal live display
+2. a new match/game begins on that board/tablet
+   - then clear/reset the temporary leg result
+
+IMPORTANT
+- Do NOT make this disappear immediately after leg completion
+- Do NOT require a page refresh to update
+- Do NOT break existing live score updates
+- Do NOT break match completion logic
+- Do NOT break overlays or completed-match stats
+- Do NOT do a broad refactor unless absolutely necessary
+- Keep the change minimal and safe
+
+WHAT TO TRACE
+Please inspect:
+- where live match state is stored and broadcast/rendered
+- where a leg win is detected
+- where checkout value is already tracked
+- where darts used on the winning visit / checkout is already known
+- how the live admin panel subscribes to and renders updates
+- how the public live page subscribes to and renders updates
+- where new score input events arrive from tablet scoring
+- where new match/game start state is created/reset
+
+PREFERRED APPROACH
+- Extend the live match state with a temporary field, for example:
+  - lastLegResult: {
+      winnerName,
+      checkout,
+      checkoutDartsUsed
+    }
+- Set it immediately when a leg completes
+- Clear it on the next score input for that same match OR when the next game starts
+- Render it in both live match UIs in a small, clear way consistent with the existing design
+
+DISPLAY REQUIREMENTS
+- Show it clearly but without redesigning the whole live panel
+- Keep styling consistent with the existing UI
+- It should be obvious that it refers to the most recently completed leg
+- Good wording examples:
+  - Leg Winner: Hallam
+  - Checkout: 72
+  - Checkout Darts: 2
+or a more compact equivalent if that suits the existing layout better
+
+EDGE CASES
+- If a leg ends and then the whole match also ends, ensure the behaviour still makes sense in the live display
+- If there is no valid checkout value or darts-used value, fail safely and do not break the panel
+- If the same live match state is consumed in multiple places, do not duplicate conflicting logic
+- If there are multiple boards/matches live, the temporary display must be isolated to the correct one
+
+VALIDATION
+Before finishing, verify:
+1. after leg completion, both admin and public live views show the leg winner + checkout + checkout darts
+2. it stays visible without needing refresh
+3. it remains until the next score input for that same match
+4. it also clears when the next game starts
+5. normal live scoring resumes correctly afterward
+6. completed-match stats and existing live data are unchanged
+
+DELIVERABLE
+Make the change directly in the codebase, then tell me:
+1. which files were changed
+2. how the temporary leg-result state is stored
+3. what event clears it
+4. where it is rendered
+5. confirmation that both admin and public live pages now show it correctly
+
+IMPORTANT
+Make this a minimal, safe change only. Avoid unrelated edits and avoid large refactors.

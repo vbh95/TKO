@@ -1041,6 +1041,17 @@ export default function TournamentDetail() {
                     <CardContent className="pt-3 pb-4 px-4 space-y-3">
                       {live ? (
                         <>
+                          {live.lastLegResult && (
+                            <div className="rounded-lg bg-primary/10 border border-primary/30 px-3 py-2 text-center">
+                              <p className="text-xs font-bold uppercase tracking-wider text-primary mb-0.5">Leg Won</p>
+                              <p className="text-sm font-black truncate">{live.lastLegResult.winnerName}</p>
+                              {live.lastLegResult.checkout > 0 && (
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  CO {live.lastLegResult.checkout} &middot; {live.lastLegResult.checkoutDarts} dart{live.lastLegResult.checkoutDarts !== 1 ? 's' : ''}
+                                </p>
+                              )}
+                            </div>
+                          )}
                           <div className="grid grid-cols-2 gap-2">
                             <div className={cn("rounded-lg p-3 transition-all", live.currentThrower === 'A' ? "bg-red-600/15 ring-2 ring-red-500/50" : "bg-green-600/15 ring-2 ring-green-500/50")}>
                               <div className="h-3.5 mb-0.5">

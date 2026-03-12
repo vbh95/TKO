@@ -35,6 +35,7 @@ interface LiveScoring {
   dartsB: number;
   lastScoreA: number | null;
   lastScoreB: number | null;
+  lastLegResult?: { winnerName: string; checkout: number; checkoutDarts: number } | null;
 }
 
 function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: {
@@ -390,6 +391,17 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel, hideScorer }:
       <CardContent className="pt-3 pb-4 px-4">
         {ls ? (
           <div>
+            {ls.lastLegResult && (
+              <div className="mb-3 rounded-lg bg-primary/10 border border-primary/30 px-3 py-2 text-center">
+                <p className="text-xs font-bold uppercase tracking-wider text-primary mb-0.5">Leg Won</p>
+                <p className="text-sm font-black truncate">{ls.lastLegResult.winnerName}</p>
+                {ls.lastLegResult.checkout > 0 && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    CO {ls.lastLegResult.checkout} &middot; {ls.lastLegResult.checkoutDarts} dart{ls.lastLegResult.checkoutDarts !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div
                 className={cn(
