@@ -407,7 +407,7 @@ export default function TournamentDetail() {
   const { tournament, players, matches, groups, groupMemberships = [], ownerName = '', isOwner = true, isCollaborator = false } = data as any;
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}/public/league/${tournament.shareToken}`;
+    const url = `${window.location.origin}/public/t/${tournament.shareToken}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
