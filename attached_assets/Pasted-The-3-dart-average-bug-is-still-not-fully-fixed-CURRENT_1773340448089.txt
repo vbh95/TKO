@@ -1,0 +1,90 @@
+The 3-dart average bug is still not fully fixed.
+
+CURRENT PROBLEM
+After your previous fix, the averages changed from impossible 150+ values to:
+
+- Hallam: 50.1 average, 60 darts thrown
+- Brayden: 46.1 average, 57 darts thrown
+
+These are still wrong for a standard 501 leg.
+
+IMPORTANT CLUE
+For Hallam:
+- 50.1 avg over 60 darts implies:
+  (50.1 / 3) * 60 = 1002 points
+- 1002 is exactly DOUBLE 501
+
+This strongly suggests the current code is now double-counting the scored points for at least one player, or calculating the average from a value that has already been aggregated once before.
+
+GOAL
+Find and fix the remaining duplication/double-counting issue without breaking anything else.
+
+INSTRUCTIONS
+1. Trace the full data flow for stats from:
+   - tablet scorer input
+   - per-visit/per-turn score updates
+   - leg completion
+   - match completion
+   - stat payload creation
+   - backend save/update
+   - frontend stats display
+2. Identify exactly where pointsScored or totalScoreForAverage is being doubled, merged twice, or recalculated from an already-processed value.
+3. Apply the smallest possible safe fix.
+4. Do NOT do a broad refactor.
+5. Do NOT change UI styling.
+6. Do NOT change unrelated scoring logic.
+7. Do NOT change database schema unless absolutely necessary.
+
+WHAT TO CHECK SPECIFICALLY
+Please inspect for any of these patterns:
+- pointsScored += visitScore happening twice
+- winner being assigned startingScore + scoredPoints
+- leg stats merged into match stats and then merged again
+- frontend computes average and backend also computes average from a total that already includes prior aggregation
+- total score being built from both:
+  - running scored points
+  - and startingScore - remainingScore
+  at the same time
+- useEffect / submit handler / save handler running twice
+- duplicate API submission
+- same stats object being appended then re-read and summed again
+- average being recalculated from a field that is already itself derived
+
+CORRECT LOGIC
+For a single 501 leg:
+- pointsScored should be derived ONCE only
+- safest source of truth is:
+  pointsScored = startingScore - remainingScore
+- for a winner in 501:
+  pointsScored = 501
+- 3-dart average = (pointsScored / dartsThrown) * 3
+
+IMPORTANT IMPLEMENTATION RULE
+Use ONE canonical source for points scored.
+Do not combine:
+- accumulated scored points
+- plus startingScore - remainingScore
+Choose one reliable source only.
+
+VALIDATION
+Before finishing, verify these exact examples:
+- winner finishes 501 in 60 darts => 25.05 (or 25.1 rounded)
+- loser scores 481 in 57 darts => 25.32 (or 25.3 rounded)
+
+Please add temporary debug logs around the final calculation path showing:
+- player name
+- startingScore
+- remainingScore
+- pointsScored used for average
+- dartsThrown
+- computedAverage
+- where the payload is sent/saved
+
+Then remove or minimize the logs before finalizing, unless they are useful and safe to keep.
+
+DELIVERABLE
+Make the fix directly and then tell me:
+1. exact root cause of the doubling,
+2. file(s) changed,
+3. exact final formula and source fields used,
+4. confirmation that points are no longer double-counted.
