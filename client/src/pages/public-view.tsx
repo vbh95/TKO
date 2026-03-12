@@ -73,9 +73,12 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
   const threeDartAvgB = notes?.totalVisitsB > 0 ? (notes.totalScoredB / notes.totalVisitsB).toFixed(1) : '-';
   const checkoutPctA = notes?.checkoutAttemptsA > 0 ? ((notes.checkoutSuccessA / notes.checkoutAttemptsA) * 100).toFixed(1) + '%' : '-';
   const checkoutPctB = notes?.checkoutAttemptsB > 0 ? ((notes.checkoutSuccessB / notes.checkoutAttemptsB) * 100).toFixed(1) + '%' : '-';
+  const firstNineAvgA = notes?.first9DartsA > 0 ? ((notes.first9PointsA / notes.first9DartsA) * 3).toFixed(1) : '-';
+  const firstNineAvgB = notes?.first9DartsB > 0 ? ((notes.first9PointsB / notes.first9DartsB) * 3).toFixed(1) : '-';
 
   const statRows = notes ? [
     { label: '3-Dart Avg', valA: threeDartAvgA, valB: threeDartAvgB },
+    { label: 'First 9 Avg', valA: firstNineAvgA, valB: firstNineAvgB },
     { label: 'Checkout %', valA: checkoutPctA, valB: checkoutPctB },
     { label: 'Highest Finish', valA: notes.highestFinishA || '-', valB: notes.highestFinishB || '-' },
     { label: 'Highest Visit', valA: notes.highestVisitA || '-', valB: notes.highestVisitB || '-' },
@@ -221,8 +224,11 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
   const threeDartAvgB = notes?.totalVisitsB > 0 ? (notes.totalScoredB / notes.totalVisitsB).toFixed(1) : '-';
   const checkoutPctA = notes?.checkoutAttemptsA > 0 ? ((notes.checkoutSuccessA / notes.checkoutAttemptsA) * 100).toFixed(1) + '%' : '-';
   const checkoutPctB = notes?.checkoutAttemptsB > 0 ? ((notes.checkoutSuccessB / notes.checkoutAttemptsB) * 100).toFixed(1) + '%' : '-';
+  const firstNineAvgA = notes?.first9DartsA > 0 ? ((notes.first9PointsA / notes.first9DartsA) * 3).toFixed(1) : '-';
+  const firstNineAvgB = notes?.first9DartsB > 0 ? ((notes.first9PointsB / notes.first9DartsB) * 3).toFixed(1) : '-';
   const statRows = notes ? [
     { label: '3-Dart Avg', valA: threeDartAvgA, valB: threeDartAvgB },
+    { label: 'First 9 Avg', valA: firstNineAvgA, valB: firstNineAvgB },
     { label: 'Checkout %', valA: checkoutPctA, valB: checkoutPctB },
     { label: 'Highest Finish', valA: notes.highestFinishA || '-', valB: notes.highestFinishB || '-' },
     { label: 'Highest Visit', valA: notes.highestVisitA || '-', valB: notes.highestVisitB || '-' },

@@ -1,0 +1,102 @@
+I want to add a new stat everywhere completed MATCH stats are displayed: First 9 Darts Avg.
+
+IMPORTANT CONTEXT
+- The existing completed-match stats are confirmed to be MATCH-wide stats, not single-leg stats.
+- Current stats like 3-Dart Avg, Darts Thrown, Highest Visit, 100+ / 140+ / 180s, Checkout %, and Highest Finish are all using match scope consistently.
+- Do NOT change that.
+- I want First 9 Darts Avg added anywhere MATCH stats are shown after a match has completed.
+- This must be calculated ACROSS ALL LEGS IN THAT MATCH for each player.
+
+GOAL
+Add a new "First 9 Darts Avg" stat for each player in completed-match stats.
+
+REQUIRED DEFINITION
+First 9 Darts Avg must be MATCH-WIDE for each player:
+- For each leg in the completed match, take only that player’s first 9 actual darts in that leg
+- Sum those first-9 points across all legs in the match
+- Sum the number of actual first-9 darts counted across all legs in the match
+- Calculate:
+
+first9Avg = (totalFirst9Points / totalFirst9Darts) * 3
+
+This is NOT a single-leg stat.
+This is NOT just the first leg.
+This must be aggregated across all legs in the completed match for that player.
+
+IMPORTANT EDGE CASES
+- If a player throws fewer than 9 darts in a leg, only count the actual darts thrown in that leg
+- Do NOT pad missing darts
+- Do NOT assume 9 darts if they finished earlier
+- If no valid darts exist, return 0 or "-" using existing app conventions
+- Bust handling must follow the app’s existing dart-counting rules consistently
+- This must use the same match-scope logic style as the existing completed-match stats
+
+EXAMPLES
+Example match with 2 legs:
+
+Player A
+- Leg 1 first 9 darts score: 140 + 100 + 60 = 300 over 9 darts
+- Leg 2 first 9 darts score: 100 + 140 + 100 = 340 over 9 darts
+- Match first9Points = 640
+- Match first9Darts = 18
+- First 9 Darts Avg = (640 / 18) * 3 = 106.7
+
+If in one leg the player only threw 6 darts before finishing:
+- count only those 6 darts for that leg
+- include those actual points and actual darts in the match total
+
+IMPLEMENTATION REQUIREMENTS
+1. Find the canonical completed-match stats calculation path.
+2. Add a match-wide First 9 Darts Avg in the smallest, safest way possible.
+3. Reuse existing visit/throw data if available.
+4. Do NOT do a broad refactor.
+5. Do NOT change existing 3-Dart Avg logic.
+6. Do NOT alter unrelated match or overlay logic.
+7. Do NOT change database schema unless absolutely necessary.
+8. Keep edits minimal and local.
+
+WHAT TO TRACE
+Please inspect:
+- where each visit / throw is recorded
+- where leg-level stats are tracked
+- where match totals are accumulated across legs
+- where completed-match stats objects are built
+- where completed-match stat panels render
+
+PREFERRED APPROACH
+- Derive first9 data from the first 3 visits per leg where visit-level scoring exists
+- If dart-level detail exists, use the first 9 actual darts instead
+- Aggregate these per leg into a match-wide total for each player
+- Add a field such as:
+  - first9Average
+  - or firstNineAvg
+- Keep naming consistent with the codebase
+
+DISPLAY REQUIREMENT
+Add “First 9 Darts Avg” anywhere completed MATCH stats are displayed after a match has completed.
+It should appear with the other match stats for both players.
+Keep the existing styling/layout consistent.
+Do not redesign the panel.
+
+VALIDATION
+Before finishing, verify:
+- First 9 Darts Avg is match-wide across all legs in the completed match
+- It is calculated separately for each player
+- It is not just using the final leg
+- It is not just using the first leg
+- 3-Dart Avg remains unchanged
+- Darts Thrown remains unchanged
+- Under-9-dart legs use actual darts only
+- Existing completed-match stats still work correctly
+
+DELIVERABLE
+Make the change directly in the codebase, then tell me:
+1. which files were changed,
+2. exactly how First 9 Darts Avg is calculated,
+3. how under-9-dart legs are handled,
+4. everywhere the new stat is displayed,
+5. confirmation that it is aggregated across all legs in the completed match for each player,
+6. confirmation that existing match stats logic was not broken.
+
+IMPORTANT
+Make this a minimal safe change only. Avoid unrelated edits and avoid creating a separate parallel stats system.

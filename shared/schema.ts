@@ -168,6 +168,10 @@ export const matchNotes = pgTable("match_notes", {
   checkoutAttemptsB: integer("checkout_attempts_b"),
   checkoutSuccessA: integer("checkout_success_a"),
   checkoutSuccessB: integer("checkout_success_b"),
+  first9PointsA: integer("first9_points_a"),
+  first9DartsA: integer("first9_darts_a"),
+  first9PointsB: integer("first9_points_b"),
+  first9DartsB: integer("first9_darts_b"),
 });
 
 export const insertMatchNoteSchema = createInsertSchema(matchNotes).omit({ id: true });

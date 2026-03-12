@@ -98,6 +98,10 @@ interface MatchStats {
   checkoutAttemptsB: number;
   checkoutSuccessA: number;
   checkoutSuccessB: number;
+  first9PointsA: number;
+  first9DartsA: number;
+  first9PointsB: number;
+  first9DartsB: number;
   playerAName: string;
   playerBName: string;
   winnerId: number | null;
@@ -123,7 +127,7 @@ interface ScorerState {
   legVisits: Visit[];
   allMatchVisits: Visit[];
   legStartingThrower: 'A' | 'B';
-  checkoutStats: { attemptsA: number; attemptsB: number; successA: number; successB: number; finishA: number; finishB: number };
+  checkoutStats: { attemptsA: number; attemptsB: number; successA: number; successB: number; finishA: number; finishB: number; first9PointsA: number; first9DartsA: number; first9PointsB: number; first9DartsB: number };
   swapPlayers: boolean;
 }
 
@@ -552,7 +556,7 @@ export default function ScorerPage() {
   const [checkoutSuccessB, setCheckoutSuccessB] = useState(0);
   const [highestFinishA, setHighestFinishA] = useState(0);
   const [highestFinishB, setHighestFinishB] = useState(0);
-  const checkoutStatsRef = useRef({ attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 });
+  const checkoutStatsRef = useRef({ attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 });
   const [swapPlayers, setSwapPlayers] = useState(false);
 
   useEffect(() => {
@@ -653,7 +657,7 @@ export default function ScorerPage() {
           setCheckoutSuccessB(0);
           setHighestFinishA(0);
           setHighestFinishB(0);
-          checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 };
+          checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 };
           resetLeg(starter);
           setView("scoring");
         }
@@ -695,7 +699,7 @@ export default function ScorerPage() {
       setCheckoutSuccessB(0);
       setHighestFinishA(0);
       setHighestFinishB(0);
-      checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 };
+      checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 };
       resetLeg('A');
       setView("scoring");
       refetch();
@@ -744,6 +748,10 @@ export default function ScorerPage() {
           checkoutAttemptsB: cs.attemptsB,
           checkoutSuccessA: cs.successA,
           checkoutSuccessB: cs.successB,
+          first9PointsA: cs.first9PointsA,
+          first9DartsA: cs.first9DartsA,
+          first9PointsB: cs.first9PointsB,
+          first9DartsB: cs.first9DartsB,
           playerAName: pA?.name || 'Player 1',
           playerBName: pB?.name || 'Player 2',
           winnerId: updatedMatch.winnerId,
@@ -939,6 +947,15 @@ export default function ScorerPage() {
     );
 
     const allVisitsIncludingCurrent = [...allMatchVisits, ...newVisits];
+
+    // Accumulate first-9-darts data for this leg (first 3 visits per player = 9 darts each)
+    const legFirst9A = newVisits.filter(v => v.player === 'A').slice(0, 3);
+    const legFirst9B = newVisits.filter(v => v.player === 'B').slice(0, 3);
+    checkoutStatsRef.current.first9PointsA += legFirst9A.reduce((s, v) => s + v.score, 0);
+    checkoutStatsRef.current.first9DartsA += legFirst9A.length * 3;
+    checkoutStatsRef.current.first9PointsB += legFirst9B.reduce((s, v) => s + v.score, 0);
+    checkoutStatsRef.current.first9DartsB += legFirst9B.length * 3;
+
     const isMatchFinished = newLegsA >= matchLegsToWin || newLegsB >= matchLegsToWin;
     let matchNotes: any = undefined;
     if (isMatchFinished) {
@@ -968,6 +985,10 @@ export default function ScorerPage() {
         checkoutAttemptsB: cs.attemptsB,
         checkoutSuccessA: cs.successA,
         checkoutSuccessB: cs.successB,
+        first9PointsA: cs.first9PointsA,
+        first9DartsA: cs.first9DartsA,
+        first9PointsB: cs.first9PointsB,
+        first9DartsB: cs.first9DartsB,
       };
     }
 
@@ -1734,9 +1755,13 @@ export default function ScorerPage() {
       ? ((stats.checkoutSuccessB / stats.checkoutAttemptsB) * 100).toFixed(2) + '%'
       : '0.00%';
 
+    const firstNineAvgA = stats.first9DartsA > 0 ? ((stats.first9PointsA / stats.first9DartsA) * 3).toFixed(1) : '-';
+    const firstNineAvgB = stats.first9DartsB > 0 ? ((stats.first9PointsB / stats.first9DartsB) * 3).toFixed(1) : '-';
+
     const statRows: Array<{ label: string; valA: string | number; valB: string | number }> = [
       { label: 'Legs Won', valA: stats.legsWonA, valB: stats.legsWonB },
       { label: '3-Dart Avg', valA: avgA, valB: avgB },
+      { label: 'First 9 Avg', valA: firstNineAvgA, valB: firstNineAvgB },
       { label: 'Checkout %', valA: checkoutRateA, valB: checkoutRateB },
       { label: 'Highest Score', valA: stats.highestVisitA, valB: stats.highestVisitB },
       { label: 'Highest Finish', valA: stats.highestFinishA || '-', valB: stats.highestFinishB || '-' },
