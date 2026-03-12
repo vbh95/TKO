@@ -1392,8 +1392,8 @@ export async function registerRoutes(
       const maxBoard = groups.length || 1;
 
       if (boardNumber !== null && boardNumber !== 0) {
-        if (typeof boardNumber !== 'number' || boardNumber < 1 || boardNumber > maxBoard) {
-          return res.status(400).json({ message: `Board number must be between 1 and ${maxBoard}, or null/0 to clear` });
+        if (typeof boardNumber !== 'number' || !Number.isInteger(boardNumber) || boardNumber < 1 || boardNumber > maxBoard) {
+          return res.status(400).json({ message: `Board number must be an integer between 1 and ${maxBoard}, or null/0 to clear` });
         }
       }
 
