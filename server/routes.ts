@@ -1397,8 +1397,26 @@ export async function registerRoutes(
         }
       }
 
+      const oldBoardNumber = match.boardNumber;
       const newBoardNumber = (boardNumber === 0 || boardNumber === null) ? null : boardNumber;
       const updatedMatch = await storage.updateMatch(matchId, { boardNumber: newBoardNumber });
+
+      const shareToken = tournament.shareToken || null;
+      emitMatchUpdate(tournamentId, shareToken, updatedMatch);
+
+      const sortedGroups = groups.sort((a, b) => a.name.localeCompare(b.name));
+      const naturalBoard = sortedGroups.findIndex(g => g.id === match.groupId) + 1;
+
+      if (naturalBoard > 0) {
+        emitBoardMatchUpdate(tournamentId, naturalBoard, { type: 'board_reassign' });
+      }
+      if (oldBoardNumber && oldBoardNumber !== naturalBoard) {
+        emitBoardMatchUpdate(tournamentId, oldBoardNumber, { type: 'board_reassign' });
+      }
+      if (newBoardNumber && newBoardNumber !== naturalBoard) {
+        emitBoardMatchUpdate(tournamentId, newBoardNumber, { type: 'board_reassign' });
+      }
+
       res.json(updatedMatch);
     } catch (err) {
       console.error("Update match board error:", err);
@@ -1782,7 +1800,7 @@ export async function registerRoutes(
       if (!group) return res.status(404).json({ message: "Board not found" });
 
       const groupMatches = group.id !== 0
-        ? allMatches.filter(m => m.groupId === group.id)
+        ? allMatches.filter(m => m.groupId === group.id && (m.boardNumber === null || m.boardNumber === boardNumber))
         : [];
 
       const guestGroupMatches = group.id !== 0
@@ -1893,7 +1911,8 @@ export async function registerRoutes(
       const boardGroup = sortedGroups.length > 0 ? sortedGroups[boardNumber - 1] : null;
 
       const isKnockoutOnly = sortedGroups.length === 0;
-      const isGroupMatch = boardGroup ? match.groupId === boardGroup.id : false;
+      const isReassignedAway = match.stage === 'GROUP' && match.boardNumber !== null && match.boardNumber !== boardNumber;
+      const isGroupMatch = boardGroup ? (match.groupId === boardGroup.id && !isReassignedAway) : false;
       const isGuestGroupMatch = match.stage === 'GROUP' && !isGroupMatch && match.boardNumber === boardNumber;
       const configuredBoards: number | undefined = (startTournament?.settings as any)?.numBoards;
 
