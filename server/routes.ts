@@ -1962,6 +1962,9 @@ export async function registerRoutes(
       }
 
       if (match.status !== 'IN_PROGRESS') {
+        if (match.status === 'COMPLETED' && match.scoreA === scoreA && match.scoreB === scoreB) {
+          return res.json(match);
+        }
         return res.status(400).json({ message: "Match must be IN_PROGRESS to update scores" });
       }
 
@@ -1988,11 +1991,15 @@ export async function registerRoutes(
       }
 
       if (req.body.notes) {
-        const noteValues = Object.fromEntries(
-          Object.entries(req.body.notes).filter(([, v]) => v !== undefined)
-        );
-        if (Object.keys(noteValues).length > 0) {
-          await storage.updateMatchNote(matchId, noteValues);
+        try {
+          const noteValues = Object.fromEntries(
+            Object.entries(req.body.notes).filter(([, v]) => v !== undefined)
+          );
+          if (Object.keys(noteValues).length > 0) {
+            await storage.updateMatchNote(matchId, noteValues);
+          }
+        } catch (noteError) {
+          console.error("Match note save error (non-fatal):", noteError);
         }
       }
 

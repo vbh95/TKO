@@ -763,7 +763,53 @@ export default function ScorerPage() {
       }
       refetch();
     },
-    onError: (err: any) => {
+    onError: async (err: any) => {
+      const freshData = await refetch();
+      const completedMatch = freshData.data?.matches.find(
+        (m: any) => m.status === 'COMPLETED' && m.id === activeMatchId
+      );
+      if (completedMatch) {
+        const vA = allMatchVisits.filter(v => v.player === 'A');
+        const vB = allMatchVisits.filter(v => v.player === 'B');
+        const pA = freshData.data?.players.find((p: any) => p.id === completedMatch.playerAId);
+        const pB = freshData.data?.players.find((p: any) => p.id === completedMatch.playerBId);
+        const cs = checkoutStatsRef.current;
+        setMatchReport({
+          totalVisitsA: vA.length,
+          totalVisitsB: vB.length,
+          totalScoredA: vA.reduce((s: number, v: Visit) => s + v.score, 0),
+          totalScoredB: vB.reduce((s: number, v: Visit) => s + v.score, 0),
+          highestVisitA: vA.length > 0 ? Math.max(...vA.map(v => v.score)) : 0,
+          highestVisitB: vB.length > 0 ? Math.max(...vB.map(v => v.score)) : 0,
+          highestFinishA: cs.finishA,
+          highestFinishB: cs.finishB,
+          ton80sA: vA.filter(v => v.score === 180).length,
+          ton80sB: vB.filter(v => v.score === 180).length,
+          ton40sA: vA.filter(v => v.score >= 140 && v.score < 180).length,
+          ton40sB: vB.filter(v => v.score >= 140 && v.score < 180).length,
+          tonsA: vA.filter(v => v.score >= 100 && v.score < 140).length,
+          tonsB: vB.filter(v => v.score >= 100 && v.score < 140).length,
+          legsWonA: completedMatch.scoreA || 0,
+          legsWonB: completedMatch.scoreB || 0,
+          checkoutAttemptsA: cs.attemptsA,
+          checkoutAttemptsB: cs.attemptsB,
+          checkoutSuccessA: cs.successA,
+          checkoutSuccessB: cs.successB,
+          first9PointsA: cs.first9PointsA,
+          first9DartsA: cs.first9DartsA,
+          first9PointsB: cs.first9PointsB,
+          first9DartsB: cs.first9DartsB,
+          playerAName: pA?.name || 'Player 1',
+          playerBName: pB?.name || 'Player 2',
+          winnerId: completedMatch.winnerId,
+          playerAId: completedMatch.playerAId,
+          playerBId: completedMatch.playerBId,
+        });
+        setActiveMatchId(null);
+        setView("matchReport");
+        clearScorerState(completedMatch.id);
+        return;
+      }
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
