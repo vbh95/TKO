@@ -38,7 +38,8 @@ import {
   Calendar,
   Lock,
   Unlock,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Monitor
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -664,6 +665,24 @@ export default function TournamentDetail() {
     }
   };
 
+  const handleAssignBoard = async (matchId: number, boardNumber: number | null) => {
+    try {
+      await apiRequest("PATCH", `/api/tournaments/${tournamentId}/matches/${matchId}/board`, { boardNumber });
+      queryClient.invalidateQueries({ queryKey: ["/api/tournaments/:id", tournamentId] });
+      toast({ title: boardNumber ? `Sent to Board ${boardNumber}` : "Board assignment cleared" });
+    } catch {
+      toast({ title: "Error", description: "Failed to assign board.", variant: "destructive" });
+    }
+  };
+
+  const sortedGroupsForBoards = [...groups].sort((a: any, b: any) => a.name.localeCompare(b.name));
+  const numBoards = sortedGroupsForBoards.length;
+  const getNaturalBoardNumber = (groupId: number | null) => {
+    if (!groupId) return null;
+    const idx = sortedGroupsForBoards.findIndex((g: any) => g.id === groupId);
+    return idx >= 0 ? idx + 1 : null;
+  };
+
   const renderGroupMatches = () => (
     <div className="space-y-8">
       {groupMatchData.byGroup.map(({ group, rounds }) => (
@@ -731,6 +750,40 @@ export default function TournamentDetail() {
                                     />
                                   </div>
                                   <div className="flex items-center gap-2">
+                                    {match.status === 'PENDING' && numBoards > 1 && !tournament.isLegacy && (
+                                      <Select
+                                        value={match.boardNumber ? String(match.boardNumber) : "default"}
+                                        onValueChange={(val) => {
+                                          const bn = val === "default" ? null : parseInt(val);
+                                          handleAssignBoard(match.id, bn);
+                                        }}
+                                      >
+                                        <SelectTrigger
+                                          className={cn(
+                                            "h-7 w-auto text-xs gap-1 px-2",
+                                            match.boardNumber && match.boardNumber !== getNaturalBoardNumber(match.groupId)
+                                              ? "border-orange-400 text-orange-600"
+                                              : ""
+                                          )}
+                                          onClick={(e) => e.stopPropagation()}
+                                          data-testid={`select-board-${match.id}`}
+                                        >
+                                          <Monitor className="w-3 h-3" />
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="default">Default</SelectItem>
+                                          {Array.from({ length: numBoards }, (_, i) => i + 1).map((bn) => (
+                                            <SelectItem key={bn} value={String(bn)}>Board {bn}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    )}
+                                    {match.boardNumber && match.boardNumber !== getNaturalBoardNumber(match.groupId) && match.status !== 'PENDING' && (
+                                      <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 gap-1">
+                                        <Monitor className="w-3 h-3" /> Board {match.boardNumber}
+                                      </Badge>
+                                    )}
                                     {match.status === 'COMPLETED' && !tournament.isLegacy && (
                                       <Button
                                         size="icon"
