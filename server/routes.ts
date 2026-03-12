@@ -383,11 +383,6 @@ async function backfillKnockoutScorers() {
 
       const allMatches = await storage.getMatchesByTournamentId(tournament.id);
       const knockoutMatches = allMatches.filter(m => m.stage === 'KNOCKOUT');
-      const qfMatches = knockoutMatches
-        .filter(m => m.roundKey === 'QF' && m.scorerId === null && (m.playerAId || m.playerBId))
-        .sort((a: any, b: any) => a.order - b.order);
-
-      if (qfMatches.length === 0) continue;
 
       const groupsList = await storage.getGroupsByTournamentId(tournament.id);
       const playersList = await storage.getPlayersByTournamentId(tournament.id);
@@ -421,7 +416,12 @@ async function backfillKnockoutScorers() {
           });
           return { id: player.id, name: player.name, pts: won * ptsWin, diff: legsFor - legsAgainst, legsFor };
         });
-        stats.sort((a, b) => b.pts - a.pts || b.diff - a.diff || b.legsFor - a.legsFor);
+        stats.sort((a, b) => {
+          if (b.pts !== a.pts) return b.pts - a.pts;
+          if (b.diff !== a.diff) return b.diff - a.diff;
+          if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+          return a.id - b.id;
+        });
         if (stats.length === 0) continue;
 
         const lastPlace = stats[stats.length - 1];
