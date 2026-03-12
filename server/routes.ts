@@ -194,20 +194,7 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     }
   }
 
-  const promotedPerGroup = 2;
-  const promotedPlayerIds = new Set<number>();
-  for (let pos = 0; pos < promotedPerGroup && pos < standings.length; pos++) {
-    promotedPlayerIds.add(standings[pos].id);
-  }
-  const completedGroupMemberIds = memberships
-    .filter(gm => gm.groupId === completedGroupId)
-    .map(gm => gm.playerId);
-  const nonPromotedFromGroup = playersList.filter(
-    p => completedGroupMemberIds.includes(p.id) && !promotedPlayerIds.has(p.id)
-  );
-
   const updatedQFIds: number[] = [];
-  let lastAssignedScorerId: number | null = null;
   for (let i = 0; i < firstRoundMatches.length && i < pairings.length; i++) {
     const pairing = pairings[i];
     const updates: any = {};
@@ -224,20 +211,19 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
 
     if (needsUpdate) {
       updates.boardNumber = i + 1;
-
-      if (pairing.aGroupIdx === completedGroupIdx || pairing.bGroupIdx === completedGroupIdx) {
-        let scorerPool = nonPromotedFromGroup.filter(p => p.id !== lastAssignedScorerId);
-        if (scorerPool.length === 0) scorerPool = [...nonPromotedFromGroup];
-        if (scorerPool.length > 0) {
-          const chosen = scorerPool[Math.floor(Math.random() * scorerPool.length)];
-          updates.scorerId = chosen.id;
-          updates.scorerName = chosen.name;
-          lastAssignedScorerId = chosen.id;
-        }
-      }
-
       await storage.updateMatch(firstRoundMatches[i].id, updates);
       updatedQFIds.push(firstRoundMatches[i].id);
+    }
+  }
+
+  if (completedGroupIdx < firstRoundMatches.length) {
+    const lastPlacePlayerId = standings[standings.length - 1].id;
+    const lastPlacePlayer = playersList.find(p => p.id === lastPlacePlayerId);
+    if (lastPlacePlayer) {
+      await storage.updateMatch(firstRoundMatches[completedGroupIdx].id, {
+        scorerId: lastPlacePlayer.id,
+        scorerName: lastPlacePlayer.name,
+      } as any);
     }
   }
 
@@ -411,8 +397,16 @@ async function backfillKnockoutScorers() {
       const ptsWin = settings.pointsForWin ?? 2;
       const ptsLoss = settings.pointsForLoss ?? 0;
 
-      const promotedIds = new Set<number>();
-      for (const group of groupsList) {
+      const allQfMatches = knockoutMatches
+        .filter(m => m.roundKey === 'QF')
+        .sort((a: any, b: any) => a.order - b.order);
+
+      for (let gi = 0; gi < groupsList.length && gi < allQfMatches.length; gi++) {
+        const qf = allQfMatches[gi];
+        if (qf.scorerId !== null) continue;
+        if (!qf.playerAId && !qf.playerBId) continue;
+
+        const group = groupsList[gi];
         const memberIds = memberships.filter(gm => gm.groupId === group.id).map(gm => gm.playerId);
         const gPlayers = playersList.filter(p => memberIds.includes(p.id));
         const gMatches = groupMatches.filter(m => m.groupId === group.id && m.status === 'COMPLETED');
@@ -425,28 +419,13 @@ async function backfillKnockoutScorers() {
             legsAgainst += isA ? (m.scoreB || 0) : (m.scoreA || 0);
             if (m.winnerId === player.id) won++;
           });
-          return { id: player.id, pts: won * ptsWin, diff: legsFor - legsAgainst, legsFor };
+          return { id: player.id, name: player.name, pts: won * ptsWin, diff: legsFor - legsAgainst, legsFor };
         });
         stats.sort((a, b) => b.pts - a.pts || b.diff - a.diff || b.legsFor - a.legsFor);
-        for (let i = 0; i < 2 && i < stats.length; i++) promotedIds.add(stats[i].id);
-      }
+        if (stats.length === 0) continue;
 
-      let lastScorerId: number | null = null;
-      for (const qf of qfMatches) {
-        const playerAGroupId = memberships.find(gm => gm.playerId === qf.playerAId)?.groupId;
-        const playerBGroupId = memberships.find(gm => gm.playerId === qf.playerBId)?.groupId;
-        const scorerGroupId = playerAGroupId || playerBGroupId;
-        if (!scorerGroupId) continue;
-
-        const groupMemberIds = memberships.filter(gm => gm.groupId === scorerGroupId).map(gm => gm.playerId);
-        const nonPromoted = playersList.filter(p => groupMemberIds.includes(p.id) && !promotedIds.has(p.id));
-        if (nonPromoted.length === 0) continue;
-
-        let pool = nonPromoted.filter(p => p.id !== lastScorerId);
-        if (pool.length === 0) pool = [...nonPromoted];
-        const chosen = pool[Math.floor(Math.random() * pool.length)];
-        await storage.updateMatch(qf.id, { scorerId: chosen.id, scorerName: chosen.name } as any);
-        lastScorerId = chosen.id;
+        const lastPlace = stats[stats.length - 1];
+        await storage.updateMatch(qf.id, { scorerId: lastPlace.id, scorerName: lastPlace.name } as any);
       }
       console.log(`Backfilled knockout scorers for tournament ${tournament.id} (${tournament.name})`);
     }
