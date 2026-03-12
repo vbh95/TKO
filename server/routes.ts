@@ -162,6 +162,15 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
   const completedGroupIdx = groupsList.findIndex(g => g.id === completedGroupId);
   if (completedGroupIdx < 0) return;
 
+  const isGroupFullyComplete = (groupId: number): boolean => {
+    const gMatches = groupMatches.filter(m => m.groupId === groupId);
+    return gMatches.length > 0 && gMatches.every(m =>
+      m.status === 'COMPLETED' || (m.id === currentMatchId && currentMatchWinnerId != null)
+    );
+  };
+
+  if (!isGroupFullyComplete(completedGroupId)) return;
+
   const standings = calcGroupStandings(completedGroupId);
   if (standings.length < 2) return;
 
@@ -210,7 +219,12 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     }
 
     if (needsUpdate) {
-      updates.boardNumber = i + 1;
+      const existingMatch = firstRoundMatches[i];
+      const finalPlayerAId = updates.playerAId ?? existingMatch.playerAId;
+      const finalPlayerBId = updates.playerBId ?? existingMatch.playerBId;
+      if (finalPlayerAId && finalPlayerBId) {
+        updates.boardNumber = i + 1;
+      }
       await storage.updateMatch(firstRoundMatches[i].id, updates);
       updatedQFIds.push(firstRoundMatches[i].id);
     }
@@ -1383,8 +1397,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Only PENDING matches can be reassigned" });
       }
 
-      if (match.stage !== 'GROUP') {
-        return res.status(400).json({ message: "Only group-stage matches can be reassigned to a different board" });
+      if (!match.playerAId || !match.playerBId) {
+        return res.status(400).json({ message: "Cannot assign board until both players are determined" });
       }
 
       const { boardNumber } = req.body;
@@ -1405,7 +1419,9 @@ export async function registerRoutes(
       emitMatchUpdate(tournamentId, shareToken, updatedMatch);
 
       const sortedGroups = groups.sort((a, b) => a.name.localeCompare(b.name));
-      const naturalBoard = sortedGroups.findIndex(g => g.id === match.groupId) + 1;
+      const naturalBoard = match.groupId
+        ? sortedGroups.findIndex(g => g.id === match.groupId) + 1
+        : 0;
 
       if (naturalBoard > 0) {
         emitBoardMatchUpdate(tournamentId, naturalBoard, { type: 'board_reassign' });
