@@ -160,7 +160,7 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
             <div className="max-w-md mx-auto">
               <div className="grid grid-cols-3 gap-1 text-sm">
                 <div className="text-right font-bold text-xs text-muted-foreground pb-1">{playerA?.name}</div>
-                <div className="text-center font-bold text-xs text-muted-foreground pb-1">Stat</div>
+                <div className="text-center font-bold text-xs text-muted-foreground pb-1">Match Stats</div>
                 <div className="text-left font-bold text-xs text-muted-foreground pb-1">{playerB?.name}</div>
                 {statRows.map(({ label, valA, valB }) => {
                   const aNum = parseFloat(String(valA));
@@ -316,7 +316,7 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
             <div className="max-w-sm mx-auto">
               <div className="grid grid-cols-3 gap-1 text-sm">
                 <div className="text-right font-bold text-xs text-muted-foreground pb-1">{playerA?.name}</div>
-                <div className="text-center font-bold text-xs text-muted-foreground pb-1">Stat</div>
+                <div className="text-center font-bold text-xs text-muted-foreground pb-1">Match Stats</div>
                 <div className="text-left font-bold text-xs text-muted-foreground pb-1">{playerB?.name}</div>
                 {statRows.map(({ label: sl, valA, valB }) => {
                   const aNum = parseFloat(String(valA));

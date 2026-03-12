@@ -222,7 +222,7 @@ function AdminMatchStats({ matchId, playerAName, playerBName }: { matchId: numbe
           {!loading && notes && statRows.length > 0 && (
             <div className="grid grid-cols-3 gap-0.5 text-xs">
               <div className="text-right font-semibold text-muted-foreground truncate">{playerAName}</div>
-              <div className="text-center font-semibold text-muted-foreground">Stat</div>
+              <div className="text-center font-semibold text-muted-foreground">Match Stats</div>
               <div className="text-left font-semibold text-muted-foreground truncate">{playerBName}</div>
               {statRows.map(({ label, valA, valB }) => {
                 const aNum = parseFloat(String(valA));
