@@ -1188,15 +1188,12 @@ export default function ScorerPage() {
   const ptsLoss = (tournament.settings as any)?.pointsForLoss ?? 0;
 
   const completedMatches = matches.filter(m => m.status === 'COMPLETED');
-  const pendingMatches = matches
-    .filter(m => m.status === 'PENDING' && m.playerAId && m.playerBId)
-    .sort((a, b) => {
-      const aIsGuest = a.groupId != null && a.groupId !== group.id && typeof a.boardNumber === 'number';
-      const bIsGuest = b.groupId != null && b.groupId !== group.id && typeof b.boardNumber === 'number';
-      if (aIsGuest && !bIsGuest) return -1;
-      if (!aIsGuest && bIsGuest) return 1;
-      return 0;
-    });
+  const allPendingMatches = matches.filter(m => m.status === 'PENDING' && m.playerAId && m.playerBId);
+  const assignedToThisBoard = allPendingMatches
+    .filter(m => typeof m.boardNumber === 'number' && m.boardNumber === boardNumber)
+    .sort((a, b) => a.order - b.order);
+  const nextUpMatch = assignedToThisBoard[0] || null;
+  const upcomingMatches = allPendingMatches.filter(m => m !== nextUpMatch);
   const waitingMatches = matches.filter(m => m.status === 'PENDING' && (!m.playerAId || !m.playerBId));
   const inProgressMatch = matches.find(m => m.status === 'IN_PROGRESS');
 
@@ -2017,36 +2014,36 @@ export default function ScorerPage() {
           </Card>
         )}
 
-        {!inProgressMatch && pendingMatches.length > 0 && (
+        {!inProgressMatch && nextUpMatch && (
           <Card className="border-2 border-primary shadow-xl" data-testid="card-next-up">
             <CardHeader className="bg-primary/10 border-b pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Play className="w-5 h-5 text-primary" />
                 Next Up
-                <Badge variant="secondary" className="ml-auto text-xs">{getMatchTypeLabel(pendingMatches[0])}</Badge>
+                <Badge variant="secondary" className="ml-auto text-xs">{getMatchTypeLabel(nextUpMatch)}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 pb-4">
               <div className="flex items-center justify-between text-center mb-4">
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">{getMatchTypeLabel(pendingMatches[0])}</p>
-                  <p className="text-xl font-bold">{getPlayer(pendingMatches[0].playerAId)?.name || "TBD"}</p>
+                  <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">{getMatchTypeLabel(nextUpMatch)}</p>
+                  <p className="text-xl font-bold">{getPlayer(nextUpMatch.playerAId)?.name || "TBD"}</p>
                 </div>
                 <div className="text-muted-foreground text-sm uppercase font-medium px-4">vs</div>
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">{getMatchTypeLabel(pendingMatches[0])}</p>
-                  <p className="text-xl font-bold">{getPlayer(pendingMatches[0].playerBId)?.name || "TBD"}</p>
+                  <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">{getMatchTypeLabel(nextUpMatch)}</p>
+                  <p className="text-xl font-bold">{getPlayer(nextUpMatch.playerBId)?.name || "TBD"}</p>
                 </div>
               </div>
-              <p className="text-center text-sm text-muted-foreground mb-2">Best of {pendingMatches[0].bestOf} (first to {Math.ceil((pendingMatches[0].bestOf || bestOf) / 2)})</p>
-              {pendingMatches[0].scorerName && (
+              <p className="text-center text-sm text-muted-foreground mb-2">Best of {nextUpMatch.bestOf} (first to {Math.ceil((nextUpMatch.bestOf || bestOf) / 2)})</p>
+              {nextUpMatch.scorerName && (
                 <p className="text-center text-xs text-muted-foreground mb-4" data-testid="text-next-up-scorer">
-                  Scorer: <span className="font-semibold">{pendingMatches[0].scorerName}</span>
+                  Scorer: <span className="font-semibold">{nextUpMatch.scorerName}</span>
                 </p>
               )}
               <Button
                 className="w-full h-14 text-lg"
-                onClick={() => handleTapMatch(pendingMatches[0].id)}
+                onClick={() => handleTapMatch(nextUpMatch.id)}
                 disabled={startMatchMutation.isPending}
                 data-testid="button-start-next-match"
               >
@@ -2061,17 +2058,17 @@ export default function ScorerPage() {
           </Card>
         )}
 
-        {pendingMatches.length === 0 && !inProgressMatch && waitingMatches.length > 0 && (
-          <Card className="border-2 border-primary/30 border-dashed" data-testid="card-waiting-for-players">
+        {!inProgressMatch && !nextUpMatch && (allPendingMatches.length > 0 || waitingMatches.length > 0) && (
+          <Card className="border-2 border-primary/30 border-dashed" data-testid="card-waiting-for-assignment">
             <CardContent className="py-12 text-center">
               <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
-              <h2 className="text-xl font-bold mb-2">Waiting for Next Match</h2>
-              <p className="text-muted-foreground">The next match will appear here once the other board finishes.</p>
+              <h2 className="text-xl font-bold mb-2">Waiting for Match Assignment</h2>
+              <p className="text-muted-foreground">The next match will appear here once the tournament admin assigns one to this board.</p>
             </CardContent>
           </Card>
         )}
 
-        {pendingMatches.length === 0 && !inProgressMatch && waitingMatches.length === 0 && (
+        {allPendingMatches.length === 0 && !inProgressMatch && waitingMatches.length === 0 && (
           <Card className="border-2 border-dashed" data-testid="card-all-done">
             <CardContent className="py-12 text-center">
               <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
@@ -2081,37 +2078,42 @@ export default function ScorerPage() {
           </Card>
         )}
 
-        {pendingMatches.length > 1 && (
+        {upcomingMatches.length > 0 && (
           <Card data-testid="card-upcoming-matches">
             <CardHeader>
               <CardTitle className="text-lg">Upcoming Matches</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y">
-                {pendingMatches.slice(1).map((match) => (
-                  <button
-                    key={match.id}
-                    className="flex items-center p-4 w-full hover:bg-muted/50 transition-colors touch-manipulation"
-                    onClick={() => handleTapMatch(match.id)}
-                    disabled={!!inProgressMatch || startMatchMutation.isPending}
-                    data-testid={`button-upcoming-match-${match.id}`}
-                  >
-                    <div className="flex-1 flex flex-col items-center gap-1">
-                      <span className="text-[10px] text-muted-foreground uppercase font-semibold">{getMatchTypeLabel(match)}</span>
-                      <div className="flex items-center justify-center gap-3 text-center w-full">
-                        <span className="flex-1 font-medium text-right">{getPlayer(match.playerAId)?.name || "TBD"}</span>
-                        <span className="text-muted-foreground text-sm shrink-0">vs</span>
-                        <span className="flex-1 font-medium text-left">{getPlayer(match.playerBId)?.name || "TBD"}</span>
-                      </div>
-                      {match.scorerName && (
-                        <span className="text-[10px] text-muted-foreground" data-testid={`text-upcoming-scorer-${match.id}`}>
-                          Scorer: {match.scorerName}
-                        </span>
+                {upcomingMatches.map((match) => {
+                  const isAssigned = typeof match.boardNumber === 'number' && match.boardNumber === boardNumber;
+                  return (
+                    <div
+                      key={match.id}
+                      className={cn(
+                        "flex items-center p-4 w-full transition-colors",
+                        isAssigned ? "hover:bg-muted/50 cursor-pointer touch-manipulation" : "opacity-60"
                       )}
+                      onClick={isAssigned && !inProgressMatch && !startMatchMutation.isPending ? () => handleTapMatch(match.id) : undefined}
+                      data-testid={`button-upcoming-match-${match.id}`}
+                    >
+                      <div className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">{getMatchTypeLabel(match)}</span>
+                        <div className="flex items-center justify-center gap-3 text-center w-full">
+                          <span className="flex-1 font-medium text-right">{getPlayer(match.playerAId)?.name || "TBD"}</span>
+                          <span className="text-muted-foreground text-sm shrink-0">vs</span>
+                          <span className="flex-1 font-medium text-left">{getPlayer(match.playerBId)?.name || "TBD"}</span>
+                        </div>
+                        {match.scorerName && (
+                          <span className="text-[10px] text-muted-foreground" data-testid={`text-upcoming-scorer-${match.id}`}>
+                            Scorer: {match.scorerName}
+                          </span>
+                        )}
+                      </div>
+                      {isAssigned && <ChevronRight className="w-4 h-4 text-muted-foreground ml-3 shrink-0" />}
                     </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground ml-3 shrink-0" />
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

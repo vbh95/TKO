@@ -777,7 +777,9 @@ export default function TournamentDetail() {
                                             "h-7 w-auto text-xs gap-1 px-2",
                                             match.boardNumber && match.boardNumber !== getNaturalBoardNumber(match.groupId)
                                               ? "border-orange-400 text-orange-600"
-                                              : ""
+                                              : match.boardNumber
+                                                ? "border-green-400 text-green-600"
+                                                : ""
                                           )}
                                           onClick={(e) => e.stopPropagation()}
                                           data-testid={`select-board-${match.id}`}
@@ -1658,7 +1660,7 @@ export default function TournamentDetail() {
               <AlertDialogDescription>
                 {pendingBoardAssign?.boardNumber
                   ? `${pendingBoardAssign?.playerAName} vs ${pendingBoardAssign?.playerBName} (${pendingBoardAssign?.groupName}) will be queued as the next match on Board ${pendingBoardAssign.boardNumber}'s scorer tablet.`
-                  : `${pendingBoardAssign?.playerAName} vs ${pendingBoardAssign?.playerBName} (${pendingBoardAssign?.groupName}) will return to its default board.`}
+                  : `${pendingBoardAssign?.playerAName} vs ${pendingBoardAssign?.playerBName} (${pendingBoardAssign?.groupName}) will be removed from the Next Up queue and return to unassigned.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
