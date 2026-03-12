@@ -1056,10 +1056,6 @@ export default function ScorerPage() {
     setAllMatchVisits(allVisitsIncludingCurrent);
 
     if (newLegsA < matchLegsToWin && newLegsB < matchLegsToWin) {
-      const playerName = isPlayerA
-        ? data?.players.find(p => p.id === activeM.playerAId)?.name
-        : data?.players.find(p => p.id === activeM.playerBId)?.name;
-      toast({ title: `Leg won by ${playerName || 'Player'}!` });
 
       const nextStarter = legStartingThrower === 'A' ? 'B' : 'A';
       persistCurrentState({
@@ -2031,7 +2027,12 @@ export default function ScorerPage() {
                   <p className="text-xl font-bold">{getPlayer(pendingMatches[0].playerBId)?.name || "TBD"}</p>
                 </div>
               </div>
-              <p className="text-center text-sm text-muted-foreground mb-4">Best of {pendingMatches[0].bestOf} (first to {Math.ceil((pendingMatches[0].bestOf || bestOf) / 2)})</p>
+              <p className="text-center text-sm text-muted-foreground mb-2">Best of {pendingMatches[0].bestOf} (first to {Math.ceil((pendingMatches[0].bestOf || bestOf) / 2)})</p>
+              {pendingMatches[0].scorerName && (
+                <p className="text-center text-xs text-muted-foreground mb-4" data-testid="text-next-up-scorer">
+                  Scorer: <span className="font-semibold">{pendingMatches[0].scorerName}</span>
+                </p>
+              )}
               <Button
                 className="w-full h-14 text-lg"
                 onClick={() => handleTapMatch(pendingMatches[0].id)}
@@ -2091,6 +2092,11 @@ export default function ScorerPage() {
                         <span className="text-muted-foreground text-sm shrink-0">vs</span>
                         <span className="flex-1 font-medium text-left">{getPlayer(match.playerBId)?.name || "TBD"}</span>
                       </div>
+                      {match.scorerName && (
+                        <span className="text-[10px] text-muted-foreground" data-testid={`text-upcoming-scorer-${match.id}`}>
+                          Scorer: {match.scorerName}
+                        </span>
+                      )}
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground ml-3 shrink-0" />
                   </button>

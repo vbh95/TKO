@@ -137,9 +137,9 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
       {isCompleted && (
         <div className="flex justify-center pb-3">
           <button
-            onClick={handleClick}
+            onClick={(e) => { e.stopPropagation(); handleClick(); }}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            data-testid={`button-match-stats-${match.id}`}
+            data-testid={`button-match-stats-toggle-${match.id}`}
           >
             Stats
             <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", expanded && "rotate-180")} />
