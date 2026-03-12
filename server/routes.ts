@@ -1965,8 +1965,11 @@ export async function registerRoutes(
       const guestOnBoard = allMatches.filter(
         m => m.stage === 'GROUP' && m.groupId !== (boardGroup?.id ?? 0) && m.boardNumber === boardNumber
       );
+      const naturalGroupMatches = boardGroup
+        ? allMatches.filter(m => m.groupId === boardGroup.id && (m.boardNumber === null || m.boardNumber === boardNumber))
+        : [];
       const boardMatches = [
-        ...(boardGroup ? allMatches.filter(m => m.groupId === boardGroup.id) : []),
+        ...naturalGroupMatches,
         ...guestOnBoard,
         ...boardKOMatches,
       ];
