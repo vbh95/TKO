@@ -536,7 +536,7 @@ export default function PublicView() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
         <h1 className="text-2xl font-bold">Tournament Not Found</h1>
-        <p className="text-muted-foreground mt-2">This link might be invalid or expired.</p>
+        <p className="text-muted-foreground mt-2">This link is no longer valid. Ask the organiser for an updated link.</p>
       </div>
     );
   }

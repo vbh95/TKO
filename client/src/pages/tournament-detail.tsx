@@ -256,7 +256,7 @@ export default function TournamentDetail() {
   const [, setLocation] = useLocation();
   const tournamentId = parseInt(id || "0");
   const { data, isLoading } = useTournament(tournamentId);
-  const { enableShare, disableShare } = useTournamentShare(tournamentId);
+  const { enableShare, regenerateShare } = useTournamentShare(tournamentId);
   const { mutate: bulkUpdate, isPending: isUpdatingPlayers } = useBulkUpdatePlayers(tournamentId);
   const deleteTournamentMutation = useDeleteTournament();
   const { toast } = useToast();
@@ -1516,7 +1516,7 @@ export default function TournamentDetail() {
           onOpenChange={setIsShareDialogOpen}
           tournament={tournament}
           enableShare={enableShare}
-          disableShare={disableShare}
+          regenerateShare={regenerateShare}
           copied={copied}
           onCopyLink={handleCopyLink}
           toast={toast}
@@ -1544,7 +1544,7 @@ export default function TournamentDetail() {
           setLocation={setLocation}
           setIsDevicesDialogOpen={setIsDevicesDialogOpen}
           enableShare={enableShare}
-          disableShare={disableShare}
+          regenerateShare={regenerateShare}
           toast={toast}
         />
 
@@ -1584,12 +1584,12 @@ export default function TournamentDetail() {
   );
 }
 
-function SharePublicDialog({ open, onOpenChange, tournament, enableShare, disableShare, copied, onCopyLink, toast }: {
+function SharePublicDialog({ open, onOpenChange, tournament, enableShare, regenerateShare, copied, onCopyLink, toast }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tournament: any;
   enableShare: any;
-  disableShare: any;
+  regenerateShare: any;
   copied: boolean;
   onCopyLink: () => void;
   toast: any;
@@ -1631,9 +1631,9 @@ function SharePublicDialog({ open, onOpenChange, tournament, enableShare, disabl
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {!tournament.shareEnabled ? (
+          {!tournament.shareToken ? (
             <div className="text-center py-6 space-y-3">
-              <p className="text-sm text-muted-foreground">Public sharing is currently disabled.</p>
+              <p className="text-sm text-muted-foreground">No public link has been generated yet.</p>
               <Button onClick={() => enableShare.mutate()} disabled={enableShare.isPending} className="gap-2">
                 {enableShare.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
                 Generate Public Link
@@ -1664,13 +1664,16 @@ function SharePublicDialog({ open, onOpenChange, tournament, enableShare, disabl
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-destructive hover:text-destructive/90"
-                  onClick={() => disableShare.mutate()}
-                  disabled={disableShare.isPending}
-                  data-testid="button-disable-sharing"
+                  onClick={() => {
+                    regenerateShare.mutate(undefined, {
+                      onSuccess: () => toast({ title: "New link generated. Old link is now invalid." }),
+                    });
+                  }}
+                  disabled={regenerateShare.isPending}
+                  data-testid="button-regenerate-share"
                 >
-                  <Lock className="w-3 h-3 mr-1" />
-                  Disable
+                  <RefreshCw className={cn("w-3 h-3 mr-1", regenerateShare.isPending && "animate-spin")} />
+                  Regenerate Link
                 </Button>
               </div>
             </div>
@@ -1687,7 +1690,7 @@ function TournamentSettingsDialog({
   renameName, setRenameName,
   collaborators, newCollabEmail, setNewCollabEmail,
   addCollaboratorMutation, removeCollaboratorMutation, deleteTournamentMutation,
-  tournamentId, setLocation, setIsDevicesDialogOpen, enableShare, disableShare, toast,
+  tournamentId, setLocation, setIsDevicesDialogOpen, enableShare, regenerateShare, toast,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -1710,7 +1713,7 @@ function TournamentSettingsDialog({
   setLocation: (path: string) => void;
   setIsDevicesDialogOpen: (open: boolean) => void;
   enableShare: any;
-  disableShare: any;
+  regenerateShare: any;
   toast: any;
 }) {
   const [savingName, setSavingName] = useState(false);
@@ -1812,7 +1815,7 @@ function TournamentSettingsDialog({
           {/* Public Sharing */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Public Sharing</Label>
-            {tournament.shareEnabled && tournament.shareToken ? (
+            {tournament.shareToken ? (
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">Your public spectator page is live. Share the link below.</p>
                 <div className="flex gap-2">
@@ -1839,13 +1842,17 @@ function TournamentSettingsDialog({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-8 shrink-0 text-destructive border-destructive/30 hover:bg-destructive/10"
-                    onClick={() => disableShare.mutate()}
-                    disabled={disableShare.isPending}
-                    data-testid="button-settings-disable-share"
+                    className="h-8 shrink-0"
+                    onClick={() => {
+                      regenerateShare.mutate(undefined, {
+                        onSuccess: () => toast({ title: "New link generated. Old link is now invalid." }),
+                      });
+                    }}
+                    disabled={regenerateShare.isPending}
+                    data-testid="button-settings-regenerate-share"
                   >
-                    <Lock className="w-3 h-3 mr-1" />
-                    Disable
+                    <RefreshCw className={cn("w-3 h-3 mr-1", regenerateShare.isPending && "animate-spin")} />
+                    Regenerate
                   </Button>
                 </div>
               </div>

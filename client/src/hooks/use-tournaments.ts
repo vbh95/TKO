@@ -133,7 +133,19 @@ export function useTournamentShare(id: number) {
     },
   });
 
-  return { enableShare, disableShare };
+  const regenerateShare = useMutation({
+    mutationFn: async () => {
+      const url = buildUrl(api.tournaments.share.regenerate.path, { id });
+      const res = await fetch(url, { method: "POST" });
+      if (!res.ok) throw new Error("Failed to regenerate share link");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.tournaments.get.path, id] });
+    },
+  });
+
+  return { enableShare, disableShare, regenerateShare };
 }
 
 // Public View Hook

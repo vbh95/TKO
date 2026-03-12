@@ -182,7 +182,7 @@ export class DatabaseStorage implements IStorage {
 
   async getTournamentByShareToken(token: string): Promise<Tournament | undefined> {
     const [tournament] = await db.select().from(tournaments).where(
-      and(eq(tournaments.shareToken, token), eq(tournaments.shareEnabled, true))
+      eq(tournaments.shareToken, token)
     );
     return tournament;
   }
