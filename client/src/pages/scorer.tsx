@@ -71,6 +71,7 @@ interface BoardData {
     groupId: number | null;
     order: number;
     stage: string;
+    boardNumber: number | null;
     scorerId: number | null;
     scorerName: string | null;
   }>;
