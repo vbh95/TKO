@@ -71,6 +71,8 @@ interface BoardData {
     groupId: number | null;
     order: number;
     stage: string;
+    scorerId: number | null;
+    scorerName: string | null;
   }>;
   accessToken?: string;
 }
