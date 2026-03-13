@@ -268,6 +268,21 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     }
   }
 
+  const allGroupsDone = groupsList.every(g => isGroupFullyComplete(g.id));
+  if (allGroupsDone) {
+    const refreshed = await storage.getMatchesByTournamentId(tournamentId);
+    const refreshedFirst = refreshed
+      .filter(m => m.stage === 'KNOCKOUT' && m.roundKey === firstRoundKey)
+      .sort((a: any, b: any) => a.order - b.order);
+    for (let i = 0; i < refreshedFirst.length; i++) {
+      const m = refreshedFirst[i];
+      if (m.status === 'PENDING' && m.playerAId && m.playerBId && !(m as any).boardNumber) {
+        await storage.updateMatch(m.id, { boardNumber: i + 1 } as any);
+        if (!updatedQFIds.includes(m.id)) updatedQFIds.push(m.id);
+      }
+    }
+  }
+
   if (completedGroupIdx < firstRoundMatches.length) {
     const lastPlacePlayerId = standings[standings.length - 1].id;
     const lastPlacePlayer = playersList.find(p => p.id === lastPlacePlayerId);
