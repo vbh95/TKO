@@ -2072,7 +2072,7 @@ export default function ScorerPage() {
           </Card>
         )}
 
-        {!inProgressMatch && !nextUpMatch && (allPendingMatches.length > 0 || waitingMatches.length > 0) && (
+        {!inProgressMatch && !nextUpMatch && allPendingMatches.length > 0 && (
           <Card className="border-2 border-primary/30 border-dashed" data-testid="card-waiting-for-assignment">
             <CardContent className="py-12 text-center">
               <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
@@ -2082,7 +2082,7 @@ export default function ScorerPage() {
           </Card>
         )}
 
-        {allPendingMatches.length === 0 && !inProgressMatch && waitingMatches.length === 0 && (
+        {allPendingMatches.length === 0 && !inProgressMatch && !nextUpMatch && (
           <Card className="border-2 border-dashed" data-testid="card-all-done">
             <CardContent className="py-12 text-center">
               <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
