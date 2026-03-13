@@ -659,12 +659,12 @@ export default function PublicView() {
         })
     : [];
 
+    const knockoutRounds = Array.from(new Set(knockoutStageMatches.map(m => m.roundKey))) as string[];
+    const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
+    knockoutRounds.sort((a, b) => (koOrder[a] || 0) - (koOrder[b] || 0));
+
     const knockoutCards: { match?: typeof matches[0]; isLive: boolean; label: string; allDone?: boolean; hideNames?: boolean }[] = [];
     if (groupsFinished && knockoutStageMatches.length > 0) {
-      const knockoutRounds = Array.from(new Set(knockoutStageMatches.map(m => m.roundKey))) as string[];
-      const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
-      knockoutRounds.sort((a, b) => (koOrder[a] || 0) - (koOrder[b] || 0));
-
       let currentRoundKey: string | null = null;
       for (const rk of knockoutRounds) {
         const roundMatches = knockoutStageMatches.filter(m => m.roundKey === rk);
@@ -954,10 +954,6 @@ export default function PublicView() {
                   <div className="divide-y">
                     {roundMatches.map((match) => {
                       const isKnockout = !match.groupId;
-                      const knockoutRounds = Array.from(new Set(knockoutStageMatches.map(m => m.roundKey))) as string[];
-                      const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
-                      knockoutRounds.sort((a, b) => (koOrder[a] || 0) - (koOrder[b] || 0));
-
                       const isFirstKnockoutRound = isKnockout && match.roundKey === knockoutRounds[0];
                       const hideNames = isFirstKnockoutRound && !groupsFinished;
                       const playerA = hideNames ? null : getPlayer(match.playerAId);
