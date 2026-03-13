@@ -240,6 +240,7 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
   const standings = calcGroupStandings(completedGroupId);
   if (standings.length < 2) return;
 
+  const allGroupsDone = groupsList.every(g => isGroupFullyComplete(g.id));
   const updatedQFIds: number[] = [];
   for (let i = 0; i < firstRoundMatches.length && i < pairings.length; i++) {
     const pairing = pairings[i];
@@ -259,7 +260,6 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
       const existingMatch = firstRoundMatches[i];
       const finalPlayerAId = updates.playerAId ?? existingMatch.playerAId;
       const finalPlayerBId = updates.playerBId ?? existingMatch.playerBId;
-      const allGroupsDone = groupsList.every(g => isGroupFullyComplete(g.id));
       if (finalPlayerAId && finalPlayerBId && allGroupsDone) {
         updates.boardNumber = i + 1;
       }
@@ -268,7 +268,6 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     }
   }
 
-  const allGroupsDone = groupsList.every(g => isGroupFullyComplete(g.id));
   if (allGroupsDone) {
     const refreshed = await storage.getMatchesByTournamentId(tournamentId);
     const refreshedFirst = refreshed
