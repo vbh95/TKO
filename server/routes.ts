@@ -259,7 +259,8 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
       const existingMatch = firstRoundMatches[i];
       const finalPlayerAId = updates.playerAId ?? existingMatch.playerAId;
       const finalPlayerBId = updates.playerBId ?? existingMatch.playerBId;
-      if (finalPlayerAId && finalPlayerBId) {
+      const allGroupsDone = groupsList.every(g => isGroupFullyComplete(g.id));
+      if (finalPlayerAId && finalPlayerBId && allGroupsDone) {
         updates.boardNumber = i + 1;
       }
       await storage.updateMatch(firstRoundMatches[i].id, updates);
@@ -1439,6 +1440,15 @@ export async function registerRoutes(
       }
 
       const { boardNumber } = req.body;
+
+      if (match.stage === 'KNOCKOUT' && boardNumber !== null && boardNumber !== 0) {
+        const allMatchesTx = await storage.getMatchesByTournamentId(tournamentId);
+        const groupMatchesTx = allMatchesTx.filter(m => m.groupId !== null);
+        const allGroupsDone = groupMatchesTx.every(m => m.status === 'COMPLETED');
+        if (!allGroupsDone) {
+          return res.status(400).json({ message: "Cannot assign knockout match to a board until all group stage matches are complete" });
+        }
+      }
       const groups = await storage.getGroupsByTournamentId(tournamentId);
       const maxBoard = groups.length || 1;
 
