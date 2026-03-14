@@ -1,6 +1,8 @@
 import { useParams } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { usePublicTournament } from "@/hooks/use-tournaments";
+import { queryClient } from "@/lib/queryClient";
+import { api } from "@shared/routes";
 import { Loader2, Trophy, Eye, Sun, Moon, Check, ChevronDown, Crosshair } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import tkoLogoFull from "@assets/TKO_White-04_1771178906649.png";
@@ -516,7 +518,23 @@ export default function PublicView() {
   }, [shareToken, joinPublic, socket, refetch]);
 
   useEffect(() => {
-    const cleanup1 = on("match:updated", () => { refetch(); });
+    const cleanup1 = on("match:updated", (updatedMatch: any) => {
+      if (updatedMatch?.id) {
+        queryClient.setQueryData(
+          [api.public.get.path, shareToken],
+          (old: any) => {
+            if (!old) return old;
+            return {
+              ...old,
+              matches: (old.matches ?? []).map((m: any) =>
+                m.id === updatedMatch.id ? { ...m, ...updatedMatch } : m
+              ),
+            };
+          }
+        );
+      }
+      refetch();
+    });
     const cleanup2 = on("tournament:updated", () => refetch());
     const cleanup3 = on("leg:scoring", (incoming: LiveScoring) => {
       setLiveScorings(prev => {

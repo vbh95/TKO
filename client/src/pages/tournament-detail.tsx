@@ -383,7 +383,21 @@ export default function TournamentDetail() {
   }, [tournamentId, joinTournament]);
 
   useEffect(() => {
-    const cleanup1 = on("match:updated", () => {
+    const cleanup1 = on("match:updated", (updatedMatch: any) => {
+      if (updatedMatch?.id) {
+        queryClient.setQueryData(
+          ['/api/tournaments/:id', tournamentId],
+          (old: any) => {
+            if (!old) return old;
+            return {
+              ...old,
+              matches: (old.matches ?? []).map((m: any) =>
+                m.id === updatedMatch.id ? { ...m, ...updatedMatch } : m
+              ),
+            };
+          }
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments/:id', tournamentId] });
     });
     const cleanup2 = on("board:status", (status: { boardNumber: number; online: boolean }) => {
