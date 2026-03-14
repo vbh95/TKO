@@ -697,6 +697,7 @@ export default function ScorerPage() {
       return res.json();
     },
     onSuccess: (_, matchId) => {
+      userNavigatedBackRef.current = false;
       setActiveMatchId(matchId);
       setLegsWonA(0);
       setLegsWonB(0);
@@ -1356,6 +1357,7 @@ export default function ScorerPage() {
 
     const handleFirstThrower = (thrower: 'A' | 'B') => {
       const applyThrower = () => {
+        userNavigatedBackRef.current = false;
         const initLegsA = activeMatch.scoreA || 0;
         const initLegsB = activeMatch.scoreB || 0;
         setLegsWonA(initLegsA);
