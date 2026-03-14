@@ -537,6 +537,7 @@ export default function ScorerPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [view, setView] = useState<ScorerView>("matchList");
   const [activeMatchId, setActiveMatchId] = useState<number | null>(null);
+  const userNavigatedBackRef = useRef(false);
 
   const [legsWonA, setLegsWonA] = useState(0);
   const [legsWonB, setLegsWonB] = useState(0);
@@ -597,6 +598,10 @@ export default function ScorerPage() {
 
   useEffect(() => {
     if (data && view === "matchList" && activeMatchId === null) {
+      if (userNavigatedBackRef.current) {
+        userNavigatedBackRef.current = false;
+        return;
+      }
       const inProgress = data.matches.find(m => m.status === 'IN_PROGRESS');
       if (inProgress) {
         const saved = loadScorerState(inProgress.id);
@@ -729,6 +734,7 @@ export default function ScorerPage() {
     },
     onSuccess: (_data, matchId) => {
       clearScorerState(matchId);
+      userNavigatedBackRef.current = true;
       setActiveMatchId(null);
       setConfirmRestart(null);
       refetch();
@@ -1403,6 +1409,7 @@ export default function ScorerPage() {
               size="icon"
               className="text-primary-foreground shrink-0 h-8 w-8"
               onClick={() => {
+                userNavigatedBackRef.current = true;
                 setView("matchList");
                 setActiveMatchId(null);
               }}
@@ -1497,6 +1504,7 @@ export default function ScorerPage() {
               size="icon"
               className="text-primary-foreground shrink-0 h-7 w-7 z-10"
               onClick={() => {
+                userNavigatedBackRef.current = true;
                 setView("matchList");
                 setActiveMatchId(null);
               }}
