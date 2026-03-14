@@ -1467,8 +1467,8 @@ export default function ScorerPage() {
           <div className="relative flex items-center max-w-4xl mx-auto h-8 md:h-10">
             <Button
               variant="ghost"
-              size="icon"
-              className="text-primary-foreground shrink-0 h-7 w-7 z-10"
+              size="sm"
+              className="text-primary-foreground shrink-0 h-7 px-1.5 gap-1 z-10"
               onClick={() => {
                 if (legVisits.length === 0 && legsWonA === 0 && legsWonB === 0) {
                   setView("bullThrow");
@@ -1481,6 +1481,9 @@ export default function ScorerPage() {
               data-testid="button-back-to-list"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
+              {legVisits.length === 0 && legsWonA === 0 && legsWonB === 0 && (
+                <span className="text-xs font-medium">Bull Throw</span>
+              )}
             </Button>
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <img src={tkoLogoWhite} alt="TKO" className="h-5 md:h-7 pointer-events-auto" />
