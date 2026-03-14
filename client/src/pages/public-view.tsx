@@ -366,13 +366,13 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel, hideScorer }:
         <CardTitle className="text-sm flex items-center gap-2">
           <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
           {headerLabel}
-          {ls && (ls.dartsA > 0 || ls.dartsB > 0) && (
+          {ls && (
             <span className="text-xs text-muted-foreground ml-auto">
               Leg {(ls.legsWonA + ls.legsWonB + 1)} / Best of {ls.bestOf}
             </span>
           )}
         </CardTitle>
-        {ls && (ls.dartsA > 0 || ls.dartsB > 0) && (
+        {ls && (
           <div className="flex items-center justify-between mt-2">
             <span className={cn(
               "truncate max-w-[38%] text-xl font-black",
@@ -391,7 +391,7 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel, hideScorer }:
         )}
       </CardHeader>
       <CardContent className="pt-3 pb-4 px-4">
-        {ls && (ls.dartsA > 0 || ls.dartsB > 0) ? (
+        {ls ? (
           <div>
             {ls.lastLegResult && (
               <div className="mb-3 rounded-lg bg-primary/10 border border-primary/30 px-3 py-2 text-center">

@@ -1165,13 +1165,13 @@ export default function TournamentDetail() {
                       <CardTitle className="text-sm flex items-center gap-2">
                         <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
                         {headerLabel}
-                        {live && (live.dartsA > 0 || live.dartsB > 0) && (
+                        {live && (
                           <span className="text-xs text-muted-foreground ml-auto">
                             Leg {live.legsWonA + live.legsWonB + 1} / Best of {live.bestOf}
                           </span>
                         )}
                       </CardTitle>
-                      {live && (live.dartsA > 0 || live.dartsB > 0) && (
+                      {live && (
                         <div className="flex items-center justify-between mt-2">
                           <span className="truncate max-w-[38%] text-xl font-black">{live.playerAName || playerA?.name || 'TBD'}</span>
                           <span className="text-primary font-black font-mono shrink-0 px-3 text-2xl tabular-nums">
@@ -1182,7 +1182,7 @@ export default function TournamentDetail() {
                       )}
                     </CardHeader>
                     <CardContent className="pt-3 pb-4 px-4 space-y-3">
-                      {live && (live.dartsA > 0 || live.dartsB > 0) ? (
+                      {live ? (
                         <>
                           {live.lastLegResult && (
                             <div className="rounded-lg bg-primary/10 border border-primary/30 px-3 py-2 text-center">
