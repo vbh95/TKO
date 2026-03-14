@@ -1190,14 +1190,16 @@ export default function TournamentDetail() {
                           </div>
                         </>
                       ) : (
-                        <div className="flex items-center justify-between text-center py-4">
-                          <div className="flex-1"><p className="text-lg font-bold">{playerA?.name || "TBD"}</p></div>
-                          <div className="flex items-center gap-3 px-3">
-                            <span className="text-2xl font-bold tabular-nums">{match.scoreA || 0}</span>
-                            <span className="text-muted-foreground text-xs uppercase font-medium">vs</span>
-                            <span className="text-2xl font-bold tabular-nums">{match.scoreB || 0}</span>
+                        <div className="flex flex-col items-center justify-center py-8 gap-3">
+                          <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-green-600 dark:text-green-400">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                            Match About to Start
+                          </span>
+                          <div className="text-xl font-black flex items-center gap-3">
+                            <span>{playerA?.name || "TBD"}</span>
+                            <span className="text-muted-foreground text-sm font-medium">vs</span>
+                            <span>{playerB?.name || "TBD"}</span>
                           </div>
-                          <div className="flex-1"><p className="text-lg font-bold">{playerB?.name || "TBD"}</p></div>
                         </div>
                       )}
                       {match.scorerName && (

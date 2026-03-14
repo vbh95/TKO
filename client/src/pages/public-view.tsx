@@ -474,10 +474,14 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel, hideScorer }:
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center min-h-[100px] text-center">
-            <div className="text-lg font-bold flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center min-h-[100px] gap-3 py-2">
+            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-green-600 dark:text-green-400">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              Match About to Start
+            </span>
+            <div className="text-xl font-black flex items-center gap-3">
               <span className={cn(!(playerA?.name) && "text-muted-foreground/60 font-normal")}>{playerA?.name || "TBD"}</span>
-              <span className="text-muted-foreground text-xs uppercase font-medium tracking-wider mx-2">vs</span>
+              <span className="text-muted-foreground text-sm font-medium">vs</span>
               <span className={cn(!(playerB?.name) && "text-muted-foreground/60 font-normal")}>{playerB?.name || "TBD"}</span>
             </div>
           </div>
