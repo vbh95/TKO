@@ -1470,9 +1470,13 @@ export default function ScorerPage() {
               size="icon"
               className="text-primary-foreground shrink-0 h-7 w-7 z-10"
               onClick={() => {
-                userNavigatedBackRef.current = true;
-                setView("matchList");
-                setActiveMatchId(null);
+                if (legVisits.length === 0 && legsWonA === 0 && legsWonB === 0) {
+                  setView("bullThrow");
+                } else {
+                  userNavigatedBackRef.current = true;
+                  setView("matchList");
+                  setActiveMatchId(null);
+                }
               }}
               data-testid="button-back-to-list"
             >
@@ -1510,18 +1514,6 @@ export default function ScorerPage() {
         </div>
 
         <div className="flex-1 flex flex-col w-full max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto px-2 md:px-4 py-0.5 md:py-1 overflow-hidden">
-          {legVisits.length === 0 && legsWonA === 0 && legsWonB === 0 && (
-            <div className="flex justify-center mb-0.5 shrink-0">
-              <button
-                className="flex items-center gap-1 text-gray-400 text-[9px] md:text-[10px] px-2 py-0.5 rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] touch-manipulation active:bg-[#3a3a3a] transition-colors"
-                onClick={() => setView("bullThrow")}
-                data-testid="button-back-to-bull"
-              >
-                <ArrowLeft className="w-2.5 h-2.5" />
-                Bull Throw
-              </button>
-            </div>
-          )}
           <div className="text-center py-0.5 md:py-1 shrink-0">
             <p className="text-primary text-[10px] md:text-sm uppercase tracking-wider font-bold">
               {getMatchRoundLabel(activeMatch)}
@@ -1777,12 +1769,15 @@ export default function ScorerPage() {
               ))}
               <div className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
                 <button
-                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
+                  className={cn(
+                    "h-full min-h-[36px] rounded-lg flex items-center justify-center touch-manipulation active:scale-90 transition-all",
+                    legVisits.length === 0 || updateScoreMutation.isPending ? "opacity-20 pointer-events-none" : "opacity-70"
+                  )}
                   onClick={handleUndo}
                   disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                   data-testid="button-undo"
                 >
-                  <Undo2 className={cn("w-5 h-5 md:w-7 md:h-7", legVisits.length === 0 ? "text-gray-700" : "text-gray-300")} />
+                  <Undo2 className="w-5 h-5 md:w-7 md:h-7 text-gray-400" />
                 </button>
                 <button
                   className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
