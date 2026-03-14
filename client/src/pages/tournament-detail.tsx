@@ -986,6 +986,15 @@ export default function TournamentDetail() {
   const liveMatches = matches.filter((m: any) => m.status === 'IN_PROGRESS');
   const tabCount = 4 + (isMultiStage ? 1 : 0);
 
+  const boardSlots = sortedGroupsForBoards.map((group: any, idx: number) => {
+    const boardNum = idx + 1;
+    const activeMatch = matches.find((m: any) =>
+      m.status === 'IN_PROGRESS' &&
+      (m.boardNumber === boardNum || (m.groupId === group.id && !m.boardNumber))
+    ) || null;
+    return { boardNum, group, activeMatch, isLive: !!activeMatch };
+  });
+
   return (
     <LayoutShell>
       <div className="space-y-8">
@@ -1079,16 +1088,38 @@ export default function TournamentDetail() {
           </TabsList>
 
           <TabsContent value="live" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {liveMatches.map((match: any) => {
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {boardSlots.map(({ boardNum, group, activeMatch, isLive }) => {
+                if (!isLive || !activeMatch) {
+                  return (
+                    <Card key={`board-${boardNum}`} className="border-2 border-dashed border-muted-foreground/30" data-testid={`board-slot-waiting-${boardNum}`}>
+                      <CardHeader className="bg-muted/30 border-b py-2.5 px-4">
+                        <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
+                          <span className="w-2.5 h-2.5 bg-muted-foreground/30 rounded-full" />
+                          Board {boardNum} — {group.name}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="py-12 text-center">
+                        <Loader2 className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3 animate-spin" />
+                        <p className="text-muted-foreground font-medium">Waiting for match to start</p>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+
+                const match = activeMatch;
                 const live = liveScorings.get(match.id);
                 const playerA = getPlayer(match.playerAId);
                 const playerB = getPlayer(match.playerBId);
                 const headerLabel = match.stage === 'GROUP'
-                  ? (groups.find((g: any) => g.id === match.groupId)?.name || 'Group Match')
-                  : match.roundKey === 'F' ? 'Final' : match.roundKey === 'SF' ? 'Semi Final' : match.roundKey === 'QF' ? 'Quarter Final' : 'Knockout';
+                  ? `Board ${boardNum} — ${group.name}`
+                  : match.roundKey === 'QF' ? `Board ${boardNum} — Quarter Final`
+                  : match.roundKey === 'SF' ? `Board ${boardNum} — Semi Final`
+                  : match.roundKey === 'F' ? `Board ${boardNum} — Final`
+                  : `Board ${boardNum}`;
+
                 return (
-                  <Card key={match.id} className="border-2 border-primary shadow-xl overflow-hidden">
+                  <Card key={match.id} className="border-2 border-primary shadow-xl overflow-hidden" data-testid={`board-slot-live-${boardNum}`}>
                     <CardHeader className="bg-primary/10 border-b py-2.5 px-4">
                       <CardTitle className="text-sm flex items-center gap-2">
                         <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
@@ -1178,17 +1209,6 @@ export default function TournamentDetail() {
                   </Card>
                 );
               })}
-              {liveMatches.length === 0 && (
-                <div className="col-span-full py-20 text-center bg-muted/20 border-2 border-dashed rounded-xl">
-                  <div className="flex flex-col items-center gap-3">
-                    <Radio className="w-10 h-10 text-muted-foreground/40 animate-pulse" />
-                    <p className="text-muted-foreground font-medium">No live matches in progress</p>
-                    <p className="text-xs text-muted-foreground/60 max-w-xs mx-auto">
-                      Head to the Matches tab and select a match to start scoring.
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
           </TabsContent>
 
