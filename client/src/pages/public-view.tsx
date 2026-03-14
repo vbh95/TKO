@@ -544,7 +544,7 @@ export default function PublicView() {
       });
     });
     return () => { cleanup1(); cleanup2(); cleanup3(); };
-  }, [on, refetch]);
+  }, [on, refetch, shareToken]);
 
   if (isLoading) {
     return (
