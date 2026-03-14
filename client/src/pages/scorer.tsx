@@ -27,14 +27,6 @@ import { useTheme } from "@/hooks/use-theme";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/hooks/use-socket";
 import { useToast } from "@/hooks/use-toast";
@@ -1217,8 +1209,6 @@ export default function ScorerPage() {
     return getMatchTypeLabel(match);
   };
 
-  const ptsWin = (tournament.settings as any)?.pointsForWin ?? 2;
-  const ptsLoss = (tournament.settings as any)?.pointsForLoss ?? 0;
 
   const completedMatches = matches.filter(m => m.status === 'COMPLETED');
   const allPendingMatches = matches.filter(m => m.status === 'PENDING' && m.playerAId && m.playerBId);
@@ -1244,31 +1234,6 @@ export default function ScorerPage() {
   const waitingMatches = matches.filter(m => m.status === 'PENDING' && (!m.playerAId || !m.playerBId));
   const inProgressMatch = matches.find(m => m.status === 'IN_PROGRESS');
 
-  const standings = players.map(player => {
-    const playerMatches = completedMatches.filter(m =>
-      m.playerAId === player.id || m.playerBId === player.id
-    );
-    let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
-    playerMatches.forEach(m => {
-      played++;
-      const isA = m.playerAId === player.id;
-      const myScore = isA ? (m.scoreA || 0) : (m.scoreB || 0);
-      const oppScore = isA ? (m.scoreB || 0) : (m.scoreA || 0);
-      legsFor += myScore;
-      legsAgainst += oppScore;
-      if (m.winnerId === player.id) won++;
-      else lost++;
-    });
-    return {
-      ...player, played, won, lost, legsFor, legsAgainst,
-      diff: legsFor - legsAgainst,
-      pts: (won * ptsWin) + (lost * ptsLoss)
-    };
-  }).sort((a, b) => {
-    if (b.pts !== a.pts) return b.pts - a.pts;
-    if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-    return 0;
-  });
 
   const handleTapMatch = (matchId: number) => {
     const match = matches.find(m => m.id === matchId);
@@ -2200,46 +2165,6 @@ export default function ScorerPage() {
             </CardContent>
           </Card>
         )}
-
-        <Card className="border-t-4 border-t-primary" data-testid="card-standings">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Trophy className="w-5 h-5 text-yellow-500" />
-              {group.name} Standings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[40px] text-center">#</TableHead>
-                  <TableHead>Player</TableHead>
-                  <TableHead className="text-center">P</TableHead>
-                  <TableHead className="text-center">W</TableHead>
-                  <TableHead className="text-center">L</TableHead>
-                  <TableHead className="text-right font-bold">Pts</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {standings.map((player, idx) => (
-                  <TableRow key={player.id} className={idx === 0 ? "bg-yellow-50 dark:bg-yellow-900/10" : ""}>
-                    <TableCell className="font-medium text-muted-foreground">
-                      <div className="flex items-center justify-center gap-1.5 text-center">
-                        {idx === 0 && <div className="w-2 h-2 rounded-full bg-green-500" />}
-                        {idx + 1}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-bold">{player.name}</TableCell>
-                    <TableCell className="text-center">{player.played}</TableCell>
-                    <TableCell className="text-center text-green-600">{player.won}</TableCell>
-                    <TableCell className="text-center text-red-500">{player.lost}</TableCell>
-                    <TableCell className="text-right font-bold text-primary text-lg">{player.pts}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
 
         {completedMatches.length > 0 && (
           <Card data-testid="card-completed-matches">
