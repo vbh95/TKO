@@ -1769,15 +1769,12 @@ export default function ScorerPage() {
               ))}
               <div className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
                 <button
-                  className={cn(
-                    "h-full min-h-[36px] rounded-lg flex items-center justify-center touch-manipulation active:scale-90 transition-all",
-                    legVisits.length === 0 || updateScoreMutation.isPending ? "opacity-20 pointer-events-none" : "opacity-70"
-                  )}
+                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
                   onClick={handleUndo}
                   disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                   data-testid="button-undo"
                 >
-                  <Undo2 className="w-5 h-5 md:w-7 md:h-7 text-gray-400" />
+                  <Undo2 className={cn("w-5 h-5 md:w-7 md:h-7", legVisits.length === 0 ? "text-gray-700" : "text-red-400")} />
                 </button>
                 <button
                   className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
