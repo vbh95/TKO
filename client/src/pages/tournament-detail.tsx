@@ -992,7 +992,12 @@ export default function TournamentDetail() {
       m.status === 'IN_PROGRESS' &&
       (m.boardNumber === boardNum || (m.groupId === group.id && !m.boardNumber))
     ) || null;
-    return { boardNum, group, activeMatch, isLive: !!activeMatch };
+    const nextMatch = !activeMatch
+      ? (matches.find((m: any) => m.status === 'PENDING' && m.boardNumber === boardNum)
+        || matches.find((m: any) => m.status === 'PENDING' && m.groupId === group.id && !m.boardNumber)
+        || null)
+      : null;
+    return { boardNum, group, activeMatch, isLive: !!activeMatch, nextMatch };
   });
 
   return (
@@ -1089,19 +1094,41 @@ export default function TournamentDetail() {
 
           <TabsContent value="live" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {boardSlots.map(({ boardNum, group, activeMatch, isLive }) => {
+              {boardSlots.map(({ boardNum, group, activeMatch, isLive, nextMatch }) => {
                 if (!isLive || !activeMatch) {
+                  const nextPlayerA = nextMatch ? getPlayer(nextMatch.playerAId) : null;
+                  const nextPlayerB = nextMatch ? getPlayer(nextMatch.playerBId) : null;
                   return (
                     <Card key={`board-${boardNum}`} className="border-2 border-dashed border-muted-foreground/30" data-testid={`board-slot-waiting-${boardNum}`}>
                       <CardHeader className="bg-muted/30 border-b py-2.5 px-4">
                         <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
                           <span className="w-2.5 h-2.5 bg-muted-foreground/30 rounded-full" />
                           Board {boardNum} — {group.name}
+                          {nextMatch && (
+                            <span className="text-xs ml-auto">Next Up</span>
+                          )}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="py-12 text-center">
-                        <Loader2 className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3 animate-spin" />
-                        <p className="text-muted-foreground font-medium">Waiting for match to start</p>
+                      <CardContent className="py-8 text-center">
+                        {nextMatch ? (
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="text-xl font-black flex items-center gap-3">
+                              <span className={cn(!nextPlayerA && "text-muted-foreground/60 font-normal")}>{nextPlayerA?.name || "TBD"}</span>
+                              <span className="text-muted-foreground text-sm font-medium">vs</span>
+                              <span className={cn(!nextPlayerB && "text-muted-foreground/60 font-normal")}>{nextPlayerB?.name || "TBD"}</span>
+                            </div>
+                            {nextMatch.scorerName && (
+                              <p className="text-[11px] text-muted-foreground" data-testid={`board-slot-next-scorer-${boardNum}`}>
+                                Scorer: {nextMatch.scorerName}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <Loader2 className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3 animate-spin" />
+                            <p className="text-muted-foreground font-medium">Waiting for match to start</p>
+                          </>
+                        )}
                       </CardContent>
                     </Card>
                   );
