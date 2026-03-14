@@ -2072,6 +2072,72 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/scorer/matches/:matchId/restart', isBoardAuthenticated, async (req: any, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      const match = await storage.getMatch(matchId);
+      if (!match) return res.status(404).json({ message: "Match not found" });
+
+      const { tournamentId, boardNumber } = req.boardSession;
+      if (match.tournamentId !== tournamentId) {
+        return res.status(403).json({ message: "Match does not belong to this tournament" });
+      }
+
+      if (match.status !== 'IN_PROGRESS') {
+        return res.status(400).json({ message: "Only IN_PROGRESS matches can be restarted" });
+      }
+
+      const [allMatches, boardGroups, startTournament] = await Promise.all([
+        storage.getMatchesByTournamentId(tournamentId),
+        storage.getGroupsByTournamentId(tournamentId),
+        storage.getTournament(tournamentId),
+      ]);
+      const sortedGroups = boardGroups.sort((a, b) => a.name.localeCompare(b.name));
+      const boardGroup = sortedGroups.length > 0 ? sortedGroups[boardNumber - 1] : null;
+
+      const isKnockoutOnly = sortedGroups.length === 0;
+      const isReassignedAway = match.stage === 'GROUP' && match.boardNumber !== null && match.boardNumber !== boardNumber;
+      const isGroupMatch = boardGroup ? (match.groupId === boardGroup.id && !isReassignedAway) : false;
+      const isGuestGroupMatch = match.stage === 'GROUP' && !isGroupMatch && match.boardNumber === boardNumber;
+      const configuredBoards: number | undefined = (startTournament?.settings as any)?.numBoards;
+
+      let isKnockoutOnBoard: boolean;
+      if (isKnockoutOnly && match.stage === 'KNOCKOUT') {
+        const sortedKO = allMatches
+          .filter(m => m.stage === 'KNOCKOUT')
+          .sort((a: any, b: any) => a.order - b.order);
+        const matchesInRound = sortedKO.filter(m => m.roundKey === match.roundKey);
+        const matchIdxInRound = matchesInRound.findIndex(m => m.id === matchId);
+        if (configuredBoards && configuredBoards > 0) {
+          isKnockoutOnBoard = (matchIdxInRound % configuredBoards) + 1 === boardNumber;
+        } else {
+          isKnockoutOnBoard = matchIdxInRound === boardNumber - 1;
+        }
+      } else {
+        isKnockoutOnBoard = match.stage === 'KNOCKOUT' && (match as any).boardNumber === boardNumber;
+      }
+
+      if (!isGroupMatch && !isGuestGroupMatch && !isKnockoutOnBoard) {
+        return res.status(403).json({ message: "Match is not assigned to this board" });
+      }
+
+      const updatedMatch = await storage.updateMatch(matchId, {
+        status: "PENDING",
+        scoreA: 0,
+        scoreB: 0,
+      });
+
+      const tournament = await storage.getTournament(tournamentId);
+      emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
+      emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
+
+      res.json(updatedMatch);
+    } catch (err) {
+      console.error("Scorer match restart error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.put('/api/scorer/matches/:matchId', isBoardAuthenticated, async (req: any, res) => {
     try {
       const matchId = parseInt(req.params.matchId);

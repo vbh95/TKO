@@ -712,6 +712,33 @@ export default function ScorerPage() {
     },
   });
 
+  const [confirmRestart, setConfirmRestart] = useState<number | null>(null);
+
+  const restartMatchMutation = useMutation({
+    mutationFn: async (matchId: number) => {
+      const res = await fetch(`/api/scorer/matches/${matchId}/restart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to restart match");
+      }
+      return res.json();
+    },
+    onSuccess: (_data, matchId) => {
+      clearScorerState(matchId);
+      setActiveMatchId(null);
+      setConfirmRestart(null);
+      refetch();
+      toast({ title: "Match restarted", description: "The match has been reset and is ready to start again." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to restart", description: err.message, variant: "destructive" });
+    },
+  });
+
   const updateScoreMutation = useMutation({
     mutationFn: async ({ matchId, scoreA, scoreB, notes }: { matchId: number; scoreA: number; scoreB: number; notes?: any }) => {
       const res = await fetch(`/api/scorer/matches/${matchId}`, {
@@ -1993,8 +2020,7 @@ export default function ScorerPage() {
       <div className="container max-w-3xl mx-auto px-4 py-6 space-y-6">
         {inProgressMatch && (
           <Card
-            className="border-2 border-green-500 shadow-xl cursor-pointer"
-            onClick={() => handleTapMatch(inProgressMatch.id)}
+            className="border-2 border-green-500 shadow-xl"
             data-testid={`card-match-in-progress-${inProgressMatch.id}`}
           >
             <CardHeader className="bg-green-500/10 border-b pb-3">
@@ -2019,11 +2045,50 @@ export default function ScorerPage() {
               <p className="text-center text-sm text-muted-foreground mb-4">Best of {inProgressMatch.bestOf} (first to {Math.ceil((inProgressMatch.bestOf || bestOf) / 2)})</p>
               <Button
                 className="w-full h-14 text-lg"
+                onClick={() => handleTapMatch(inProgressMatch.id)}
                 data-testid="button-resume-scoring"
               >
                 <Play className="w-5 h-5 mr-2" />
                 Continue Scoring
               </Button>
+              {confirmRestart === inProgressMatch.id ? (
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="destructive"
+                    className="flex-1 h-12"
+                    onClick={() => {
+                      restartMatchMutation.mutate(inProgressMatch.id);
+                    }}
+                    disabled={restartMatchMutation.isPending}
+                    data-testid="button-confirm-restart-match"
+                  >
+                    {restartMatchMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                    )}
+                    Confirm Restart
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-12"
+                    onClick={() => setConfirmRestart(null)}
+                    data-testid="button-cancel-restart-match"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full h-12 mt-2 border-destructive/40 text-destructive hover:bg-destructive/10"
+                  onClick={() => setConfirmRestart(inProgressMatch.id)}
+                  data-testid="button-restart-match"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Restart Match
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
