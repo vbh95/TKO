@@ -16,7 +16,6 @@ import {
   Wifi,
   WifiOff,
   Play,
-  ChevronRight,
   RotateCcw,
   Camera,
   ScanLine,
@@ -2175,18 +2174,11 @@ export default function ScorerPage() {
             <CardContent className="p-0">
               <div className="divide-y">
                 {upcomingMatches.map((match) => {
-                  const isAssigned = typeof match.boardNumber === 'number' && match.boardNumber === boardNumber;
-                  const isInNaturalQueue = match.groupId === naturalGroupId && (match.boardNumber === null || match.boardNumber === boardNumber);
-                  const isInteractive = isAssigned || isInNaturalQueue;
                   return (
                     <div
                       key={match.id}
-                      className={cn(
-                        "flex items-center p-4 w-full transition-colors",
-                        isInteractive ? "hover:bg-muted/50 cursor-pointer touch-manipulation" : "opacity-60"
-                      )}
-                      onClick={isInteractive && !inProgressMatch && !startMatchMutation.isPending ? () => handleTapMatch(match.id) : undefined}
-                      data-testid={`button-upcoming-match-${match.id}`}
+                      className="flex items-center p-4 w-full"
+                      data-testid={`row-upcoming-match-${match.id}`}
                     >
                       <div className="flex-1 flex flex-col items-center gap-1">
                         <span className="text-[10px] text-muted-foreground uppercase font-semibold">{getMatchTypeLabel(match)}</span>
@@ -2201,7 +2193,6 @@ export default function ScorerPage() {
                           </span>
                         )}
                       </div>
-                      {isInteractive && <ChevronRight className="w-4 h-4 text-muted-foreground ml-3 shrink-0" />}
                     </div>
                   );
                 })}
