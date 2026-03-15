@@ -2451,10 +2451,15 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, 
               })}
             </div>
           );
-        })() : (
+        })() : (() => {
+          const tSettings = (tournament.settings as any) || {};
+          const isBoardRotation = tSettings.groupScheduleMode === 'board_rotation';
+          const numBoardsForRotation: number = tSettings.numberOfBoards || Math.floor(sortedGroups.length / 2);
+          const boardCount = isBoardRotation ? numBoardsForRotation : sortedGroups.length;
+          const boardNumbers = Array.from({ length: boardCount }, (_, i) => i + 1);
+          return (
           <div className="space-y-4">
-            {sortedGroups.map((group: any, idx: number) => {
-              const boardNumber = idx + 1;
+            {boardNumbers.map((boardNumber: number) => {
               const session = boardSessions.find((s: any) => s.boardNumber === boardNumber);
               const isPaired = session?.pairedAt != null;
               const pairUrl = session ? `${window.location.origin}/pair?token=${session.pairingToken}` : null;
@@ -2462,22 +2467,40 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, 
                 ? `${window.location.origin}/public/t/${tournament.shareToken}/board/${boardNumber}`
                 : null;
 
-              const groupMatches = matches.filter((m: any) => m.groupId === group.id);
-              const knockoutMatchesOnBoard = matches.filter((m: any) => !m.groupId && m.boardNumber === boardNumber);
-              const overlayMatch =
-                groupMatches.find((m: any) => m.status === 'IN_PROGRESS') ||
-                groupMatches.find((m: any) => m.status === 'PENDING' && m.playerAId && m.playerBId) ||
-                knockoutMatchesOnBoard.find((m: any) => m.status === 'IN_PROGRESS') ||
-                knockoutMatchesOnBoard.find((m: any) => m.status === 'PENDING' && m.playerAId && m.playerBId) ||
-                null;
+              let boardSubtitle: string;
+              let overlayMatch: any;
+              if (isBoardRotation) {
+                const groupA = sortedGroups[(boardNumber - 1) * 2];
+                const groupB = sortedGroups[(boardNumber - 1) * 2 + 1];
+                boardSubtitle = [groupA?.name, groupB?.name].filter(Boolean).join(' & ');
+                const boardGroupMatches = matches.filter((m: any) => m.boardNumber === boardNumber && m.groupId);
+                const knockoutMatchesOnBoard = matches.filter((m: any) => !m.groupId && m.boardNumber === boardNumber);
+                overlayMatch =
+                  boardGroupMatches.find((m: any) => m.status === 'IN_PROGRESS') ||
+                  boardGroupMatches.find((m: any) => m.status === 'PENDING' && m.playerAId && m.playerBId) ||
+                  knockoutMatchesOnBoard.find((m: any) => m.status === 'IN_PROGRESS') ||
+                  knockoutMatchesOnBoard.find((m: any) => m.status === 'PENDING' && m.playerAId && m.playerBId) ||
+                  null;
+              } else {
+                const group = sortedGroups[boardNumber - 1];
+                boardSubtitle = group?.name || '';
+                const groupMatches = matches.filter((m: any) => m.groupId === group?.id);
+                const knockoutMatchesOnBoard = matches.filter((m: any) => !m.groupId && m.boardNumber === boardNumber);
+                overlayMatch =
+                  groupMatches.find((m: any) => m.status === 'IN_PROGRESS') ||
+                  groupMatches.find((m: any) => m.status === 'PENDING' && m.playerAId && m.playerBId) ||
+                  knockoutMatchesOnBoard.find((m: any) => m.status === 'IN_PROGRESS') ||
+                  knockoutMatchesOnBoard.find((m: any) => m.status === 'PENDING' && m.playerAId && m.playerBId) ||
+                  null;
+              }
               const overlayUrl = overlayMatch ? `${window.location.origin}/overlay/${overlayMatch.id}` : null;
 
               return (
-                <div key={group.id} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${boardNumber}`}>
+                <div key={boardNumber} className="border rounded-xl p-4 space-y-3" data-testid={`device-board-${boardNumber}`}>
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-bold text-sm">Board {boardNumber}</h3>
-                      <p className="text-xs text-muted-foreground">{group.name}</p>
+                      <p className="text-xs text-muted-foreground">{boardSubtitle}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {isPaired && boardStatuses[boardNumber] && (
@@ -2597,7 +2620,9 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, 
               );
             })}
           </div>
-        )}
+        );
+        })()
+        }
       </DialogContent>
     </Dialog>
   );
