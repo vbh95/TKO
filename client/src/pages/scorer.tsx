@@ -1439,10 +1439,12 @@ export default function ScorerPage() {
     const visitsB = legVisits.filter(v => v.player === 'B');
     const dartsA = visitsA.length * 3;
     const dartsB = visitsB.length * 3;
-    const totalScoreA = visitsA.reduce((s, v) => s + v.score, 0);
-    const totalScoreB = visitsB.reduce((s, v) => s + v.score, 0);
-    const avgA = dartsA > 0 ? (totalScoreA / visitsA.length).toFixed(2) : '0.00';
-    const avgB = dartsB > 0 ? (totalScoreB / visitsB.length).toFixed(2) : '0.00';
+    const matchAllA = [...allMatchVisits, ...legVisits].filter(v => v.player === 'A');
+    const matchAllB = [...allMatchVisits, ...legVisits].filter(v => v.player === 'B');
+    const matchTotalA = matchAllA.reduce((s, v) => s + v.score, 0);
+    const matchTotalB = matchAllB.reduce((s, v) => s + v.score, 0);
+    const avgA = matchAllA.length > 0 ? (matchTotalA / matchAllA.length).toFixed(1) : '0.0';
+    const avgB = matchAllB.length > 0 ? (matchTotalB / matchAllB.length).toFixed(1) : '0.0';
     const lastScoreA = visitsA.length > 0 ? visitsA[visitsA.length - 1].score : null;
     const lastScoreB = visitsB.length > 0 ? visitsB[visitsB.length - 1].score : null;
 
