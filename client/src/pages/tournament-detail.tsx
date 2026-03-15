@@ -163,6 +163,89 @@ function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { ma
   );
 }
 
+function LegScoresPanel({ legHistory, playerAName, playerBName }: { legHistory: any[]; playerAName: string; playerBName: string }) {
+  const [open, setOpen] = useState(false);
+  const STARTING_SCORE = 501;
+  return (
+    <div className="mt-2" data-testid="match-scores-section">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center"
+        data-testid="button-toggle-match-scores"
+      >
+        Match Scores
+        <ChevronDown className={cn("w-3 h-3 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="mt-2 space-y-3">
+          {legHistory.map((leg: any, legIdx: number) => {
+            const vA = (leg.visits || []).filter((v: any) => v.player === 'A');
+            const vB = (leg.visits || []).filter((v: any) => v.player === 'B');
+            const maxRounds = Math.max(vA.length, vB.length);
+            const loser: 'A' | 'B' = leg.winner === 'A' ? 'B' : 'A';
+            const loserVisits = loser === 'A' ? vA : vB;
+            const loserRemaining = STARTING_SCORE - loserVisits.reduce((s: number, v: any) => s + v.score, 0);
+            return (
+              <div key={legIdx} className="rounded-lg border overflow-hidden" data-testid={`leg-scores-${legIdx}`}>
+                <div className="text-center py-1.5 border-b bg-muted/30">
+                  <span className="font-bold text-xs">Leg {legIdx + 1}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-0 text-xs">
+                  <div className="text-right font-semibold text-muted-foreground py-1 px-2 border-b truncate">{playerAName}</div>
+                  <div className="text-center font-semibold text-muted-foreground py-1 border-b">#</div>
+                  <div className="text-left font-semibold text-muted-foreground py-1 px-2 border-b truncate">{playerBName}</div>
+                  {Array.from({ length: maxRounds }, (_, roundIdx) => {
+                    const scoreA = vA[roundIdx]?.score;
+                    const scoreB = vB[roundIdx]?.score;
+                    const isCheckoutA = leg.winner === 'A' && roundIdx === vA.length - 1 && scoreA !== undefined;
+                    const isCheckoutB = leg.winner === 'B' && roundIdx === vB.length - 1 && scoreB !== undefined;
+                    return (
+                      <div key={roundIdx} className="contents" data-testid={`score-row-${legIdx}-${roundIdx}`}>
+                        <div className={cn(
+                          "text-right tabular-nums py-0.5 px-2",
+                          isCheckoutA ? "bg-green-500 text-white dark:text-black font-bold" : ""
+                        )}>
+                          {scoreA !== undefined ? scoreA : ''}
+                        </div>
+                        <div className="text-center text-muted-foreground tabular-nums py-0.5">
+                          {roundIdx + 1}
+                        </div>
+                        <div className={cn(
+                          "text-left tabular-nums py-0.5 px-2",
+                          isCheckoutB ? "bg-green-500 text-white dark:text-black font-bold" : ""
+                        )}>
+                          {scoreB !== undefined ? scoreB : ''}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-3 gap-0 text-xs border-t">
+                  <div className="text-right py-1 px-2">
+                    {loser === 'A' && (
+                      <span className="inline-block bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded" data-testid={`remaining-${legIdx}`}>
+                        {loserRemaining}
+                      </span>
+                    )}
+                  </div>
+                  <div />
+                  <div className="text-left py-1 px-2">
+                    {loser === 'B' && (
+                      <span className="inline-block bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded" data-testid={`remaining-${legIdx}`}>
+                        {loserRemaining}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminMatchStats({ matchId, playerAName, playerBName }: { matchId: number; playerAName: string; playerBName: string }) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState<any>(null);
@@ -242,6 +325,9 @@ function AdminMatchStats({ matchId, playerAName, playerBName }: { matchId: numbe
                 );
               })}
             </div>
+          )}
+          {!loading && notes && Array.isArray(notes.legHistory) && notes.legHistory.length > 0 && (
+            <LegScoresPanel legHistory={notes.legHistory} playerAName={playerAName} playerBName={playerBName} />
           )}
           {!loading && !notes && (
             <p className="text-xs text-muted-foreground text-center py-1">No stats available</p>

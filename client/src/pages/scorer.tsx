@@ -1087,6 +1087,7 @@ export default function ScorerPage() {
         first9DartsA: cs.first9DartsA,
         first9PointsB: cs.first9PointsB,
         first9DartsB: cs.first9DartsB,
+        legHistory: legHistoryRef.current,
       };
     }
 

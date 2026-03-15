@@ -172,6 +172,7 @@ export const matchNotes = pgTable("match_notes", {
   first9DartsA: integer("first9_darts_a"),
   first9PointsB: integer("first9_points_b"),
   first9DartsB: integer("first9_darts_b"),
+  legHistory: jsonb("leg_history"),
 });
 
 export const insertMatchNoteSchema = createInsertSchema(matchNotes).omit({ id: true });
