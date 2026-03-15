@@ -141,6 +141,8 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
     return promise;
   };
 
+  useEffect(() => { if (isCompleted) fetchNotes(); }, []);
+
   const handleStatsClick = async () => {
     if (!isCompleted) return;
     const willOpen = !statsOpen;
@@ -227,14 +229,16 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
             Stats
             <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", statsOpen && "rotate-180")} />
           </button>
-          <button
-            onClick={handleScoresClick}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            data-testid={`button-match-scores-toggle-${match.id}`}
-          >
-            Scores
-            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", scoresOpen && "rotate-180")} />
-          </button>
+          {hasLegHistory && (
+            <button
+              onClick={handleScoresClick}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              data-testid={`button-match-scores-toggle-${match.id}`}
+            >
+              Match Scores
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", scoresOpen && "rotate-180")} />
+            </button>
+          )}
         </div>
       )}
 
@@ -329,6 +333,8 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
     fetchPromiseRef.current = promise;
     return promise;
   };
+
+  useEffect(() => { if (isCompleted) fetchNotes(); }, []);
 
   const handleStatsClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -433,14 +439,16 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
               Stats
               <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", statsOpen && "rotate-180")} />
             </button>
-            <button
-              onClick={handleScoresClick}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              data-testid={`button-knockout-scores-${match.id}`}
-            >
-              Scores
-              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", scoresOpen && "rotate-180")} />
-            </button>
+            {hasLegHistory && (
+              <button
+                onClick={handleScoresClick}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                data-testid={`button-knockout-scores-${match.id}`}
+              >
+                Match Scores
+                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", scoresOpen && "rotate-180")} />
+              </button>
+            )}
           </div>
         )}
         {match.scorerName && !hideScorer && (

@@ -257,6 +257,8 @@ function AdminMatchStats({ matchId, playerAName, playerBName }: { matchId: numbe
     return promise;
   };
 
+  useEffect(() => { fetchNotes(); }, []);
+
   const handleStatsToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const willOpen = !statsOpen;
@@ -302,14 +304,16 @@ function AdminMatchStats({ matchId, playerAName, playerBName }: { matchId: numbe
           Stats
           <ChevronDown className={cn("w-3 h-3 transition-transform", statsOpen && "rotate-180")} />
         </button>
-        <button
-          onClick={handleScoresToggle}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          data-testid={`button-match-scores-${matchId}`}
-        >
-          Scores
-          <ChevronDown className={cn("w-3 h-3 transition-transform", scoresOpen && "rotate-180")} />
-        </button>
+        {hasLegHistory && (
+          <button
+            onClick={handleScoresToggle}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            data-testid={`button-match-scores-${matchId}`}
+          >
+            Match Scores
+            <ChevronDown className={cn("w-3 h-3 transition-transform", scoresOpen && "rotate-180")} />
+          </button>
+        )}
       </div>
       {statsOpen && (
         <div className="mt-2 border-t pt-2">
