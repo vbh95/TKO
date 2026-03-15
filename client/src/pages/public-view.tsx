@@ -40,85 +40,72 @@ interface LiveScoring {
   lastLegResult?: { winnerName: string; checkout: number; checkoutDarts: number } | null;
 }
 
-function LegScoresPanel({ legHistory, playerAName, playerBName }: { legHistory: any[]; playerAName: string; playerBName: string }) {
-  const [open, setOpen] = useState(false);
+function LegScoresContent({ legHistory, playerAName, playerBName }: { legHistory: any[]; playerAName: string; playerBName: string }) {
   const STARTING_SCORE = 501;
   return (
-    <div className="mt-2" data-testid="match-scores-section">
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center"
-        data-testid="button-toggle-match-scores"
-      >
-        Match Scores
-        <ChevronDown className={cn("w-3 h-3 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div className="mt-2 space-y-3">
-          {legHistory.map((leg: any, legIdx: number) => {
-            const vA = (leg.visits || []).filter((v: any) => v.player === 'A');
-            const vB = (leg.visits || []).filter((v: any) => v.player === 'B');
-            const maxRounds = Math.max(vA.length, vB.length);
-            const loser: 'A' | 'B' = leg.winner === 'A' ? 'B' : 'A';
-            const loserVisits = loser === 'A' ? vA : vB;
-            const loserRemaining = STARTING_SCORE - loserVisits.reduce((s: number, v: any) => s + v.score, 0);
-            return (
-              <div key={legIdx} className="rounded-lg border overflow-hidden" data-testid={`leg-scores-${legIdx}`}>
-                <div className="text-center py-1.5 border-b bg-muted/30">
-                  <span className="font-bold text-xs">Leg {legIdx + 1}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-0 text-xs">
-                  <div className="text-right font-semibold text-muted-foreground py-1 px-2 border-b truncate">{playerAName}</div>
-                  <div className="text-center font-semibold text-muted-foreground py-1 border-b">#</div>
-                  <div className="text-left font-semibold text-muted-foreground py-1 px-2 border-b truncate">{playerBName}</div>
-                  {Array.from({ length: maxRounds }, (_, roundIdx) => {
-                    const scoreA = vA[roundIdx]?.score;
-                    const scoreB = vB[roundIdx]?.score;
-                    const isCheckoutA = leg.winner === 'A' && roundIdx === vA.length - 1 && scoreA !== undefined;
-                    const isCheckoutB = leg.winner === 'B' && roundIdx === vB.length - 1 && scoreB !== undefined;
-                    return (
-                      <div key={roundIdx} className="contents" data-testid={`score-row-${legIdx}-${roundIdx}`}>
-                        <div className={cn(
-                          "text-right tabular-nums py-0.5 px-2",
-                          isCheckoutA ? "bg-green-500 text-white dark:text-black font-bold" : ""
-                        )}>
-                          {scoreA !== undefined ? scoreA : ''}
-                        </div>
-                        <div className="text-center text-muted-foreground tabular-nums py-0.5">
-                          {roundIdx + 1}
-                        </div>
-                        <div className={cn(
-                          "text-left tabular-nums py-0.5 px-2",
-                          isCheckoutB ? "bg-green-500 text-white dark:text-black font-bold" : ""
-                        )}>
-                          {scoreB !== undefined ? scoreB : ''}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="grid grid-cols-3 gap-0 text-xs border-t">
-                  <div className="text-right py-1 px-2">
-                    {loser === 'A' && (
-                      <span className="inline-block bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded" data-testid={`remaining-${legIdx}`}>
-                        {loserRemaining}
-                      </span>
-                    )}
+    <div className="space-y-3" data-testid="match-scores-content">
+      {legHistory.map((leg: any, legIdx: number) => {
+        const vA = (leg.visits || []).filter((v: any) => v.player === 'A');
+        const vB = (leg.visits || []).filter((v: any) => v.player === 'B');
+        const maxRounds = Math.max(vA.length, vB.length);
+        const loser: 'A' | 'B' = leg.winner === 'A' ? 'B' : 'A';
+        const loserVisits = loser === 'A' ? vA : vB;
+        const loserRemaining = STARTING_SCORE - loserVisits.reduce((s: number, v: any) => s + v.score, 0);
+        return (
+          <div key={legIdx} className="rounded-lg border overflow-hidden" data-testid={`leg-scores-${legIdx}`}>
+            <div className="text-center py-1.5 border-b bg-muted/30">
+              <span className="font-bold text-xs">Leg {legIdx + 1}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-0 text-xs">
+              <div className="text-right font-semibold text-muted-foreground py-1 px-2 border-b truncate">{playerAName}</div>
+              <div className="text-center font-semibold text-muted-foreground py-1 border-b">#</div>
+              <div className="text-left font-semibold text-muted-foreground py-1 px-2 border-b truncate">{playerBName}</div>
+              {Array.from({ length: maxRounds }, (_, roundIdx) => {
+                const scoreA = vA[roundIdx]?.score;
+                const scoreB = vB[roundIdx]?.score;
+                const isCheckoutA = leg.winner === 'A' && roundIdx === vA.length - 1 && scoreA !== undefined;
+                const isCheckoutB = leg.winner === 'B' && roundIdx === vB.length - 1 && scoreB !== undefined;
+                return (
+                  <div key={roundIdx} className="contents" data-testid={`score-row-${legIdx}-${roundIdx}`}>
+                    <div className={cn(
+                      "text-right tabular-nums py-0.5 px-2",
+                      isCheckoutA ? "bg-green-500 text-white dark:text-black font-bold" : ""
+                    )}>
+                      {scoreA !== undefined ? scoreA : ''}
+                    </div>
+                    <div className="text-center text-muted-foreground tabular-nums py-0.5">
+                      {roundIdx + 1}
+                    </div>
+                    <div className={cn(
+                      "text-left tabular-nums py-0.5 px-2",
+                      isCheckoutB ? "bg-green-500 text-white dark:text-black font-bold" : ""
+                    )}>
+                      {scoreB !== undefined ? scoreB : ''}
+                    </div>
                   </div>
-                  <div />
-                  <div className="text-left py-1 px-2">
-                    {loser === 'B' && (
-                      <span className="inline-block bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded" data-testid={`remaining-${legIdx}`}>
-                        {loserRemaining}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-3 gap-0 text-xs border-t">
+              <div className="text-right py-1 px-2">
+                {loser === 'A' && (
+                  <span className="inline-block bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded" data-testid={`remaining-${legIdx}`}>
+                    {loserRemaining}
+                  </span>
+                )}
               </div>
-            );
-          })}
-        </div>
-      )}
+              <div />
+              <div className="text-left py-1 px-2">
+                {loser === 'B' && (
+                  <span className="inline-block bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded" data-testid={`remaining-${legIdx}`}>
+                    {loserRemaining}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -130,31 +117,44 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
   shareToken: string;
   scorerName?: string | null;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [scoresOpen, setScoresOpen] = useState(false);
   const [notes, setNotes] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [fetched, setFetched] = useState(false);
+  const fetchPromiseRef = useRef<Promise<void> | null>(null);
   const isCompleted = match.status === 'COMPLETED';
 
-  const handleClick = async () => {
-    if (!isCompleted) return;
-    const willExpand = !expanded;
-    setExpanded(willExpand);
-    if (willExpand && !fetched) {
+  const fetchNotes = async () => {
+    if (notes) return;
+    if (fetchPromiseRef.current) return fetchPromiseRef.current;
+    const promise = (async () => {
       setLoading(true);
       try {
         const res = await fetch(`/api/public/t/${shareToken}/match/${match.id}/notes`);
         if (res.ok) {
-          const data = await res.json();
-          setNotes(data);
+          setNotes(await res.json());
         }
       } catch { }
       setLoading(false);
-      setFetched(true);
-    }
+    })();
+    fetchPromiseRef.current = promise;
+    return promise;
   };
 
-  // 3-dart avg = totalScored / totalVisits (each visit = 3 darts, so no extra *3 needed)
+  const handleStatsClick = async () => {
+    if (!isCompleted) return;
+    const willOpen = !statsOpen;
+    setStatsOpen(willOpen);
+    if (willOpen) await fetchNotes();
+  };
+
+  const handleScoresClick = async () => {
+    if (!isCompleted) return;
+    const willOpen = !scoresOpen;
+    setScoresOpen(willOpen);
+    if (willOpen) await fetchNotes();
+  };
+
   const threeDartAvgA = notes?.totalVisitsA > 0 ? (notes.totalScoredA / notes.totalVisitsA).toFixed(1) : '-';
   const threeDartAvgB = notes?.totalVisitsB > 0 ? (notes.totalScoredB / notes.totalVisitsB).toFixed(1) : '-';
   const checkoutPctA = notes?.checkoutAttemptsA > 0 ? ((notes.checkoutSuccessA / notes.checkoutAttemptsA) * 100).toFixed(1) + '%' : '-';
@@ -174,14 +174,12 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
     { label: 'Darts Thrown', valA: notes.totalVisitsA != null ? notes.totalVisitsA * 3 : '-', valB: notes.totalVisitsB != null ? notes.totalVisitsB * 3 : '-' },
   ] : [];
 
+  const hasLegHistory = notes && Array.isArray(notes.legHistory) && notes.legHistory.length > 0;
+
   return (
     <div data-testid={`match-row-${match.id}`}>
       <div
-        className={cn(
-          "flex items-center justify-between p-4 transition-colors",
-          isCompleted && "cursor-pointer hover:bg-muted/30"
-        )}
-        onClick={handleClick}
+        className="flex items-center justify-between p-4"
         data-testid={`button-match-stats-${match.id}`}
       >
         <div className="flex-1 text-right font-medium">
@@ -220,14 +218,22 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
       </div>
 
       {isCompleted && (
-        <div className="flex justify-center pb-3">
+        <div className="flex items-center justify-center gap-3 pb-3">
           <button
-            onClick={(e) => { e.stopPropagation(); handleClick(); }}
+            onClick={handleStatsClick}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             data-testid={`button-match-stats-toggle-${match.id}`}
           >
             Stats
-            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", expanded && "rotate-180")} />
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", statsOpen && "rotate-180")} />
+          </button>
+          <button
+            onClick={handleScoresClick}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            data-testid={`button-match-scores-toggle-${match.id}`}
+          >
+            Scores
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", scoresOpen && "rotate-180")} />
           </button>
         </div>
       )}
@@ -238,7 +244,7 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
         </div>
       )}
 
-      {expanded && isCompleted && (
+      {statsOpen && isCompleted && (
         <div className="border-t bg-muted/20 px-4 py-3">
           {loading && (
             <div className="flex items-center justify-center py-4">
@@ -267,13 +273,26 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
               </div>
             </div>
           )}
-          {!loading && notes && Array.isArray(notes.legHistory) && notes.legHistory.length > 0 && (
-            <div className="max-w-md mx-auto">
-              <LegScoresPanel legHistory={notes.legHistory} playerAName={playerA?.name || 'Player A'} playerBName={playerB?.name || 'Player B'} />
-            </div>
-          )}
           {!loading && !notes && (
             <p className="text-sm text-muted-foreground text-center py-2">No detailed stats available for this match</p>
+          )}
+        </div>
+      )}
+
+      {scoresOpen && isCompleted && (
+        <div className="border-t bg-muted/20 px-4 py-3">
+          {loading && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {!loading && hasLegHistory && (
+            <div className="max-w-md mx-auto">
+              <LegScoresContent legHistory={notes.legHistory} playerAName={playerA?.name || 'Player A'} playerBName={playerB?.name || 'Player B'} />
+            </div>
+          )}
+          {!loading && !hasLegHistory && (
+            <p className="text-sm text-muted-foreground text-center py-2">No score breakdown available</p>
           )}
         </div>
       )}
@@ -290,27 +309,43 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
   shareToken: string;
   hideScorer?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [scoresOpen, setScoresOpen] = useState(false);
   const [notes, setNotes] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [fetched, setFetched] = useState(false);
+  const fetchPromiseRef = useRef<Promise<void> | null>(null);
 
-  const handleClick = async () => {
-    if (!isCompleted) return;
-    const willExpand = !expanded;
-    setExpanded(willExpand);
-    if (willExpand && !fetched) {
+  const fetchNotes = async () => {
+    if (notes) return;
+    if (fetchPromiseRef.current) return fetchPromiseRef.current;
+    const promise = (async () => {
       setLoading(true);
       try {
         const res = await fetch(`/api/public/t/${shareToken}/match/${match.id}/notes`);
         if (res.ok) setNotes(await res.json());
       } catch { }
       setLoading(false);
-      setFetched(true);
-    }
+    })();
+    fetchPromiseRef.current = promise;
+    return promise;
   };
 
-  // 3-dart avg = totalScored / totalVisits (each visit = 3 darts, so no extra *3 needed)
+  const handleStatsClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isCompleted) return;
+    const willOpen = !statsOpen;
+    setStatsOpen(willOpen);
+    if (willOpen) await fetchNotes();
+  };
+
+  const handleScoresClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isCompleted) return;
+    const willOpen = !scoresOpen;
+    setScoresOpen(willOpen);
+    if (willOpen) await fetchNotes();
+  };
+
   const threeDartAvgA = notes?.totalVisitsA > 0 ? (notes.totalScoredA / notes.totalVisitsA).toFixed(1) : '-';
   const threeDartAvgB = notes?.totalVisitsB > 0 ? (notes.totalScoredB / notes.totalVisitsB).toFixed(1) : '-';
   const checkoutPctA = notes?.checkoutAttemptsA > 0 ? ((notes.checkoutSuccessA / notes.checkoutAttemptsA) * 100).toFixed(1) + '%' : '-';
@@ -329,15 +364,15 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
     { label: 'Darts Thrown', valA: notes.totalVisitsA != null ? notes.totalVisitsA * 3 : '-', valB: notes.totalVisitsB != null ? notes.totalVisitsB * 3 : '-' },
   ] : [];
 
+  const hasLegHistory = notes && Array.isArray(notes.legHistory) && notes.legHistory.length > 0;
+
   return (
     <Card
       className={cn(
         "overflow-hidden flex flex-col h-full",
-        isCompleted ? "border border-muted-foreground/20 cursor-pointer" : "border-2 border-dashed border-primary/40"
+        isCompleted ? "border border-muted-foreground/20" : "border-2 border-dashed border-primary/40"
       )}
       data-testid={`knockout-match-${match.id}`}
-      onClick={handleClick}
-      role={isCompleted ? "button" : undefined}
     >
       <CardHeader className={cn("border-b py-2.5 px-4", isCompleted ? "bg-muted/30" : "bg-primary/5")}>
         <CardTitle className="text-sm flex items-center gap-2">
@@ -389,11 +424,23 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
           </div>
         )}
         {isCompleted && (
-          <div className="flex justify-center mt-2 mb-1">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="flex items-center justify-center gap-3 mt-2 mb-1">
+            <button
+              onClick={handleStatsClick}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              data-testid={`button-knockout-stats-${match.id}`}
+            >
               Stats
-              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", expanded && "rotate-180")} />
-            </div>
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", statsOpen && "rotate-180")} />
+            </button>
+            <button
+              onClick={handleScoresClick}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              data-testid={`button-knockout-scores-${match.id}`}
+            >
+              Scores
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", scoresOpen && "rotate-180")} />
+            </button>
           </div>
         )}
         {match.scorerName && !hideScorer && (
@@ -402,7 +449,7 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
           </div>
         )}
       </CardContent>
-      {expanded && isCompleted && (
+      {statsOpen && isCompleted && (
         <div className="border-t bg-muted/20 px-4 py-3">
           {loading && (
             <div className="flex items-center justify-center py-4">
@@ -431,13 +478,25 @@ function KnockoutMatchCard({ match, playerA, playerB, label, isCompleted, shareT
               </div>
             </div>
           )}
-          {!loading && notes && Array.isArray(notes.legHistory) && notes.legHistory.length > 0 && (
-            <div className="max-w-sm mx-auto">
-              <LegScoresPanel legHistory={notes.legHistory} playerAName={playerA?.name || 'Player A'} playerBName={playerB?.name || 'Player B'} />
-            </div>
-          )}
           {!loading && !notes && (
             <p className="text-sm text-muted-foreground text-center py-2">No detailed stats available for this match</p>
+          )}
+        </div>
+      )}
+      {scoresOpen && isCompleted && (
+        <div className="border-t bg-muted/20 px-4 py-3">
+          {loading && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {!loading && hasLegHistory && (
+            <div className="max-w-sm mx-auto">
+              <LegScoresContent legHistory={notes.legHistory} playerAName={playerA?.name || 'Player A'} playerBName={playerB?.name || 'Player B'} />
+            </div>
+          )}
+          {!loading && !hasLegHistory && (
+            <p className="text-sm text-muted-foreground text-center py-2">No score breakdown available</p>
           )}
         </div>
       )}
