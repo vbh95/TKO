@@ -1819,13 +1819,6 @@ export default function ScorerPage() {
     const avgB = stats.totalVisitsB > 0 ? ((stats.totalScoredB / stats.totalVisitsB) * 1).toFixed(1) : '0.0';
     const winnerName = stats.winnerId === null ? null : stats.winnerId === stats.playerAId ? stats.playerAName : stats.playerBName;
 
-    const checkoutRateA = stats.checkoutAttemptsA > 0
-      ? ((stats.checkoutSuccessA / stats.checkoutAttemptsA) * 100).toFixed(2) + '%'
-      : '0.00%';
-    const checkoutRateB = stats.checkoutAttemptsB > 0
-      ? ((stats.checkoutSuccessB / stats.checkoutAttemptsB) * 100).toFixed(2) + '%'
-      : '0.00%';
-
     const firstNineAvgA = stats.first9DartsA > 0 ? ((stats.first9PointsA / stats.first9DartsA) * 3).toFixed(1) : '-';
     const firstNineAvgB = stats.first9DartsB > 0 ? ((stats.first9PointsB / stats.first9DartsB) * 3).toFixed(1) : '-';
 
@@ -1833,7 +1826,6 @@ export default function ScorerPage() {
       { label: 'Legs Won', valA: stats.legsWonA, valB: stats.legsWonB },
       { label: '3-Dart Avg', valA: avgA, valB: avgB },
       { label: 'First 9 Avg', valA: firstNineAvgA, valB: firstNineAvgB },
-      { label: 'Checkout %', valA: checkoutRateA, valB: checkoutRateB },
       { label: 'Highest Score', valA: stats.highestVisitA, valB: stats.highestVisitB },
       { label: 'Highest Finish', valA: stats.highestFinishA || '-', valB: stats.highestFinishB || '-' },
       { label: '180s', valA: stats.ton80sA, valB: stats.ton80sB },
