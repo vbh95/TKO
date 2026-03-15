@@ -20,6 +20,7 @@ import {
   Camera,
   ScanLine,
   RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import tkoLogoWhite from "@assets/TKO_White-04_1771796486840.png";
@@ -101,6 +102,7 @@ interface MatchStats {
   winnerId: number | null;
   playerAId: number | null;
   playerBId: number | null;
+  legHistory: Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B' }>;
 }
 
 type ScorerView = "matchList" | "bullThrow" | "scoring" | "matchReport";
@@ -123,6 +125,7 @@ interface ScorerState {
   legStartingThrower: 'A' | 'B';
   checkoutStats: { attemptsA: number; attemptsB: number; successA: number; successB: number; finishA: number; finishB: number; first9PointsA: number; first9DartsA: number; first9PointsB: number; first9DartsB: number };
   swapPlayers: boolean;
+  legHistory: Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B' }>;
 }
 
 function saveScorerState(state: ScorerState) {
@@ -542,6 +545,7 @@ export default function ScorerPage() {
   const [showQuickScores, setShowQuickScores] = useState(false);
   const [allMatchVisits, setAllMatchVisits] = useState<Visit[]>([]);
   const [matchReport, setMatchReport] = useState<MatchStats | null>(null);
+  const [matchScoresOpen, setMatchScoresOpen] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState<{ player: 'A' | 'B'; newLegsA: number; newLegsB: number; newVisits: Visit[]; checkoutScore: number } | null>(null);
   const [pendingDartsAtDouble, setPendingDartsAtDouble] = useState(false);
   const [impossibleWarning, setImpossibleWarning] = useState<string | null>(null);
@@ -552,6 +556,7 @@ export default function ScorerPage() {
   const [highestFinishA, setHighestFinishA] = useState(0);
   const [highestFinishB, setHighestFinishB] = useState(0);
   const checkoutStatsRef = useRef({ attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 });
+  const legHistoryRef = useRef<Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B' }>>([]);
   const [swapPlayers, setSwapPlayers] = useState(false);
 
   useEffect(() => {
@@ -613,6 +618,7 @@ export default function ScorerPage() {
           setHighestFinishA(saved.checkoutStats.finishA);
           setHighestFinishB(saved.checkoutStats.finishB);
           checkoutStatsRef.current = { ...saved.checkoutStats };
+          legHistoryRef.current = saved.legHistory || [];
           setSwapPlayers(saved.swapPlayers);
           setView("scoring");
           const pA = data?.players.find(p => p.id === inProgress.playerAId);
@@ -657,6 +663,7 @@ export default function ScorerPage() {
           setHighestFinishA(0);
           setHighestFinishB(0);
           checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 };
+          legHistoryRef.current = [];
           resetLeg(starter);
           setView("scoring");
         }
@@ -700,6 +707,7 @@ export default function ScorerPage() {
       setHighestFinishA(0);
       setHighestFinishB(0);
       checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 };
+      legHistoryRef.current = [];
       resetLeg('A');
       setView("scoring");
       refetch();
@@ -785,8 +793,10 @@ export default function ScorerPage() {
           winnerId: updatedMatch.winnerId,
           playerAId: updatedMatch.playerAId,
           playerBId: updatedMatch.playerBId,
+          legHistory: legHistoryRef.current,
         });
         setActiveMatchId(null);
+        setMatchScoresOpen(false);
         setView("matchReport");
       }
       refetch();
@@ -832,8 +842,10 @@ export default function ScorerPage() {
           winnerId: completedMatch.winnerId,
           playerAId: completedMatch.playerAId,
           playerBId: completedMatch.playerBId,
+          legHistory: legHistoryRef.current,
         });
         setActiveMatchId(null);
+        setMatchScoresOpen(false);
         setView("matchReport");
         clearScorerState(completedMatch.id);
         return;
@@ -879,6 +891,7 @@ export default function ScorerPage() {
       legStartingThrower,
       checkoutStats: { ...checkoutStatsRef.current },
       swapPlayers,
+      legHistory: legHistoryRef.current,
       ...overrides,
     };
     saveScorerState(state);
@@ -1031,6 +1044,8 @@ export default function ScorerPage() {
 
     const allVisitsIncludingCurrent = [...allMatchVisits, ...newVisits];
 
+    legHistoryRef.current = [...legHistoryRef.current, { startingThrower: legStartingThrower, visits: newVisits, winner: player }];
+
     // Accumulate first-9-darts data for this leg (first 3 visits per player = 9 darts each)
     const legFirst9A = newVisits.filter(v => v.player === 'A').slice(0, 3);
     const legFirst9B = newVisits.filter(v => v.player === 'B').slice(0, 3);
@@ -1096,6 +1111,7 @@ export default function ScorerPage() {
         currentThrower: nextStarter,
         legStartingThrower: nextStarter,
         legVisits: [],
+        legHistory: legHistoryRef.current,
       });
       setTimeout(() => resetLeg(nextStarter), 1500);
     } else {
@@ -1259,6 +1275,7 @@ export default function ScorerPage() {
         setHighestFinishA(saved.checkoutStats.finishA);
         setHighestFinishB(saved.checkoutStats.finishB);
         checkoutStatsRef.current = { ...saved.checkoutStats };
+        legHistoryRef.current = saved.legHistory || [];
         setSwapPlayers(saved.swapPlayers);
         setView("scoring");
         const pA = data?.players.find(p => p.id === match.playerAId);
@@ -1303,6 +1320,7 @@ export default function ScorerPage() {
         setHighestFinishA(0);
         setHighestFinishB(0);
         checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 };
+        legHistoryRef.current = [];
         setSwapPlayers(false);
         resetLeg(starter);
         setView("scoring");
@@ -1335,6 +1353,7 @@ export default function ScorerPage() {
         setHighestFinishA(0);
         setHighestFinishB(0);
         checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 };
+        legHistoryRef.current = [];
         resetLeg(thrower);
         setLegStartingThrower(thrower);
         setSwapPlayers(thrower === 'B');
@@ -1351,6 +1370,7 @@ export default function ScorerPage() {
           legStartingThrower: thrower,
           checkoutStats: { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 },
           swapPlayers: thrower === 'B',
+          legHistory: [],
         });
         emitLiveState(STARTING_SCORE, STARTING_SCORE, thrower, initLegsA, initLegsB, [], thrower);
       };
@@ -1915,6 +1935,90 @@ export default function ScorerPage() {
               );
             })}
           </div>
+
+          {stats.legHistory && stats.legHistory.length > 0 && (
+              <div className="mt-4" data-testid="match-scores-section">
+                <button
+                  onClick={() => setMatchScoresOpen(!matchScoresOpen)}
+                  className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg bg-[#222] text-white font-semibold text-sm"
+                  data-testid="button-toggle-match-scores"
+                >
+                  <span>Match Scores</span>
+                  <ChevronDown className={cn("w-4 h-4 transition-transform", matchScoresOpen && "rotate-180")} />
+                </button>
+                {matchScoresOpen && (
+                  <div className="mt-2 space-y-4" data-testid="match-scores-content">
+                    {stats.legHistory.map((leg, legIdx) => {
+                      const vA = leg.visits.filter(v => v.player === 'A');
+                      const vB = leg.visits.filter(v => v.player === 'B');
+                      const maxRounds = Math.max(vA.length, vB.length);
+                      const loser: 'A' | 'B' = leg.winner === 'A' ? 'B' : 'A';
+                      const loserVisits = loser === 'A' ? vA : vB;
+                      const loserRemaining = STARTING_SCORE - loserVisits.reduce((s, v) => s + v.score, 0);
+
+                      return (
+                        <div key={legIdx} className="rounded-lg bg-[#222] overflow-hidden" data-testid={`leg-scores-${legIdx}`}>
+                          <div className="text-center py-2 border-b border-gray-700">
+                            <span className="text-white font-bold text-sm">Leg {legIdx + 1}</span>
+                          </div>
+                          <div className="divide-y divide-gray-700/50">
+                            {Array.from({ length: maxRounds }, (_, roundIdx) => {
+                              const scoreA = vA[roundIdx]?.score;
+                              const scoreB = vB[roundIdx]?.score;
+                              const isCheckoutA = leg.winner === 'A' && roundIdx === vA.length - 1 && scoreA !== undefined;
+                              const isCheckoutB = leg.winner === 'B' && roundIdx === vB.length - 1 && scoreB !== undefined;
+
+                              return (
+                                <div key={roundIdx} className="flex items-center" data-testid={`score-row-${legIdx}-${roundIdx}`}>
+                                  <div className={cn(
+                                    "flex-1 text-center py-2 text-sm font-semibold tabular-nums",
+                                    isCheckoutA ? "bg-green-500 text-black" : "text-white"
+                                  )}>
+                                    {scoreA !== undefined ? scoreA : ''}
+                                  </div>
+                                  <div className="w-12 text-center py-2 bg-[#333] text-gray-400 text-xs font-medium tabular-nums">
+                                    {roundIdx + 1}
+                                  </div>
+                                  <div className={cn(
+                                    "flex-1 text-center py-2 text-sm font-semibold tabular-nums",
+                                    isCheckoutB ? "bg-green-500 text-black" : "text-white"
+                                  )}>
+                                    {scoreB !== undefined ? scoreB : ''}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="flex items-center border-t border-gray-700 py-1.5 px-3">
+                            {loser === 'A' ? (
+                              <>
+                                <div className="flex-1 text-center">
+                                  <span className="inline-block bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded" data-testid={`remaining-${legIdx}`}>
+                                    {loserRemaining}
+                                  </span>
+                                </div>
+                                <div className="w-12" />
+                                <div className="flex-1" />
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex-1" />
+                                <div className="w-12" />
+                                <div className="flex-1 text-center">
+                                  <span className="inline-block bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded" data-testid={`remaining-${legIdx}`}>
+                                    {loserRemaining}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+          )}
 
           <Button
             className="w-full mt-6 h-12 text-base font-semibold bg-primary hover:bg-primary/90"
