@@ -617,7 +617,7 @@ export default function ScorerPage() {
           setCheckoutSuccessB(saved.checkoutStats.successB);
           setHighestFinishA(saved.checkoutStats.finishA);
           setHighestFinishB(saved.checkoutStats.finishB);
-          checkoutStatsRef.current = { ...saved.checkoutStats };
+          checkoutStatsRef.current = { first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0, ...saved.checkoutStats };
           legHistoryRef.current = saved.legHistory || [];
           setSwapPlayers(saved.swapPlayers);
           setView("scoring");
@@ -1275,7 +1275,7 @@ export default function ScorerPage() {
         setCheckoutSuccessB(saved.checkoutStats.successB);
         setHighestFinishA(saved.checkoutStats.finishA);
         setHighestFinishB(saved.checkoutStats.finishB);
-        checkoutStatsRef.current = { ...saved.checkoutStats };
+        checkoutStatsRef.current = { first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0, ...saved.checkoutStats };
         legHistoryRef.current = saved.legHistory || [];
         setSwapPlayers(saved.swapPlayers);
         setView("scoring");
@@ -1320,7 +1320,7 @@ export default function ScorerPage() {
         setCheckoutSuccessB(0);
         setHighestFinishA(0);
         setHighestFinishB(0);
-        checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 };
+        checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 };
         legHistoryRef.current = [];
         setSwapPlayers(false);
         resetLeg(starter);
@@ -1353,7 +1353,7 @@ export default function ScorerPage() {
         setCheckoutSuccessB(0);
         setHighestFinishA(0);
         setHighestFinishB(0);
-        checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 };
+        checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 };
         legHistoryRef.current = [];
         resetLeg(thrower);
         setLegStartingThrower(thrower);
@@ -1369,7 +1369,7 @@ export default function ScorerPage() {
           legVisits: [],
           allMatchVisits: [],
           legStartingThrower: thrower,
-          checkoutStats: { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0 },
+          checkoutStats: { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 },
           swapPlayers: thrower === 'B',
           legHistory: [],
         });
