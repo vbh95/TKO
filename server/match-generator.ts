@@ -252,6 +252,12 @@ export async function generateRoundRobinMatches(
       });
     }
   }
+
+  if (settings.groupScheduleMode === 'board_rotation' && settings.numberOfBoards) {
+    const createdGroups = await storage.getGroupsByTournamentId(tournamentId);
+    const sortedGroups = createdGroups.sort((a, b) => a.name.localeCompare(b.name));
+    await applyBoardRotationSchedule(tournamentId, sortedGroups, settings.numberOfBoards);
+  }
 }
 
 export async function generateKnockoutMatches(
@@ -482,6 +488,12 @@ export async function generateMultiStageMatches(
     }
   }
 
+  if (settings.groupScheduleMode === 'board_rotation' && settings.numberOfBoards) {
+    const createdGroups = await storage.getGroupsByTournamentId(tournamentId);
+    const sortedGroups = createdGroups.sort((a, b) => a.name.localeCompare(b.name));
+    await applyBoardRotationSchedule(tournamentId, sortedGroups, settings.numberOfBoards);
+  }
+
   const knockoutPlayers = groupCount * promotedPerGroup;
   const totalSlots = nextPowerOfTwo(knockoutPlayers);
   const knockoutRounds = Math.log2(totalSlots);
@@ -547,6 +559,62 @@ export async function regenerateGroupMatchesFromMemberships(
         scorerName: scorer?.name || null,
       });
     }
+  }
+
+  if (settings.groupScheduleMode === 'board_rotation' && settings.numberOfBoards) {
+    const sortedGroups = groups.slice().sort((a, b) => a.name.localeCompare(b.name));
+    await applyBoardRotationSchedule(tournamentId, sortedGroups, settings.numberOfBoards);
+  }
+}
+
+async function applyBoardRotationSchedule(
+  tournamentId: number,
+  sortedGroups: { id: number; name: string }[],
+  numberOfBoards: number
+): Promise<void> {
+  if (
+    numberOfBoards <= 0 ||
+    sortedGroups.length % numberOfBoards !== 0 ||
+    sortedGroups.length / numberOfBoards !== 2
+  ) {
+    return;
+  }
+
+  const allMatches = await storage.getMatchesByTournamentId(tournamentId);
+  const groupMatches = allMatches
+    .filter(m => m.stage === 'GROUP')
+    .sort((a, b) => a.order - b.order);
+
+  const boardSequences: (typeof groupMatches)[] = [];
+  for (let b = 0; b < numberOfBoards; b++) {
+    const groupA = sortedGroups[b * 2];
+    const groupB = sortedGroups[b * 2 + 1];
+    const matchesA = groupMatches.filter(m => m.groupId === groupA.id);
+    const matchesB = groupMatches.filter(m => m.groupId === groupB.id);
+    const maxLen = Math.max(matchesA.length, matchesB.length);
+    const interleaved: typeof groupMatches = [];
+    for (let i = 0; i < maxLen; i++) {
+      if (i < matchesA.length) interleaved.push(matchesA[i]);
+      if (i < matchesB.length) interleaved.push(matchesB[i]);
+    }
+    boardSequences.push(interleaved);
+  }
+
+  const maxSlots = Math.max(...boardSequences.map(s => s.length));
+  let globalOrder = 0;
+  const updates: Array<{ id: number; boardNumber: number; order: number }> = [];
+
+  for (let slot = 0; slot < maxSlots; slot++) {
+    for (let b = 0; b < numberOfBoards; b++) {
+      const match = boardSequences[b][slot];
+      if (match) {
+        updates.push({ id: match.id, boardNumber: b + 1, order: globalOrder++ });
+      }
+    }
+  }
+
+  for (const u of updates) {
+    await storage.updateMatch(u.id, { boardNumber: u.boardNumber, order: u.order });
   }
 }
 

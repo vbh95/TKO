@@ -1,0 +1,236 @@
+You are working on an existing darts tournament software project. Your task is to add a NEW OPTIONAL feature for board-based round robin scheduling, WITHOUT breaking, changing, or regressing any current functionality.
+
+CRITICAL RULES:
+- Do NOT refactor unrelated working code.
+- Do NOT change existing tournament generation logic unless strictly required to support this feature.
+- Do NOT remove or alter any current behavior for existing users.
+- This feature must be fully optional and only activate when explicitly selected.
+- If the new settings are not enabled, the software must behave EXACTLY as it does now.
+- Preserve backwards compatibility with existing tournaments, existing database rows, and current live/admin/public views.
+- Prefer additive changes over destructive changes.
+- Guard all new logic behind explicit feature checks.
+- If a schema change is needed, make it nullable or provide safe defaults so old tournaments still work.
+
+FEATURE GOAL:
+Add support for an OPTIONAL group-stage scheduling mode for tournaments that have:
+- multiple round robin groups
+- multiple boards
+- two groups assigned per board
+- a turn-for-turn board rotation schedule
+
+Example:
+8 groups across 4 boards
+Board 1 = Groups A and B
+Board 2 = Groups C and D
+Board 3 = Groups E and F
+Board 4 = Groups G and H
+
+Required play order:
+Board 1 Group A match 1
+Board 2 Group C match 1
+Board 3 Group E match 1
+Board 4 Group G match 1
+Board 1 Group B match 1
+Board 2 Group D match 1
+Board 3 Group F match 1
+Board 4 Group H match 1
+Board 1 Group A match 2
+Board 2 Group C match 2
+Board 3 Group E match 2
+Board 4 Group G match 2
+Board 1 Group B match 2
+Board 2 Group D match 2
+Board 3 Group F match 2
+Board 4 Group H match 2
+...continue until all group matches are scheduled.
+
+IMPORTANT:
+This is NOT a new tournament type.
+This is NOT a change to knockout generation.
+This is an OPTIONAL scheduling mode for the GROUP STAGE ONLY.
+
+IMPLEMENTATION REQUIREMENTS:
+
+1. TOURNAMENT SETUP
+Add new OPTIONAL fields to tournament setup:
+- numberOfBoards
+- groupScheduleMode
+
+groupScheduleMode should support:
+- "standard" (default, current behavior)
+- "board_rotation" (new optional behavior)
+
+Default must always be "standard" so current tournaments and users are unaffected.
+
+2. ACTIVATION RULE
+Only use the new scheduling logic when ALL of the below are true:
+- stage is round robin / group stage
+- groupScheduleMode === "board_rotation"
+- numberOfBoards is set
+- number of groups is divisible by numberOfBoards
+- exactly 2 groups per board in v1
+
+If these conditions are not met:
+- do NOT force new behavior
+- either fall back safely to standard mode or show a validation message in setup
+- do NOT break tournament creation
+
+For v1, board rotation should only run when:
+groupCount / numberOfBoards === 2
+
+3. DATA MODEL
+Add only safe, backwards-compatible fields if needed:
+Tournament:
+- number_of_boards nullable or default null
+- group_schedule_mode nullable or default "standard"
+
+Group:
+- board_number nullable
+
+Match:
+- board_number nullable
+- schedule_order nullable (or play_order / queue_order, whichever matches existing naming style)
+
+Do not remove or rename existing columns.
+Do not make old data invalid.
+
+4. GENERATION STRATEGY
+Keep existing round robin fixture generation exactly as it is if possible.
+
+Use a second scheduling pass:
+- First generate all group matches using the current proven logic
+- Then, ONLY if board_rotation mode is enabled, assign board numbers and schedule order
+
+This must be additive and safe.
+
+5. BOARD ASSIGNMENT
+When board_rotation is active:
+- assign groups evenly to boards in order
+Example for 8 groups, 4 boards:
+Board 1 -> Group A, Group B
+Board 2 -> Group C, Group D
+Board 3 -> Group E, Group F
+Board 4 -> Group G, Group H
+
+If group names are stored differently, use their generated order.
+
+6. MATCH ORDERING LOGIC
+For each board:
+- take the match list for the first assigned group
+- take the match list for the second assigned group
+- alternate them:
+  A1, B1, A2, B2, A3, B3...
+
+Then merge all boards in rounds:
+Round 1:
+- Board 1 first group first match
+- Board 2 first group first match
+- Board 3 first group first match
+- Board 4 first group first match
+
+Round 2:
+- Board 1 second group first match
+- Board 2 second group first match
+- Board 3 second group first match
+- Board 4 second group first match
+
+Round 3:
+- Board 1 first group second match
+- Board 2 first group second match
+- Board 3 first group second match
+- Board 4 first group second match
+
+Continue until exhausted.
+
+Assign each match:
+- board_number
+- schedule_order
+
+Do NOT alter standings logic, results logic, or knockout qualification logic.
+
+7. UI / DISPLAY SAFETY
+Only extend existing UI where needed.
+Do not redesign working pages.
+
+Where useful, safely expose:
+- board number on group-stage matches
+- schedule order if already using a sort field
+- current / next match per board in admin or tablet views ONLY if easy and safe
+
+If adding UI would risk breaking current pages, prioritize backend/data support first and keep UI changes minimal.
+
+8. TABLET / LIVE VIEW COMPATIBILITY
+Do not break current tablet scoring behavior.
+
+If the system already supports fetching the next/current match:
+- ensure board_rotation tournaments can be filtered by board_number
+- ensure schedule_order is used consistently when selecting next match for a board
+
+But only do this in a non-breaking way.
+If no board-specific tablet flow exists yet, prepare the data model and APIs without disrupting the current flow.
+
+9. KNOCKOUT STAGE
+Do NOT change knockout generation unless absolutely necessary.
+This feature applies only to the group-stage scheduling order.
+After groups finish, knockout should continue using current logic.
+
+10. VALIDATION
+Add safe validation for board_rotation mode:
+- numberOfBoards must be > 0
+- groupCount must divide evenly by numberOfBoards
+- exactly 2 groups per board for v1
+
+If invalid:
+- prevent board_rotation mode from being applied
+- provide a clear message
+- do not crash creation
+- do not affect standard mode
+
+11. MIGRATION / BACKWARDS COMPATIBILITY
+Any migration must be safe for existing production data.
+Use nullable columns or safe defaults.
+Do not require old tournaments to have board data.
+All old tournaments must continue to load normally.
+
+12. CODING APPROACH
+Please implement with the least invasive approach possible:
+- inspect existing tournament creation flow
+- identify where round robin matches are currently created
+- add a new helper/service for board rotation scheduling
+- keep existing standard scheduling path untouched
+- call the new helper only when board_rotation is selected
+
+Suggested structure:
+- existing round robin generation remains unchanged
+- new helper like applyBoardRotationSchedule(matches, groups, boardCount)
+- only invoked when enabled
+
+13. BEFORE WRITING CODE
+First inspect the current codebase and identify:
+- tournament setup model/schema
+- round robin fixture generation code
+- match ordering fields already in use
+- any existing board/tablet/live concepts already present
+
+Then implement the smallest safe change set.
+
+14. OUTPUT REQUIRED
+Make the code changes directly.
+Also provide a short summary of:
+- files changed
+- schema changes added
+- exact activation conditions
+- confirmation that default behavior remains unchanged
+
+15. TESTING
+Add or perform safe checks for:
+- existing tournament creation still works in standard mode
+- old tournaments still load
+- 8 groups + 4 boards + board_rotation produces alternating grouped board order
+- knockout still generates as before
+- no board_rotation selected = no behavior change
+
+Again:
+THIS MUST NOT BREAK ANY EXISTING WORKING LOGIC.
+Default behavior must remain identical unless the new mode is explicitly selected.
+Use defensive coding and minimal invasive changes.

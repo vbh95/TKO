@@ -300,6 +300,8 @@ export type TournamentSettings = {
   pointsForWin?: number;
   pointsForDraw?: number;
   pointsForLoss?: number;
+  groupScheduleMode?: 'standard' | 'board_rotation';
+  numberOfBoards?: number;
 };
 
 export type CreateTournamentRequest = {

@@ -1,0 +1,168 @@
+Implement ticket: #37 - Board-Rotation Group Stage Scheduling
+
+Important constraints:
+- This is a purely additive feature.
+- Do NOT refactor unrelated code.
+- Do NOT change existing tournament behavior unless the new mode is explicitly enabled.
+- All existing ROUND_ROBIN, MULTI_STAGE, and KNOCKOUT tournaments must continue to behave exactly as they do now.
+- Old tournaments with no new settings must behave exactly as today.
+- If board rotation conditions are invalid or not met, silently fall back to standard behavior on the server.
+- Keep changes minimal and targeted to the files listed below.
+
+Ticket summary:
+Add an optional group-stage scheduling mode where groups are paired to boards and their matches are interleaved in a turn-for-turn rotation.
+
+Example:
+Board 1 -> Groups A+B
+Board 2 -> Groups C+D
+Board 3 -> Groups E+F
+Board 4 -> Groups G+H
+
+Interleaved order pattern:
+Board1 GroupA Match1
+Board2 GroupC Match1
+Board3 GroupE Match1
+Board4 GroupG Match1
+Board1 GroupB Match1
+Board2 GroupD Match1
+Board3 GroupF Match1
+Board4 GroupH Match1
+Board1 GroupA Match2
+Board2 GroupC Match2
+...
+
+Scope:
+- Applies only to group-stage scheduling for ROUND_ROBIN and MULTI_STAGE
+- v1 only supports exactly 2 groups per board
+- No DB migration required
+- No changes to knockout generation, standings, qualification, or public view
+- No schedule reordering after tournament start
+
+Required work
+
+1) Add TypeScript settings fields
+File: shared/schema.ts
+
+Extend TournamentSettings to include:
+- groupScheduleMode?: 'standard' | 'board_rotation'
+- numberOfBoards?: number
+
+These must live in the existing settings JSONB structure only.
+Do not add SQL columns.
+Do not break existing settings typing.
+
+2) Add board-rotation scheduling helper
+File: server/match-generator.ts
+
+Create a pure helper:
+applyBoardRotationSchedule(tournamentId, sortedGroups, numberOfBoards, storage)
+
+Behavior:
+- Load the newly created group-stage matches for the tournament
+- Pair groups to boards in sorted order:
+  Board 1 => sortedGroups[0] and sortedGroups[1]
+  Board 2 => sortedGroups[2] and sortedGroups[3]
+  etc.
+- For each board, take the two groups' match lists in their existing order and interleave them:
+  G1M1, G2M1, G1M2, G2M2, ...
+- Then merge all boards in super-rounds:
+  board1 item1, board2 item1, board3 item1, board4 item1,
+  board1 item2, board2 item2, board3 item2, board4 item2, ...
+- Update each match using storage.updateMatch so that:
+  - boardNumber is assigned
+  - order is assigned to reflect the new global interleaved schedule
+
+Guard conditions:
+Only apply when all are true:
+- settings.groupScheduleMode === 'board_rotation'
+- numberOfBoards > 0
+- sortedGroups.length % numberOfBoards === 0
+- sortedGroups.length / numberOfBoards === 2
+
+If any guard fails, return without changing anything.
+
+Important:
+- Keep existing match generation logic intact
+- This helper must be additive and only run after matches already exist
+- Reuse existing match ordering where possible
+- Only operate on group-stage matches just created by the current generation flow
+
+3) Call helper from all 3 generation paths
+File: server/match-generator.ts
+
+After the group match creation loop in each of these functions:
+- generateRoundRobinMatches
+- generateMultiStageMatches
+- regenerateGroupMatchesFromMemberships
+
+Read the tournament settings and, if valid, invoke applyBoardRotationSchedule(...).
+
+When mode is not active, these functions must behave exactly as before.
+
+4) Update scorer board-data endpoint
+File: server/routes.ts
+Route area: /api/scorer/board-data
+
+Current behavior appears to return matches for one group on the board.
+Change it only for board rotation mode.
+
+When:
+- settings.groupScheduleMode === 'board_rotation'
+
+Then:
+- determine the board's two assigned groups from sortedGroups:
+  first = sortedGroups[(boardNumber - 1) * 2]
+  second = sortedGroups[(boardNumber - 1) * 2 + 1]
+- return both groups' matches for that board
+- filter by boardNumber so the board only receives the matches scheduled for it
+
+Keep the existing single-group logic unchanged for standard mode.
+
+Do not break current scorer behavior.
+
+5) Add creation-form UI
+File: client/src/pages/create-tournament.tsx
+
+For ROUND_ROBIN and MULTI_STAGE only:
+- under the existing Number of Groups section
+- when groupCount >= 4
+add:
+- Number of Boards select
+- Schedule Mode control
+
+Schedule Mode options:
+- standard
+- board_rotation
+
+Behavior:
+- Only show these controls when groupCount >= 4
+- Show a validation hint only, not a blocking error, when groupCount / numBoards !== 2
+- Pass groupScheduleMode and numberOfBoards into settings in handleSubmit
+- Only include these settings for ROUND_ROBIN and MULTI_STAGE
+- Default behavior should remain standard if user does not choose board rotation
+
+6) Preserve compatibility
+- Existing tournaments with no groupScheduleMode must continue to act as standard mode
+- Existing admin views must remain unchanged except that board labels should now appear automatically on group matches because boardNumber becomes non-null
+- Do not modify public view logic
+- Do not change knockout logic
+
+Relevant files
+- shared/schema.ts
+- server/match-generator.ts
+- server/routes.ts
+- client/src/pages/create-tournament.tsx
+
+Implementation notes
+- Make the smallest safe code changes
+- Follow existing code style and naming
+- Do not introduce a migration
+- Do not rename existing fields or break existing APIs
+- If there is existing sorting logic for groups or matches, reuse it
+- If any invalid board_rotation configuration reaches the backend, fail safe by doing nothing and leaving standard order intact
+
+After coding, provide:
+1. A short summary of files changed
+2. Exactly how the feature is activated
+3. Confirmation that default behavior remains unchanged
+4. Any assumptions made about existing match ordering

@@ -1866,23 +1866,43 @@ export async function registerRoutes(
 
       const sortedGroups = groupsList.sort((a, b) => a.name.localeCompare(b.name));
       const isKnockoutOnly = sortedGroups.length === 0;
+      const boardSettings = (tournament.settings as any) || {};
+      const isBoardRotation = !isKnockoutOnly && boardSettings.groupScheduleMode === 'board_rotation';
 
-      // For knockout-only tournaments there are no groups – use a synthetic one so the
-      // client can render without changes.  For group-stage tournaments, look up the
-      // group that corresponds to this board number.
-      const group = isKnockoutOnly
-        ? { id: 0, name: `Board ${boardNumber}` }
-        : sortedGroups[boardNumber - 1];
+      // Determine the primary group for this board.
+      // Board rotation: two groups per board, Board K → groups[2K-2] and groups[2K-1].
+      // Standard / knockout-only: one group per board (or synthetic group for KO-only).
+      let group: { id: number; name: string };
+      if (isKnockoutOnly) {
+        group = { id: 0, name: `Board ${boardNumber}` };
+      } else if (isBoardRotation) {
+        const firstIdx = (boardNumber - 1) * 2;
+        const g = sortedGroups[firstIdx];
+        if (!g) return res.status(404).json({ message: "Board not found" });
+        group = g;
+      } else {
+        const g = sortedGroups[boardNumber - 1];
+        if (!g) return res.status(404).json({ message: "Board not found" });
+        group = g;
+      }
 
-      if (!group) return res.status(404).json({ message: "Board not found" });
+      // Determine which group-stage matches belong to this board.
+      // Board rotation: all GROUP matches explicitly assigned boardNumber K.
+      // Standard: matches for the primary group (with optional boardNumber override).
+      let groupMatches: typeof allMatches;
+      let guestGroupMatches: typeof allMatches;
 
-      const groupMatches = group.id !== 0
-        ? allMatches.filter(m => m.groupId === group.id && (m.boardNumber === null || m.boardNumber === boardNumber))
-        : [];
-
-      const guestGroupMatches = group.id !== 0
-        ? allMatches.filter(m => m.stage === 'GROUP' && m.groupId !== group.id && m.boardNumber === boardNumber)
-        : [];
+      if (isBoardRotation) {
+        groupMatches = allMatches.filter(m => m.stage === 'GROUP' && m.boardNumber === boardNumber);
+        guestGroupMatches = [];
+      } else {
+        groupMatches = group.id !== 0
+          ? allMatches.filter(m => m.groupId === group.id && (m.boardNumber === null || m.boardNumber === boardNumber))
+          : [];
+        guestGroupMatches = group.id !== 0
+          ? allMatches.filter(m => m.stage === 'GROUP' && m.groupId !== group.id && m.boardNumber === boardNumber)
+          : [];
+      }
 
       let knockoutBoardMatches: typeof allMatches;
       let totalBoards: number;
@@ -1935,14 +1955,26 @@ export async function registerRoutes(
         knockoutBoardMatches = allMatches.filter(
           m => m.stage === 'KNOCKOUT' && (m as any).boardNumber === boardNumber
         );
-        totalBoards = sortedGroups.length;
+        totalBoards = isBoardRotation
+          ? (boardSettings.numberOfBoards || Math.floor(sortedGroups.length / 2))
+          : sortedGroups.length;
       }
 
       const boardMatches = [...groupMatches, ...guestGroupMatches, ...knockoutBoardMatches];
 
-      const groupMembershipPlayerIds = group.id !== 0
-        ? allMemberships.filter(m => m.groupId === group.id).map(m => m.playerId)
-        : [];
+      let groupMembershipPlayerIds: number[];
+      if (isBoardRotation) {
+        const firstIdx = (boardNumber - 1) * 2;
+        const groupAId = sortedGroups[firstIdx]?.id;
+        const groupBId = sortedGroups[firstIdx + 1]?.id;
+        groupMembershipPlayerIds = allMemberships
+          .filter(m => m.groupId === groupAId || m.groupId === groupBId)
+          .map(m => m.playerId);
+      } else {
+        groupMembershipPlayerIds = group.id !== 0
+          ? allMemberships.filter(m => m.groupId === group.id).map(m => m.playerId)
+          : [];
+      }
       const knockoutPlayerIds = knockoutBoardMatches
         .flatMap(m => [m.playerAId, m.playerBId].filter(Boolean)) as number[];
       const guestPlayerIds = guestGroupMatches

@@ -51,6 +51,8 @@ export default function CreateTournament() {
     const [pointsForLoss, setPointsForLoss] = useState(0);
     const [numBoards, setNumBoards] = useState(1);
     const [useSets, setUseSets] = useState(false);
+    const [groupScheduleMode, setGroupScheduleMode] = useState<'standard' | 'board_rotation'>('standard');
+    const [groupNumBoards, setGroupNumBoards] = useState(2);
 
     const handleAddPlayer = () => {
       if (players.length >= 48) return;
@@ -153,6 +155,8 @@ export default function CreateTournament() {
           useSets: type === "KNOCKOUT" ? useSets : undefined,
           pointsForWin: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForWin : undefined,
           pointsForLoss: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForLoss : undefined,
+          groupScheduleMode: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") && groupCount >= 4 ? groupScheduleMode : undefined,
+          numberOfBoards: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") && groupCount >= 4 && groupScheduleMode === 'board_rotation' ? groupNumBoards : undefined,
         }
       }, {
         onSuccess: async (newTournament) => {
@@ -287,7 +291,7 @@ export default function CreateTournament() {
                       <Label htmlFor="groupCount">Number of Groups</Label>
                       <Select 
                         value={groupCount.toString()} 
-                        onValueChange={(val) => setGroupCount(parseInt(val))}
+                        onValueChange={(val) => { setGroupCount(parseInt(val)); setGroupScheduleMode('standard'); }}
                       >
                         <SelectTrigger id="groupCount" className="h-12">
                           <SelectValue />
@@ -299,6 +303,48 @@ export default function CreateTournament() {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {groupCount >= 4 && (
+                      <div className="space-y-2">
+                        <Label htmlFor="groupScheduleMode">Board Schedule Mode</Label>
+                        <Select
+                          value={groupScheduleMode}
+                          onValueChange={(val) => setGroupScheduleMode(val as 'standard' | 'board_rotation')}
+                        >
+                          <SelectTrigger id="groupScheduleMode" className="h-12" data-testid="select-group-schedule-mode">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="standard">Standard</SelectItem>
+                            <SelectItem value="board_rotation">Board Rotation</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {groupCount >= 4 && groupScheduleMode === 'board_rotation' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="groupNumBoards">Number of Boards</Label>
+                        <Select
+                          value={groupNumBoards.toString()}
+                          onValueChange={(val) => setGroupNumBoards(parseInt(val))}
+                        >
+                          <SelectTrigger id="groupNumBoards" className="h-12" data-testid="select-group-num-boards">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[2, 4, 6, 8].map(n => (
+                              <SelectItem key={n} value={n.toString()}>{n} Board{n > 1 ? 's' : ''}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {groupCount / groupNumBoards !== 2 && (
+                          <p className="text-sm text-muted-foreground">
+                            For board rotation, the number of groups should be exactly twice the number of boards (currently {groupCount} groups ÷ {groupNumBoards} boards = {(groupCount / groupNumBoards).toFixed(1)}). Scheduling will fall back to standard if invalid.
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="groupBestOf">Group Stage Match Format</Label>
