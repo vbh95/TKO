@@ -970,6 +970,7 @@ export default function ScorerPage() {
       nextThrower,
       legsWonA,
       legsWonB,
+      newVisits,
     );
 
     persistCurrentState({
@@ -1134,13 +1135,13 @@ export default function ScorerPage() {
       const newR = remainingA + lastVisit.score;
       setRemainingA(newR);
       setCurrentThrower('A');
-      emitLiveState(newR, remainingB, 'A', legsWonA, legsWonB);
+      emitLiveState(newR, remainingB, 'A', legsWonA, legsWonB, newVisits);
       persistCurrentState({ remainingA: newR, currentThrower: 'A', legVisits: newVisits });
     } else {
       const newR = remainingB + lastVisit.score;
       setRemainingB(newR);
       setCurrentThrower('B');
-      emitLiveState(remainingA, newR, 'B', legsWonA, legsWonB);
+      emitLiveState(remainingA, newR, 'B', legsWonA, legsWonB, newVisits);
       persistCurrentState({ remainingB: newR, currentThrower: 'B', legVisits: newVisits });
     }
 
