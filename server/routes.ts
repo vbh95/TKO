@@ -280,31 +280,36 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     }
   }
 
-  // 3rd-place bracket: assign 3rd-place finisher from each group to TP_QF
-  if (enableTp && tpKoMatches.length > 0 && standings.length >= 3) {
+  // 3rd-place bracket: fill ALL TP_QF slots once every group is done
+  if (enableTp && tpKoMatches.length > 0 && allGroupsDone) {
     const tpSorted = [...tpKoMatches].sort((a: any, b: any) => a.order - b.order);
     const tpRoundKeys: string[] = [];
     for (const m of tpSorted) {
       if (!tpRoundKeys.includes(m.roundKey)) tpRoundKeys.push(m.roundKey);
     }
     const tpFirstKey = tpRoundKeys[0];
-    const tpFirstMatches = tpSorted.filter(m => m.roundKey === tpFirstKey);
-    const tpMatchIdx = Math.floor(completedGroupIdx / 2);
-    const isPlayerA = completedGroupIdx % 2 === 0;
-    if (tpMatchIdx < tpFirstMatches.length) {
+    const tpFirstMatches = tpSorted.filter((m: any) => m.roundKey === tpFirstKey);
+
+    // Sort groups by id for stable, reproducible pairing across all calls
+    const sortedGroups = [...groupsList].sort((a: any, b: any) => a.id - b.id);
+    for (let gi = 0; gi < sortedGroups.length; gi++) {
+      const group = sortedGroups[gi];
+      const grpStandings = calcGroupStandings(group.id);
+      const thirdPlaceId = grpStandings[2]?.id;
+      if (!thirdPlaceId) continue;
+      const tpMatchIdx = Math.floor(gi / 2);
+      const isPlayerA = gi % 2 === 0;
+      if (tpMatchIdx >= tpFirstMatches.length) continue;
       const tpUpdates: any = {};
-      const thirdPlaceId = standings[2]?.id;
-      if (thirdPlaceId) {
-        if (isPlayerA) tpUpdates.playerAId = thirdPlaceId;
-        else tpUpdates.playerBId = thirdPlaceId;
-        if (allGroupsDone && nbBoards >= 2) {
-          const halfBoards = Math.floor(nbBoards / 2);
-          tpUpdates.boardNumber = (tpMatchIdx % halfBoards) + halfBoards + 1;
-        }
-        await storage.updateMatch(tpFirstMatches[tpMatchIdx].id, tpUpdates);
-        if (!updatedQFIds.includes(tpFirstMatches[tpMatchIdx].id)) {
-          updatedQFIds.push(tpFirstMatches[tpMatchIdx].id);
-        }
+      if (isPlayerA) tpUpdates.playerAId = thirdPlaceId;
+      else tpUpdates.playerBId = thirdPlaceId;
+      if (nbBoards >= 2) {
+        const halfBoards = Math.floor(nbBoards / 2);
+        tpUpdates.boardNumber = (tpMatchIdx % halfBoards) + halfBoards + 1;
+      }
+      await storage.updateMatch(tpFirstMatches[tpMatchIdx].id, tpUpdates);
+      if (!updatedQFIds.includes(tpFirstMatches[tpMatchIdx].id)) {
+        updatedQFIds.push(tpFirstMatches[tpMatchIdx].id);
       }
     }
   }
