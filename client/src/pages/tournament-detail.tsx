@@ -858,7 +858,14 @@ export default function TournamentDetail() {
     }
   };
 
-  const sortedGroupsForBoards = [...groups].sort((a: any, b: any) => a.name.localeCompare(b.name));
+  const sortedGroupsForBoards = (() => {
+    const allSorted = [...groups].sort((a: any, b: any) => a.name.localeCompare(b.name));
+    if (settings.groupScheduleMode === 'board_rotation' && settings.numberOfBoards) {
+      const n = settings.numberOfBoards as number;
+      return Array.from({ length: n }, (_, i) => allSorted[i % allSorted.length]);
+    }
+    return allSorted;
+  })();
   const numBoards = sortedGroupsForBoards.length;
   const getNaturalBoardNumber = (groupId: number | null) => {
     if (!groupId) return null;
@@ -1402,9 +1409,13 @@ export default function TournamentDetail() {
                 const playerB = getPlayer(match.playerBId);
                 const headerLabel = match.stage === 'GROUP'
                   ? `Board ${boardNum} — ${group.name}`
+                  : match.roundKey === 'R16' ? `Board ${boardNum} — Round of 16`
                   : match.roundKey === 'QF' ? `Board ${boardNum} — Quarter Final`
                   : match.roundKey === 'SF' ? `Board ${boardNum} — Semi Final`
                   : match.roundKey === 'F' ? `Board ${boardNum} — Final`
+                  : match.roundKey === 'TP_QF' ? `Board ${boardNum} — 3rd Place QF`
+                  : match.roundKey === 'TP_SF' ? `Board ${boardNum} — 3rd Place SF`
+                  : match.roundKey === 'TP_F' ? `Board ${boardNum} — 3rd Place Final`
                   : `Board ${boardNum}`;
 
                 return (

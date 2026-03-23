@@ -265,7 +265,7 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
       const existingMatch = firstRoundMatches[i];
       const finalPlayerAId = updates.playerAId ?? existingMatch.playerAId;
       const finalPlayerBId = updates.playerBId ?? existingMatch.playerBId;
-      if (finalPlayerAId && finalPlayerBId && allGroupsDone) {
+      if (finalPlayerAId && finalPlayerBId && allGroupsDone && !(existingMatch as any).boardNumber) {
         if (enableTp && nbBoards >= 2) {
           const halfBoards = Math.floor(nbBoards / 2);
           updates.boardNumber = i < nbBoards

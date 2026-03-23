@@ -529,7 +529,7 @@ export async function generateMultiStageMatches(
     }
   }
 
-  if (settings.enableThirdPlaceBracket && settings.groupScheduleMode === 'board_rotation' && groupCount >= 4) {
+  if (settings.enableThirdPlaceBracket && settings.groupScheduleMode === 'board_rotation' && settings.numberOfBoards && groupCount >= 4) {
     const tpSlots = nextPowerOfTwo(groupCount);
     const tpRounds = Math.log2(tpSlots);
     for (let round = 0; round < tpRounds; round++) {
@@ -554,6 +554,38 @@ export async function generateMultiStageMatches(
           winnerId: null,
           order: matchOrder++,
         });
+      }
+    }
+
+    // Pre-assign board numbers to all knockout matches so tablets know ahead of time
+    const nbBoards = settings.numberOfBoards!;
+    const halfBoards = Math.floor(nbBoards / 2);
+    const allNewMatches = await storage.getMatchesByTournamentId(tournamentId);
+    const koMatches = allNewMatches
+      .filter(m => m.stage === 'KNOCKOUT')
+      .sort((a, b) => a.order - b.order);
+
+    const mainKo = koMatches.filter(m => !(m.roundKey as string).startsWith('TP_'));
+    const tpKo = koMatches.filter(m => (m.roundKey as string).startsWith('TP_'));
+
+    const mainRounds = Array.from(new Set(mainKo.map(m => m.roundKey)));
+    const firstMainRound = mainRounds[0];
+    for (const rk of mainRounds) {
+      const roundMatches = mainKo.filter(m => m.roundKey === rk);
+      for (let i = 0; i < roundMatches.length; i++) {
+        const board = rk === firstMainRound
+          ? (i < nbBoards ? i + 1 : ((i - nbBoards) % halfBoards) + 1)
+          : (i % halfBoards) + 1;
+        await storage.updateMatch(roundMatches[i].id, { boardNumber: board } as any);
+      }
+    }
+
+    const tpRoundsSorted = Array.from(new Set(tpKo.map(m => m.roundKey)));
+    for (const rk of tpRoundsSorted) {
+      const roundMatches = tpKo.filter(m => m.roundKey === rk);
+      for (let i = 0; i < roundMatches.length; i++) {
+        const board = (i % halfBoards) + halfBoards + 1;
+        await storage.updateMatch(roundMatches[i].id, { boardNumber: board } as any);
       }
     }
   }
