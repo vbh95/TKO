@@ -24,6 +24,14 @@ function getBestOfForRound(roundKey: string, settings: TournamentSettings): numb
   return settings.knockoutBestOf || 3;
 }
 
+function getTpRoundKey(totalSlots: number, round: number): string {
+  const matchesInRound = totalSlots / Math.pow(2, round + 1);
+  if (matchesInRound === 1) return "TP_F";
+  if (matchesInRound === 2) return "TP_SF";
+  if (matchesInRound === 4) return "TP_QF";
+  return `TP_R${round + 1}`;
+}
+
 function nextPowerOfTwo(n: number): number {
   let p = 1;
   while (p < n) p *= 2;
@@ -518,6 +526,35 @@ export async function generateMultiStageMatches(
         winnerId: null,
         order: matchOrder++,
       });
+    }
+  }
+
+  if (settings.enableThirdPlaceBracket && settings.groupScheduleMode === 'board_rotation' && groupCount >= 4) {
+    const tpSlots = nextPowerOfTwo(groupCount);
+    const tpRounds = Math.log2(tpSlots);
+    for (let round = 0; round < tpRounds; round++) {
+      const matchCount = tpSlots / Math.pow(2, round + 1);
+      const tpRoundKey = getTpRoundKey(tpSlots, round);
+      const bestOf = getBestOfForRound(
+        tpRoundKey === 'TP_F' ? 'F' : tpRoundKey === 'TP_SF' ? 'SF' : 'QF',
+        settings
+      );
+      for (let m = 0; m < matchCount; m++) {
+        await storage.createMatch({
+          tournamentId,
+          stage: "KNOCKOUT",
+          roundKey: tpRoundKey,
+          groupId: null,
+          playerAId: null,
+          playerBId: null,
+          scoreA: 0,
+          scoreB: 0,
+          bestOf,
+          status: "PENDING",
+          winnerId: null,
+          order: matchOrder++,
+        });
+      }
     }
   }
 }

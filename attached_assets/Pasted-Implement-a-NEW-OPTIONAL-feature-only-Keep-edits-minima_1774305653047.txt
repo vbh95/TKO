@@ -1,0 +1,69 @@
+Implement a NEW OPTIONAL feature only. Keep edits minimal. Do NOT refactor unrelated code. Do NOT change current logic unless explicitly enabled.
+
+Feature:
+Add an optional “3rd Place Bracket” for MULTI_STAGE tournaments that already use board rotation.
+
+Rules:
+- Only available when:
+  - tournament type = MULTI_STAGE
+  - board rotation is enabled
+- Add a create-tournament option:
+  - enableThirdPlaceBracket: boolean
+- Store it in existing tournament settings JSON only
+- No DB migration unless absolutely unavoidable
+
+Behavior:
+- Existing main knockout stays unchanged
+- When enabled, also create a separate knockout bracket using the 3rd-place finisher from each group
+- This is NOT a normal 3rd-place playoff between semi-final losers
+- It is a separate consolation knockout for all group-stage 3rd-place finishers
+- Example: 8 groups => 8 third-place qualifiers => QF, SF, Final
+
+Scheduling / boards:
+- First 4 main Round-of-16 matches still run on boards 1,2,3,4
+- After 4 main Round-of-16 matches are completed:
+  - remaining main Round-of-16 matches should run on boards 1 and 2
+  - 3rd-place bracket quarter-finals should begin on boards 3 and 4
+- After activation:
+  - main bracket stays on boards 1 and 2
+  - 3rd-place bracket stays on boards 3 and 4
+- Reuse existing boardNumber / order logic if possible
+- Do not redesign the full scheduler
+
+Implementation requirements:
+1. Inspect existing code first and find:
+   - tournament settings type
+   - create-tournament form submit logic
+   - main knockout generation
+   - how 3rd place in groups can be read from current standings logic
+   - board rotation logic
+   - scorer/board routing logic
+2. Make the SMALLEST safe change set
+3. Reuse existing knockout generator/helpers if available
+4. Distinguish 3rd-place bracket from main bracket using the lightest-touch method that fits current code:
+   - e.g. bracketType: 'main' | 'third_place'
+   - or equivalent metadata
+5. Guard all new behavior behind explicit checks
+6. If config is invalid, silently skip the feature and preserve current behavior
+
+Do not change:
+- normal ROUND_ROBIN behavior
+- normal MULTI_STAGE behavior when feature is off
+- KNOCKOUT tournaments
+- standings calculation
+- existing main knockout qualification logic
+- public view unless absolutely required
+
+Files most likely relevant:
+- shared/schema.ts
+- server/match-generator.ts
+- server/routes.ts
+- client/src/pages/create-tournament.tsx
+
+Deliverables:
+- implement code directly
+- then give a very short summary:
+  - files changed
+  - settings added
+  - activation conditions
+  - confirmation default behavior is unchanged

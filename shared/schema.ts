@@ -302,6 +302,7 @@ export type TournamentSettings = {
   pointsForLoss?: number;
   groupScheduleMode?: 'standard' | 'board_rotation';
   numberOfBoards?: number;
+  enableThirdPlaceBracket?: boolean;
 };
 
 export type CreateTournamentRequest = {

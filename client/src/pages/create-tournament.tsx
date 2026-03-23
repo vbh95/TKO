@@ -53,6 +53,7 @@ export default function CreateTournament() {
     const [useSets, setUseSets] = useState(false);
     const [groupScheduleMode, setGroupScheduleMode] = useState<'standard' | 'board_rotation'>('standard');
     const [groupNumBoards, setGroupNumBoards] = useState(2);
+    const [enableThirdPlaceBracket, setEnableThirdPlaceBracket] = useState(false);
 
     const handleAddPlayer = () => {
       if (players.length >= 48) return;
@@ -157,6 +158,7 @@ export default function CreateTournament() {
           pointsForLoss: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForLoss : undefined,
           groupScheduleMode: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") && groupCount >= 4 ? groupScheduleMode : undefined,
           numberOfBoards: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") && groupCount >= 4 && groupScheduleMode === 'board_rotation' ? groupNumBoards : undefined,
+          enableThirdPlaceBracket: type === "MULTI_STAGE" && groupCount >= 4 && groupScheduleMode === 'board_rotation' && enableThirdPlaceBracket ? true : undefined,
         }
       }, {
         onSuccess: async (newTournament) => {
@@ -319,6 +321,18 @@ export default function CreateTournament() {
                             <SelectItem value="board_rotation">Board Rotation</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                    )}
+
+                    {type === "MULTI_STAGE" && groupCount >= 4 && groupScheduleMode === 'board_rotation' && (
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="enableThirdPlaceBracket" className="cursor-pointer">3rd Place Consolation Bracket</Label>
+                        <Switch
+                          id="enableThirdPlaceBracket"
+                          checked={enableThirdPlaceBracket}
+                          onCheckedChange={setEnableThirdPlaceBracket}
+                          data-testid="toggle-third-place-bracket"
+                        />
                       </div>
                     )}
 

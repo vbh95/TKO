@@ -31,28 +31,33 @@ interface PromoteGroupParams {
   ptsWin: number;
   ptsLoss: number;
   shareToken: string | null;
+  settings?: TournamentSettings;
 }
 
 async function promoteGroupToKnockout(params: PromoteGroupParams) {
-  const { tournamentId, completedGroupId, currentMatchId, currentMatchWinnerId, ptsWin, ptsLoss, shareToken } = params;
+  const { tournamentId, completedGroupId, currentMatchId, currentMatchWinnerId, ptsWin, ptsLoss, shareToken, settings } = params;
+  const enableTp = !!(settings?.enableThirdPlaceBracket && settings?.groupScheduleMode === 'board_rotation');
+  const nbBoards = settings?.numberOfBoards || 0;
 
   const allMatches = await storage.getMatchesByTournamentId(tournamentId);
   const groupMatches = allMatches.filter(m => m.stage === 'GROUP');
   const knockoutMatches = allMatches.filter(m => m.stage === 'KNOCKOUT');
-  if (knockoutMatches.length === 0) return;
+  const mainKoMatches = knockoutMatches.filter(m => !m.roundKey.startsWith('TP_'));
+  const tpKoMatches = knockoutMatches.filter(m => m.roundKey.startsWith('TP_'));
+  if (mainKoMatches.length === 0) return;
 
   const groupsList = await storage.getGroupsByTournamentId(tournamentId);
   const playersList = await storage.getPlayersByTournamentId(tournamentId);
   const memberships = await storage.getGroupMembershipsByTournamentId(tournamentId);
   if (groupsList.length === 0) return;
 
-  const sorted = [...knockoutMatches].sort((a: any, b: any) => a.order - b.order);
-  const roundKeys: string[] = [];
-  for (const m of sorted) {
-    if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
+  const mainSorted = [...mainKoMatches].sort((a: any, b: any) => a.order - b.order);
+  const mainRoundKeys: string[] = [];
+  for (const m of mainSorted) {
+    if (!mainRoundKeys.includes(m.roundKey)) mainRoundKeys.push(m.roundKey);
   }
-  const firstRoundKey = roundKeys[0];
-  const firstRoundMatches = sorted.filter(m => m.roundKey === firstRoundKey);
+  const firstRoundKey = mainRoundKeys[0];
+  const firstRoundMatches = mainSorted.filter(m => m.roundKey === firstRoundKey);
 
   const calcGroupStandings = (groupId: number) => {
     const memberPlayerIds = memberships.filter(gm => gm.groupId === groupId).map(gm => gm.playerId);
@@ -261,10 +266,46 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
       const finalPlayerAId = updates.playerAId ?? existingMatch.playerAId;
       const finalPlayerBId = updates.playerBId ?? existingMatch.playerBId;
       if (finalPlayerAId && finalPlayerBId && allGroupsDone) {
-        updates.boardNumber = i + 1;
+        if (enableTp && nbBoards >= 2) {
+          const halfBoards = Math.floor(nbBoards / 2);
+          updates.boardNumber = i < nbBoards
+            ? i + 1
+            : ((i - nbBoards) % halfBoards) + 1;
+        } else {
+          updates.boardNumber = i + 1;
+        }
       }
       await storage.updateMatch(firstRoundMatches[i].id, updates);
       updatedQFIds.push(firstRoundMatches[i].id);
+    }
+  }
+
+  // 3rd-place bracket: assign 3rd-place finisher from each group to TP_QF
+  if (enableTp && tpKoMatches.length > 0 && standings.length >= 3) {
+    const tpSorted = [...tpKoMatches].sort((a: any, b: any) => a.order - b.order);
+    const tpRoundKeys: string[] = [];
+    for (const m of tpSorted) {
+      if (!tpRoundKeys.includes(m.roundKey)) tpRoundKeys.push(m.roundKey);
+    }
+    const tpFirstKey = tpRoundKeys[0];
+    const tpFirstMatches = tpSorted.filter(m => m.roundKey === tpFirstKey);
+    const tpMatchIdx = Math.floor(completedGroupIdx / 2);
+    const isPlayerA = completedGroupIdx % 2 === 0;
+    if (tpMatchIdx < tpFirstMatches.length) {
+      const tpUpdates: any = {};
+      const thirdPlaceId = standings[2]?.id;
+      if (thirdPlaceId) {
+        if (isPlayerA) tpUpdates.playerAId = thirdPlaceId;
+        else tpUpdates.playerBId = thirdPlaceId;
+        if (allGroupsDone && nbBoards >= 2) {
+          const halfBoards = Math.floor(nbBoards / 2);
+          tpUpdates.boardNumber = (tpMatchIdx % halfBoards) + halfBoards + 1;
+        }
+        await storage.updateMatch(tpFirstMatches[tpMatchIdx].id, tpUpdates);
+        if (!updatedQFIds.includes(tpFirstMatches[tpMatchIdx].id)) {
+          updatedQFIds.push(tpFirstMatches[tpMatchIdx].id);
+        }
+      }
     }
   }
 
@@ -276,7 +317,14 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     for (let i = 0; i < refreshedFirst.length; i++) {
       const m = refreshedFirst[i];
       if (m.status === 'PENDING' && m.playerAId && m.playerBId && !(m as any).boardNumber) {
-        await storage.updateMatch(m.id, { boardNumber: i + 1 } as any);
+        let assignedBoard: number;
+        if (enableTp && nbBoards >= 2) {
+          const halfBoards = Math.floor(nbBoards / 2);
+          assignedBoard = i < nbBoards ? i + 1 : ((i - nbBoards) % halfBoards) + 1;
+        } else {
+          assignedBoard = i + 1;
+        }
+        await storage.updateMatch(m.id, { boardNumber: assignedBoard } as any);
         if (!updatedQFIds.includes(m.id)) updatedQFIds.push(m.id);
       }
     }
@@ -293,14 +341,28 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     }
   }
 
-  const totalBoards = groupsList.length;
-  for (const km of sorted) {
+  const totalBoards = enableTp && nbBoards >= 2 ? nbBoards : groupsList.length;
+  for (const km of mainSorted) {
     if (km.roundKey === firstRoundKey) continue;
     if (km.boardNumber) continue;
-    const roundMatches = sorted.filter(m => m.roundKey === km.roundKey);
+    const roundMatches = mainSorted.filter(m => m.roundKey === km.roundKey);
     const idx = roundMatches.findIndex(m => m.id === km.id);
     const assignedBoard = (idx % totalBoards) + 1;
     await storage.updateMatch(km.id, { boardNumber: assignedBoard } as any);
+  }
+
+  if (allGroupsDone && enableTp && nbBoards >= 2 && tpKoMatches.length > 0) {
+    const tpSortedLate = [...tpKoMatches].sort((a: any, b: any) => a.order - b.order);
+    const tpFirstKeyLate = tpSortedLate[0]?.roundKey;
+    const halfBoards = Math.floor(nbBoards / 2);
+    for (const km of tpSortedLate) {
+      if (km.roundKey === tpFirstKeyLate) continue;
+      if (km.boardNumber) continue;
+      const roundMatches = tpSortedLate.filter(m => m.roundKey === km.roundKey);
+      const idx = roundMatches.findIndex(m => m.id === km.id);
+      const assignedBoard = (idx % halfBoards) + halfBoards + 1;
+      await storage.updateMatch(km.id, { boardNumber: assignedBoard } as any);
+    }
   }
 
   await deduplicateRoundScorers(tournamentId, shareToken);
@@ -1558,6 +1620,7 @@ export async function registerRoutes(
           ptsWin,
           ptsLoss,
           shareToken: tournamentData?.shareToken || null,
+          settings: tournamentData?.settings as TournamentSettings | undefined,
         });
       } else if (match.stage === 'KNOCKOUT') {
         if (isReset) {
@@ -1566,7 +1629,11 @@ export async function registerRoutes(
 
         const knockoutMatches = await storage.getMatchesByTournamentId(match.tournamentId);
         const koOnly = knockoutMatches.filter(m => m.stage === 'KNOCKOUT');
-        const sorted = [...koOnly].sort((a: any, b: any) => a.order - b.order);
+        const isThirdPlaceMatch = match.roundKey.startsWith('TP_');
+        const relevantKo = isThirdPlaceMatch
+          ? koOnly.filter(m => m.roundKey.startsWith('TP_'))
+          : koOnly.filter(m => !m.roundKey.startsWith('TP_'));
+        const sorted = [...relevantKo].sort((a: any, b: any) => a.order - b.order);
         const roundKeys: string[] = [];
         for (const m of sorted) {
           if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
