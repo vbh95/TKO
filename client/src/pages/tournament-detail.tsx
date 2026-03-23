@@ -585,7 +585,7 @@ export default function TournamentDetail() {
 
   const groupMatchData = (() => {
     const groupMatches = matches.filter((m: any) => m.stage === "GROUP");
-    const nonGroupMatches = matches.filter((m: any) => m.stage !== "GROUP");
+    const nonGroupMatches = matches.filter((m: any) => m.stage !== "GROUP" && !m.roundKey?.startsWith('TP_'));
 
     const byGroup: { group: any; rounds: { roundKey: string; matches: any[] }[] }[] = [];
 
@@ -642,7 +642,7 @@ export default function TournamentDetail() {
   };
 
   const knockoutSlotLabels = (() => {
-    const knockoutMatches = matches.filter((m: any) => m.stage === 'KNOCKOUT');
+    const knockoutMatches = matches.filter((m: any) => m.stage === 'KNOCKOUT' && !m.roundKey?.startsWith('TP_'));
     if (knockoutMatches.length === 0 || groups.length === 0) return {};
 
     const sorted = [...knockoutMatches].sort((a: any, b: any) => a.order - b.order);
@@ -712,6 +712,57 @@ export default function TournamentDetail() {
 
     return labels;
   })();
+
+  const tpMatchData = (() => {
+    const tpMatches = matches.filter((m: any) => m.roundKey?.startsWith('TP_'));
+    if (tpMatches.length === 0) return [];
+    const tpRoundOrder: Record<string, number> = { 'TP_QF': 1, 'TP_SF': 2, 'TP_F': 3 };
+    const roundKeys = Array.from(new Set(tpMatches.map((m: any) => m.roundKey))) as string[];
+    roundKeys.sort((a, b) => (tpRoundOrder[a] || 0) - (tpRoundOrder[b] || 0));
+    return roundKeys.map(rk => ({
+      roundKey: rk,
+      matches: tpMatches.filter((m: any) => m.roundKey === rk).sort((a: any, b: any) => a.order - b.order),
+    }));
+  })();
+
+  const tpSlotLabels = (() => {
+    const labels: Record<number, { a: string; b: string }> = {};
+    const tpFirstRound = tpMatchData[0];
+    if (!tpFirstRound || groups.length === 0) return labels;
+    const matchRefs: Record<number, string> = {};
+    tpFirstRound.matches.forEach((match: any, idx: number) => {
+      const grpA = groups[idx * 2];
+      const grpB = groups[idx * 2 + 1];
+      labels[match.id] = {
+        a: grpA ? `3rd ${grpA.name}` : 'TBD',
+        b: grpB ? `3rd ${grpB.name}` : 'TBD',
+      };
+      matchRefs[match.id] = `TP_QF ${idx + 1}`;
+    });
+    for (let r = 1; r < tpMatchData.length; r++) {
+      const prevMatches = tpMatchData[r - 1].matches;
+      const currentMatches = tpMatchData[r].matches;
+      currentMatches.forEach((match: any, idx: number) => {
+        const prev1 = prevMatches[idx * 2];
+        const prev2 = prevMatches[idx * 2 + 1];
+        labels[match.id] = {
+          a: prev1 ? `Winner of ${matchRefs[prev1.id]}` : 'TBD',
+          b: prev2 ? `Winner of ${matchRefs[prev2.id]}` : 'TBD',
+        };
+        matchRefs[match.id] = tpMatchData[r].roundKey === 'TP_F' ? 'TP Final' : `${tpMatchData[r].roundKey} ${idx + 1}`;
+      });
+    }
+    return labels;
+  })();
+
+  const getTpRoundDisplayName = (roundKey: string): string => {
+    switch (roundKey) {
+      case 'TP_QF': return 'Quarter-Finals';
+      case 'TP_SF': return 'Semi-Finals';
+      case 'TP_F': return 'Final';
+      default: return roundKey;
+    }
+  };
 
   const groupStandings = groups.length > 0
     ? groups.map((group: any) => {
@@ -1107,9 +1158,92 @@ export default function TournamentDetail() {
     </div>
   );
 
+  const renderThirdPlaceMatches = () => (
+    <div className="space-y-8">
+      {tpMatchData.map(({ roundKey, matches: roundMatches }, roundIdx) => (
+        <div key={roundKey} className="space-y-4">
+          <h2 className="text-xl font-bold text-primary" data-testid={`tp-round-header-${roundKey}`}>
+            {getTpRoundDisplayName(roundKey)}
+          </h2>
+          <div className={cn(
+            "grid gap-4",
+            roundMatches.length === 1 ? "grid-cols-1 max-w-md mx-auto" : "grid-cols-1 md:grid-cols-2"
+          )}>
+            {roundMatches.map((match: any, matchIdx: number) => {
+              const playerA = getPlayer(match.playerAId);
+              const playerB = getPlayer(match.playerBId);
+              const slotLabel = tpSlotLabels[match.id];
+              const labelA = playerA?.name || slotLabel?.a || 'TBD';
+              const labelB = playerB?.name || slotLabel?.b || 'TBD';
+              return (
+                <Card
+                  key={match.id}
+                  onClick={() => setSelectedMatch(match)}
+                  className={cn(
+                    "overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
+                    match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
+                  )}
+                  data-testid={`match-card-tp-${match.id}`}
+                >
+                  <div className="bg-amber-600 px-4 py-2 flex items-center justify-between gap-2">
+                    <span className="text-white font-bold text-sm">
+                      {roundKey === 'TP_F' ? '3rd Place Final' : `${getTpRoundDisplayName(roundKey)} ${matchIdx + 1}`}
+                    </span>
+                    {match.status === 'COMPLETED' && (
+                      <Badge variant="secondary" className="text-xs">Completed</Badge>
+                    )}
+                  </div>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 space-y-2">
+                        <div className={cn(
+                          "text-base font-bold",
+                          match.status === 'COMPLETED' && match.winnerId === match.playerAId && match.playerAId && "text-primary font-black"
+                        )}>
+                          {labelA}
+                        </div>
+                        <div className={cn(
+                          "text-base font-bold",
+                          match.status === 'COMPLETED' && match.winnerId === match.playerBId && match.playerBId && "text-primary font-black"
+                        )}>
+                          {labelB}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-center gap-2 ml-4">
+                        <div className={cn(
+                          "w-8 h-8 flex items-center justify-center rounded text-base font-black",
+                          match.status === 'COMPLETED' && match.scoreA > match.scoreB ? "bg-primary text-primary-foreground" : "bg-muted"
+                        )}>
+                          {match.scoreA || 0}
+                        </div>
+                        <div className={cn(
+                          "w-8 h-8 flex items-center justify-center rounded text-base font-black",
+                          match.status === 'COMPLETED' && match.scoreB > match.scoreA ? "bg-primary text-primary-foreground" : "bg-muted"
+                        )}>
+                          {match.scoreB || 0}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      {tpMatchData.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          <p className="text-lg font-medium">3rd place bracket not yet generated</p>
+          <p className="text-sm mt-1">Complete the group stage to populate the consolation bracket.</p>
+        </div>
+      )}
+    </div>
+  );
+
   const isMultiStage = tournament.type === 'MULTI_STAGE';
   const liveMatches = matches.filter((m: any) => m.status === 'IN_PROGRESS');
-  const tabCount = 4 + (isMultiStage ? 1 : 0);
+  const hasThirdPlaceBracket = isMultiStage && settings.enableThirdPlaceBracket === true;
+  const tabCount = 4 + (isMultiStage ? 1 : 0) + (hasThirdPlaceBracket ? 1 : 0);
 
   const boardSlots = sortedGroupsForBoards.map((group: any, idx: number) => {
     const boardNum = idx + 1;
@@ -1190,7 +1324,7 @@ export default function TournamentDetail() {
         </div>
 
         <Tabs defaultValue="live" className="space-y-6">
-          <TabsList className={cn("grid w-full lg:w-[600px]", tabCount === 5 ? "grid-cols-5" : "grid-cols-4")}>
+          <TabsList className={cn("grid w-full", tabCount === 6 ? "lg:w-[720px] grid-cols-6" : tabCount === 5 ? "lg:w-[600px] grid-cols-5" : "lg:w-[600px] grid-cols-4")}>
             <TabsTrigger value="live" data-testid="tab-live" className="gap-1.5">
               <Radio className="w-3.5 h-3.5" />
               Live
@@ -1205,6 +1339,9 @@ export default function TournamentDetail() {
                 <TabsTrigger value="groups" data-testid="tab-groups">Groups</TabsTrigger>
                 <TabsTrigger value="standings" data-testid="tab-standings">Standings</TabsTrigger>
                 <TabsTrigger value="knockout" data-testid="tab-knockout">Knockout</TabsTrigger>
+                {hasThirdPlaceBracket && (
+                  <TabsTrigger value="third-place" data-testid="tab-third-place">3rd Place</TabsTrigger>
+                )}
               </>
             ) : tournament.type === 'ROUND_ROBIN' ? (
               <>
@@ -1457,6 +1594,16 @@ export default function TournamentDetail() {
           <TabsContent value="knockout" className="space-y-6">
             {renderKnockoutMatches()}
           </TabsContent>
+
+          {hasThirdPlaceBracket && (
+            <TabsContent value="third-place" className="space-y-6">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-3 h-3 rounded-full bg-amber-600" />
+                <span className="text-sm font-medium text-muted-foreground">3rd Place Consolation Bracket</span>
+              </div>
+              {renderThirdPlaceMatches()}
+            </TabsContent>
+          )}
 
           <TabsContent value="players">
             {(() => {
