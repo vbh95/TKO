@@ -1252,15 +1252,32 @@ export default function TournamentDetail() {
   const hasThirdPlaceBracket = isMultiStage && settings.enableThirdPlaceBracket === true;
   const tabCount = 4 + (isMultiStage ? 1 : 0) + (hasThirdPlaceBracket ? 1 : 0);
 
+  const matchesByOrder = [...matches].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+
+  const firstWaveR16Done = (() => {
+    if (!hasThirdPlaceBracket) return true;
+    const nbBoards = (settings.numberOfBoards as number) || 0;
+    if (nbBoards < 2) return true;
+    const mainKo = matchesByOrder.filter((m: any) => m.stage === 'KNOCKOUT' && !String(m.roundKey).startsWith('TP_'));
+    const firstRoundKey = mainKo[0]?.roundKey;
+    if (!firstRoundKey) return true;
+    const firstWave = mainKo.filter((m: any) => m.roundKey === firstRoundKey && m.boardNumber && m.boardNumber <= nbBoards);
+    return firstWave.length > 0 && firstWave.every((m: any) => m.status === 'COMPLETED');
+  })();
+
   const boardSlots = sortedGroupsForBoards.map((group: any, idx: number) => {
     const boardNum = idx + 1;
-    const activeMatch = matches.find((m: any) =>
+    const activeMatch = matchesByOrder.find((m: any) =>
       m.status === 'IN_PROGRESS' &&
       (m.boardNumber === boardNum || (m.groupId === group.id && !m.boardNumber))
     ) || null;
     const nextMatch = !activeMatch
-      ? (matches.find((m: any) => m.status === 'PENDING' && m.boardNumber === boardNum)
-        || matches.find((m: any) => m.status === 'PENDING' && m.groupId === group.id && !m.boardNumber)
+      ? (matchesByOrder.find((m: any) => {
+          if (m.status !== 'PENDING' || m.boardNumber !== boardNum) return false;
+          if (String(m.roundKey).startsWith('TP_') && !firstWaveR16Done) return false;
+          return true;
+        })
+        || matchesByOrder.find((m: any) => m.status === 'PENDING' && m.groupId === group.id && !m.boardNumber)
         || null)
       : null;
     return { boardNum, group, activeMatch, isLive: !!activeMatch, nextMatch };
