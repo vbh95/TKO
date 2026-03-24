@@ -1659,7 +1659,7 @@ export default function TournamentDetail() {
                   (m: any) => m.playerAId === playerId || m.playerBId === playerId
                 );
                 for (const m of allPlayerMatches) {
-                  if (m.stage === 'KNOCKOUT') {
+                  if (m.stage === 'KNOCKOUT' && !m.roundKey?.startsWith('TP_')) {
                     const priority = roundPriority[m.roundKey] || 0;
                     if (priority > bestPriority) {
                       bestPriority = priority;
@@ -1724,6 +1724,70 @@ export default function TournamentDetail() {
                 };
               }).sort((a: any, b: any) => b.points - a.points || b.legsWon - a.legsWon);
 
+              const getTpPlayerBestRound = (playerId: number) => {
+                const tpPriority: Record<string, number> = { 'TP_F': 3, 'TP_SF': 2, 'TP_QF': 1 };
+                let bestRound = 'group';
+                let bestPriority = 0;
+                let wonTpFinal = false;
+                const allPlayerMatches = matches.filter(
+                  (m: any) => m.playerAId === playerId || m.playerBId === playerId
+                );
+                for (const m of allPlayerMatches) {
+                  if (m.stage === 'KNOCKOUT' && m.roundKey?.startsWith('TP_')) {
+                    const priority = tpPriority[m.roundKey] || 0;
+                    if (priority > bestPriority) {
+                      bestPriority = priority;
+                      bestRound = m.roundKey;
+                    }
+                  }
+                  if (m.roundKey === 'TP_F' && m.status === 'COMPLETED' && m.winnerId === playerId) {
+                    wonTpFinal = true;
+                  }
+                }
+                return { bestRound, wonTpFinal, inTp: bestPriority > 0 };
+              };
+
+              const getTpPositionLabel = (bestRound: string, wonTpFinal: boolean) => {
+                if (bestRound === 'TP_F') return wonTpFinal ? 'TP Winner' : 'TP Runner-Up';
+                if (bestRound === 'TP_SF') return 'TP Semi-Final';
+                if (bestRound === 'TP_QF') return 'TP Quarter-Final';
+                return 'Group Stage';
+              };
+
+              const getTpBadgeColor = (bestRound: string, wonTpFinal: boolean) => {
+                if (bestRound === 'TP_F' && wonTpFinal) return 'bg-amber-400/20 text-amber-700 dark:text-amber-400 border-amber-500/30';
+                if (bestRound === 'TP_F') return 'bg-amber-200/40 text-amber-700 dark:text-amber-500 border-amber-400/30';
+                if (bestRound === 'TP_SF') return 'bg-amber-100/60 text-amber-600 dark:text-amber-500 border-amber-300/40';
+                if (bestRound === 'TP_QF') return 'bg-amber-50 text-amber-600 dark:text-amber-600 border-amber-300/30';
+                return 'bg-muted text-muted-foreground border-border';
+              };
+
+              const getTpPoints = (bestRound: string, wonTpFinal: boolean) => {
+                if (bestRound === 'TP_F' && wonTpFinal) return 7.5;
+                if (bestRound === 'TP_F') return 7;
+                if (bestRound === 'TP_SF') return 6.5;
+                if (bestRound === 'TP_QF') return 6;
+                return 5;
+              };
+
+              const tpPlayerResults = hasThirdPlaceBracket
+                ? players
+                    .map((p: Player) => {
+                      const { bestRound, wonTpFinal, inTp } = getTpPlayerBestRound(p.id);
+                      return {
+                        ...p,
+                        bestRound,
+                        wonTpFinal,
+                        inTp,
+                        positionLabel: getTpPositionLabel(bestRound, wonTpFinal),
+                        points: getTpPoints(bestRound, wonTpFinal),
+                        legsWon: getTotalLegsWon(p.id),
+                      };
+                    })
+                    .filter((p: any) => p.inTp)
+                    .sort((a: any, b: any) => b.points - a.points || b.legsWon - a.legsWon)
+                : [];
+
               const handleSavePlayerName = async (playerId: number) => {
                 if (!editingPlayerName.trim()) return;
                 try {
@@ -1753,7 +1817,7 @@ export default function TournamentDetail() {
                 }
               };
 
-              return (
+              const mainResultsCard = (
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
                     <CardTitle>Tournament Results</CardTitle>
@@ -1923,6 +1987,84 @@ export default function TournamentDetail() {
                     </div>
                   </CardContent>
                 </Card>
+              );
+
+              if (!hasThirdPlaceBracket) {
+                return mainResultsCard;
+              }
+
+              return (
+                <div className="space-y-4">
+                  <Tabs defaultValue="main-results">
+                    <TabsList className="w-full sm:w-auto">
+                      <TabsTrigger value="main-results" className="flex-1 sm:flex-none" data-testid="tab-main-results">Main Tournament</TabsTrigger>
+                      <TabsTrigger value="tp-results" className="flex-1 sm:flex-none" data-testid="tab-tp-results">3rd Place Bracket</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="main-results" className="mt-4">
+                      {mainResultsCard}
+                    </TabsContent>
+                    <TabsContent value="tp-results" className="mt-4">
+                      <Card className="border-amber-500/30">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" />
+                            3rd Place Bracket Results
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0 sm:p-6">
+                          {tpPlayerResults.length === 0 ? (
+                            <p className="text-center text-muted-foreground py-8 text-sm">No 3rd place bracket matches played yet.</p>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="hover:bg-transparent border-b border-amber-500/20">
+                                    <TableHead className="w-[50px] px-2 text-sm sm:text-base font-bold text-muted-foreground/70">#</TableHead>
+                                    <TableHead className="px-2 text-sm sm:text-base font-bold text-muted-foreground/70">Player</TableHead>
+                                    {hasGroups && <TableHead className="text-center px-1 text-sm sm:text-base font-bold text-muted-foreground/70">Group</TableHead>}
+                                    <TableHead className="text-center px-1 text-sm sm:text-base font-bold text-muted-foreground/70">Position</TableHead>
+                                    <TableHead className="text-center px-1 text-sm sm:text-base font-bold text-muted-foreground/70">Legs Won</TableHead>
+                                    <TableHead className="text-center px-2 font-black text-sm sm:text-base text-muted-foreground/70">Points</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {tpPlayerResults.map((player: any, idx: number) => {
+                                    const playerGroup = hasGroups ? getPlayerGroup(player.id) : null;
+                                    return (
+                                      <TableRow key={player.id} data-testid={`tp-player-result-row-${player.id}`} className="border-b border-amber-500/10 hover:bg-amber-500/5 transition-colors">
+                                        <TableCell className="font-bold text-muted-foreground px-2 py-3 text-sm">
+                                          <div className="flex items-center gap-2">
+                                            {idx + 1}
+                                            {player.wonTpFinal && <Trophy className="w-4 h-4 text-amber-500" />}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="px-2 py-3">
+                                          <span className="font-semibold text-sm sm:text-base">{player.name}</span>
+                                        </TableCell>
+                                        {hasGroups && (
+                                          <TableCell className="text-center px-1 py-3">
+                                            <Badge variant="outline" className="text-xs px-4 h-8 rounded-md border-amber-400/30 bg-transparent font-bold text-amber-600 dark:text-amber-500">{playerGroup?.name || "—"}</Badge>
+                                          </TableCell>
+                                        )}
+                                        <TableCell className="text-center px-1 py-3">
+                                          <span className={cn("inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap", getTpBadgeColor(player.bestRound, player.wonTpFinal))}>
+                                            {player.positionLabel}
+                                          </span>
+                                        </TableCell>
+                                        <TableCell className="text-center font-semibold px-1 py-3 text-sm text-muted-foreground/90">{player.legsWon}</TableCell>
+                                        <TableCell className="text-center font-bold text-amber-500 dark:text-amber-400 text-base sm:text-lg px-2 py-3">{player.points}</TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  </Tabs>
+                </div>
               );
             })()}
 
