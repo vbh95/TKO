@@ -860,19 +860,13 @@ export default function PublicView() {
         }
       }
       if (!currentRoundKey) currentRoundKey = rounds[rounds.length - 1];
-      const currentRoundIndex = rounds.indexOf(currentRoundKey!);
-      for (let i = 0; i <= currentRoundIndex; i++) {
-        const rk = rounds[i];
-        const roundName = getDisplayName(rk);
-        const roundMatches = koMatches.filter(m => m.roundKey === rk).sort((a, b) => (a.order || 0) - (b.order || 0));
-        if (i < currentRoundIndex) {
-          cards.push({ isLive: false, label: roundName, allDone: true });
-        } else {
-          roundMatches.forEach((match, j) => {
-            cards.push({ match, isLive: match.status === 'IN_PROGRESS', label: `${roundName}${roundMatches.length > 1 ? ` ${j + 1}` : ''}` });
-          });
-        }
-      }
+      const currentRoundMatches = koMatches
+        .filter(m => m.roundKey === currentRoundKey)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      currentRoundMatches.forEach((match, j) => {
+        const roundName = getDisplayName(currentRoundKey!);
+        cards.push({ match, isLive: match.status === 'IN_PROGRESS', label: `${roundName}${currentRoundMatches.length > 1 ? ` ${j + 1}` : ''}` });
+      });
       return cards;
     };
 
