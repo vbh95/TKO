@@ -1081,9 +1081,10 @@ export default function PublicView() {
         )}
 
         <Tabs defaultValue="standings" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
             <TabsTrigger value="standings">Standings</TabsTrigger>
             <TabsTrigger value="matches">Matches</TabsTrigger>
+            <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
           </TabsList>
 
           <TabsContent value="standings" className="space-y-6">
@@ -1187,6 +1188,143 @@ export default function PublicView() {
                 </CardContent>
               </Card>
             ))}
+          </TabsContent>
+
+          <TabsContent value="leaderboard">
+            {(() => {
+              const tpPriority: Record<string, number> = { 'TP_F': 3, 'TP_SF': 2, 'TP_QF': 1 };
+              const roundPriority: Record<string, number> = { 'F': 5, 'SF': 4, 'QF': 3, 'R16': 2, 'R32': 1, 'group': 0 };
+
+              const getPlayerBestRound = (playerId: number) => {
+                let bestRound = 'group';
+                let bestPriority = 0;
+                let tpBestRound = 'group';
+                let tpBestPriority = 0;
+                let wonFinal = false;
+                let wonTpFinal = false;
+                const playerMatches = matches.filter((m: any) => m.playerAId === playerId || m.playerBId === playerId);
+                for (const m of playerMatches) {
+                  if (m.stage === 'KNOCKOUT') {
+                    if (!m.roundKey?.startsWith('TP_')) {
+                      const p = roundPriority[m.roundKey] || 0;
+                      if (p > bestPriority) { bestPriority = p; bestRound = m.roundKey; }
+                    } else {
+                      const p = tpPriority[m.roundKey] || 0;
+                      if (p > tpBestPriority) { tpBestPriority = p; tpBestRound = m.roundKey; }
+                    }
+                  }
+                  if (m.roundKey === 'F' && m.status === 'COMPLETED' && m.winnerId === playerId) wonFinal = true;
+                  if (m.roundKey === 'TP_F' && m.status === 'COMPLETED' && m.winnerId === playerId) wonTpFinal = true;
+                }
+                if (bestRound === 'group' && tpBestPriority > 0) return { bestRound: tpBestRound, wonFinal: wonTpFinal };
+                return { bestRound, wonFinal };
+              };
+
+              const getLabel = (bestRound: string, wonFinal: boolean) => {
+                if (bestRound === 'F') return wonFinal ? 'Champion' : 'Runner-Up';
+                if (bestRound === 'SF') return 'Semi-Finalist';
+                if (bestRound === 'QF') return 'Quarter-Finalist';
+                if (bestRound === 'R16') return 'R16';
+                if (bestRound === 'R32') return 'R32';
+                if (bestRound === 'TP_F') return wonFinal ? '3rd Place Winner' : '3rd Place R-Up';
+                if (bestRound === 'TP_SF') return '3rd Place SF';
+                if (bestRound === 'TP_QF') return '3rd Place QF';
+                return 'Group Stage';
+              };
+
+              const getBadgeColor = (bestRound: string, wonFinal: boolean) => {
+                if (bestRound === 'F' && wonFinal) return 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
+                if (bestRound === 'F') return 'bg-gray-200/50 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300 border-gray-400/30';
+                if (bestRound === 'SF') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-400/30';
+                if (bestRound === 'QF') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-400/30';
+                if (bestRound === 'R16') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-400/30';
+                if (bestRound === 'R32') return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border-teal-400/30';
+                if (bestRound === 'TP_F' && wonFinal) return 'bg-amber-500 text-white border-amber-600';
+                if (bestRound === 'TP_F') return 'bg-amber-400 text-white border-amber-500';
+                if (bestRound === 'TP_SF') return 'bg-amber-300 text-amber-900 border-amber-400';
+                if (bestRound === 'TP_QF') return 'bg-amber-200 text-amber-900 border-amber-300';
+                return 'bg-muted text-muted-foreground border-border';
+              };
+
+              const getPoints = (bestRound: string, wonFinal: boolean) => {
+                if (bestRound === 'F' && wonFinal) return 40;
+                if (bestRound === 'F') return 30;
+                if (bestRound === 'SF') return 20;
+                if (bestRound === 'QF') return 10;
+                if (bestRound === 'R16') return 8;
+                if (bestRound === 'R32') return 6;
+                if (bestRound === 'TP_F' && wonFinal) return 7.5;
+                if (bestRound === 'TP_F') return 7;
+                if (bestRound === 'TP_SF') return 6.5;
+                if (bestRound === 'TP_QF') return 6;
+                return 5;
+              };
+
+              const getTotalLegsWon = (playerId: number) => {
+                let total = 0;
+                for (const m of matches) {
+                  if (m.status !== 'COMPLETED') continue;
+                  if (m.playerAId === playerId) total += (m.scoreA || 0);
+                  if (m.playerBId === playerId) total += (m.scoreB || 0);
+                }
+                return total;
+              };
+
+              const leaderboard = players.map((p: any) => {
+                const { bestRound, wonFinal } = getPlayerBestRound(p.id);
+                return {
+                  ...p,
+                  bestRound,
+                  wonFinal,
+                  label: getLabel(bestRound, wonFinal),
+                  points: getPoints(bestRound, wonFinal),
+                  legsWon: getTotalLegsWon(p.id),
+                };
+              }).sort((a: any, b: any) => b.points - a.points || b.legsWon - a.legsWon);
+
+              return (
+                <Card className="shadow-md overflow-hidden">
+                  <CardHeader className="py-4 px-4 border-b">
+                    <CardTitle className="text-foreground text-lg font-bold">Leaderboard</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent border-b border-muted-foreground/20">
+                          <TableHead className="w-[48px] px-3 font-bold text-muted-foreground/70">#</TableHead>
+                          <TableHead className="px-3 font-bold text-muted-foreground/70">Player</TableHead>
+                          <TableHead className="text-center px-2 font-bold text-muted-foreground/70">Position</TableHead>
+                          <TableHead className="text-center px-2 font-bold text-muted-foreground/70">Legs</TableHead>
+                          <TableHead className="text-center px-3 font-black text-muted-foreground/70">Pts</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {leaderboard.map((player: any, idx: number) => (
+                          <TableRow key={player.id} data-testid={`leaderboard-row-${player.id}`} className="border-b border-muted-foreground/10 hover:bg-muted/5 transition-colors">
+                            <TableCell className="font-bold text-muted-foreground px-3 py-3 text-sm">
+                              <div className="flex items-center gap-1.5">
+                                {idx + 1}
+                                {player.wonFinal && (
+                                  <Trophy className={cn("w-3.5 h-3.5", player.bestRound?.startsWith('TP_') ? 'text-amber-500' : 'text-yellow-500')} />
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="px-3 py-3 font-semibold text-sm">{player.name}</TableCell>
+                            <TableCell className="text-center px-2 py-3">
+                              <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border whitespace-nowrap", getBadgeColor(player.bestRound, player.wonFinal))}>
+                                {player.label === 'Group Stage' ? 'Group' : player.label}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center font-semibold px-2 py-3 text-sm text-muted-foreground/90">{player.legsWon}</TableCell>
+                            <TableCell className="text-center font-bold text-green-500 dark:text-green-400 text-base px-3 py-3">{player.points}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </TabsContent>
         </Tabs>
       </div>
