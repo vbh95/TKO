@@ -1755,10 +1755,10 @@ export default function TournamentDetail() {
               };
 
               const getTpBadgeColor = (bestRound: string, wonTpFinal: boolean) => {
-                if (bestRound === 'TP_F' && wonTpFinal) return 'bg-amber-400/20 text-amber-700 dark:text-amber-400 border-amber-500/30';
-                if (bestRound === 'TP_F') return 'bg-amber-200/40 text-amber-700 dark:text-amber-500 border-amber-400/30';
-                if (bestRound === 'TP_SF') return 'bg-amber-100/60 text-amber-600 dark:text-amber-500 border-amber-300/40';
-                if (bestRound === 'TP_QF') return 'bg-amber-50 text-amber-600 dark:text-amber-600 border-amber-300/30';
+                if (bestRound === 'TP_F' && wonTpFinal) return 'bg-amber-500 text-white border-amber-600';
+                if (bestRound === 'TP_F') return 'bg-amber-400 text-white border-amber-500';
+                if (bestRound === 'TP_SF') return 'bg-amber-300 text-amber-900 border-amber-400';
+                if (bestRound === 'TP_QF') return 'bg-amber-200 text-amber-900 border-amber-300';
                 return 'bg-muted text-muted-foreground border-border';
               };
 
