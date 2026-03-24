@@ -1652,23 +1652,41 @@ export default function TournamentDetail() {
             {(() => {
               const getPlayerBestRound = (playerId: number) => {
                 const roundPriority: Record<string, number> = { 'F': 5, 'SF': 4, 'QF': 3, 'R16': 2, 'R32': 1, 'group': 0 };
+                const tpPriority: Record<string, number> = { 'TP_F': 3, 'TP_SF': 2, 'TP_QF': 1 };
                 let bestRound = 'group';
                 let bestPriority = 0;
+                let tpBestRound = 'group';
+                let tpBestPriority = 0;
                 let wonFinal = false;
+                let wonTpFinal = false;
                 const allPlayerMatches = matches.filter(
                   (m: any) => m.playerAId === playerId || m.playerBId === playerId
                 );
                 for (const m of allPlayerMatches) {
-                  if (m.stage === 'KNOCKOUT' && !m.roundKey?.startsWith('TP_')) {
-                    const priority = roundPriority[m.roundKey] || 0;
-                    if (priority > bestPriority) {
-                      bestPriority = priority;
-                      bestRound = m.roundKey;
+                  if (m.stage === 'KNOCKOUT') {
+                    if (!m.roundKey?.startsWith('TP_')) {
+                      const priority = roundPriority[m.roundKey] || 0;
+                      if (priority > bestPriority) {
+                        bestPriority = priority;
+                        bestRound = m.roundKey;
+                      }
+                    } else {
+                      const priority = tpPriority[m.roundKey] || 0;
+                      if (priority > tpBestPriority) {
+                        tpBestPriority = priority;
+                        tpBestRound = m.roundKey;
+                      }
                     }
                   }
                   if (m.roundKey === 'F' && m.status === 'COMPLETED' && m.winnerId === playerId) {
                     wonFinal = true;
                   }
+                  if (m.roundKey === 'TP_F' && m.status === 'COMPLETED' && m.winnerId === playerId) {
+                    wonTpFinal = true;
+                  }
+                }
+                if (bestRound === 'group' && tpBestPriority > 0) {
+                  return { bestRound: tpBestRound, wonFinal: wonTpFinal };
                 }
                 return { bestRound, wonFinal };
               };
@@ -1679,6 +1697,9 @@ export default function TournamentDetail() {
                 if (bestRound === 'QF') return 'Quarter-Finalist';
                 if (bestRound === 'R16') return 'R16';
                 if (bestRound === 'R32') return 'R32';
+                if (bestRound === 'TP_F') return wonFinal ? '3rd Place Winner' : '3rd Place R-Up';
+                if (bestRound === 'TP_SF') return '3rd Place SF';
+                if (bestRound === 'TP_QF') return '3rd Place QF';
                 return 'Group Stage';
               };
 
@@ -1689,6 +1710,10 @@ export default function TournamentDetail() {
                 if (bestRound === 'QF') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-400/30';
                 if (bestRound === 'R16') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-400/30';
                 if (bestRound === 'R32') return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border-teal-400/30';
+                if (bestRound === 'TP_F' && wonFinal) return 'bg-amber-500 text-white border-amber-600';
+                if (bestRound === 'TP_F') return 'bg-amber-400 text-white border-amber-500';
+                if (bestRound === 'TP_SF') return 'bg-amber-300 text-amber-900 border-amber-400';
+                if (bestRound === 'TP_QF') return 'bg-amber-200 text-amber-900 border-amber-300';
                 return 'bg-muted text-muted-foreground border-border';
               };
 
@@ -1699,6 +1724,10 @@ export default function TournamentDetail() {
                 if (bestRound === 'QF') return 10;
                 if (bestRound === 'R16') return 8;
                 if (bestRound === 'R32') return 6;
+                if (bestRound === 'TP_F' && wonFinal) return 7.5;
+                if (bestRound === 'TP_F') return 7;
+                if (bestRound === 'TP_SF') return 6.5;
+                if (bestRound === 'TP_QF') return 6;
                 return 5;
               };
 
@@ -1915,7 +1944,7 @@ export default function TournamentDetail() {
                               <TableCell className="font-bold text-muted-foreground px-2 py-3 text-sm">
                                 <div className="flex items-center gap-2">
                                   {idx + 1}
-                                  {player.wonFinal && <Trophy className="w-4 h-4 text-yellow-500" />}
+                                  {player.wonFinal && <Trophy className={cn("w-4 h-4", player.bestRound?.startsWith('TP_') ? 'text-amber-500' : 'text-yellow-500')} />}
                                 </div>
                               </TableCell>
                               <TableCell className="px-2 py-3">
