@@ -1258,6 +1258,12 @@ export default function TournamentDetail() {
     if (!hasThirdPlaceBracket) return true;
     const nbBoards = (settings.numberOfBoards as number) || 0;
     if (nbBoards < 2) return true;
+    // Once any TP match has started or finished, the bracket is already running — no need to gate further
+    const tpStarted = matchesByOrder.some((m: any) =>
+      String(m.roundKey).startsWith('TP_') && (m.status === 'IN_PROGRESS' || m.status === 'COMPLETED')
+    );
+    if (tpStarted) return true;
+    // Gate: wait until the first wave of main KO (all boards 1..N) is fully complete before allowing TP to show
     const mainKo = matchesByOrder.filter((m: any) => m.stage === 'KNOCKOUT' && !String(m.roundKey).startsWith('TP_'));
     const firstRoundKey = mainKo[0]?.roundKey;
     if (!firstRoundKey) return true;
