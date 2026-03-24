@@ -657,6 +657,7 @@ export default function PublicView() {
   const { data, isLoading, error, refetch } = usePublicTournament(shareToken || "");
   const { socket, joinPublic, on } = useSocket();
   const [liveScorings, setLiveScorings] = useState<Map<number, LiveScoring>>(new Map());
+  const [koTab, setKoTab] = useState<'main' | '3rd-place'>('main');
   const matchesRef = useRef(data?.matches);
   matchesRef.current = data?.matches;
 
@@ -835,52 +836,60 @@ export default function PublicView() {
         })
     : [];
 
-    const knockoutRounds = Array.from(new Set(knockoutStageMatches.map(m => m.roundKey))) as string[];
-    const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
-    knockoutRounds.sort((a, b) => (koOrder[a] || 0) - (koOrder[b] || 0));
+    const hasThirdPlaceBracket = (tournament.settings as any)?.enableThirdPlaceBracket === true;
+    const mainKoMatches = knockoutStageMatches.filter(m => !m.roundKey?.startsWith('TP_'));
+    const tpKoMatches = knockoutStageMatches.filter(m => m.roundKey?.startsWith('TP_'));
 
-    const knockoutCards: { match?: typeof matches[0]; isLive: boolean; label: string; allDone?: boolean; hideNames?: boolean }[] = [];
-    if (groupsFinished && knockoutStageMatches.length > 0) {
+    type KnockoutCard = { match?: typeof matches[0]; isLive: boolean; label: string; allDone?: boolean };
+
+    const buildKnockoutCards = (
+      koMatches: typeof matches,
+      orderMap: Record<string, number>,
+      getDisplayName: (rk: string) => string
+    ): KnockoutCard[] => {
+      const cards: KnockoutCard[] = [];
+      if (!groupsFinished || koMatches.length === 0) return cards;
+      const rounds = Array.from(new Set(koMatches.map(m => m.roundKey))) as string[];
+      rounds.sort((a, b) => (orderMap[a] || 0) - (orderMap[b] || 0));
       let currentRoundKey: string | null = null;
-      for (const rk of knockoutRounds) {
-        const roundMatches = knockoutStageMatches.filter(m => m.roundKey === rk);
+      for (const rk of rounds) {
+        const roundMatches = koMatches.filter(m => m.roundKey === rk);
         if (!roundMatches.every(m => m.status === 'COMPLETED')) {
           currentRoundKey = rk;
           break;
         }
       }
-
-      if (!currentRoundKey) {
-        currentRoundKey = knockoutRounds[knockoutRounds.length - 1];
-      }
-
-      const currentRoundIndex = knockoutRounds.indexOf(currentRoundKey!);
+      if (!currentRoundKey) currentRoundKey = rounds[rounds.length - 1];
+      const currentRoundIndex = rounds.indexOf(currentRoundKey!);
       for (let i = 0; i <= currentRoundIndex; i++) {
-        const rk = knockoutRounds[i];
-        const roundName = getRoundDisplayName(rk);
-        const roundMatches = knockoutStageMatches
-          .filter(m => m.roundKey === rk)
-          .sort((a, b) => (a.order || 0) - (b.order || 0));
-
+        const rk = rounds[i];
+        const roundName = getDisplayName(rk);
+        const roundMatches = koMatches.filter(m => m.roundKey === rk).sort((a, b) => (a.order || 0) - (b.order || 0));
         if (i < currentRoundIndex) {
-          knockoutCards.push({ isLive: false, label: roundName, allDone: true });
+          cards.push({ isLive: false, label: roundName, allDone: true });
         } else {
           roundMatches.forEach((match, j) => {
-            // Show names if they are present (qualifiers)
-            knockoutCards.push({
-              match,
-              isLive: match.status === 'IN_PROGRESS',
-              label: `${roundName}${roundMatches.length > 1 ? ` ${j + 1}` : ''}`,
-              hideNames: false // Names will show if present in match.playerAId/BId
-            });
+            cards.push({ match, isLive: match.status === 'IN_PROGRESS', label: `${roundName}${roundMatches.length > 1 ? ` ${j + 1}` : ''}` });
           });
         }
       }
-    }
+      return cards;
+    };
+
+    const koOrder: Record<string, number> = { QF: 1, SF: 2, F: 3, GF: 4 };
+    const tpKoOrder: Record<string, number> = { TP_QF: 1, TP_SF: 2, TP_F: 3 };
+    const tpRoundNames: Record<string, string> = { TP_QF: 'Quarter Final', TP_SF: 'Semi Final', TP_F: 'Final' };
+
+    const mainKnockoutCards = buildKnockoutCards(mainKoMatches, koOrder, getRoundDisplayName);
+    const tpKnockoutCards = buildKnockoutCards(tpKoMatches, tpKoOrder, rk => tpRoundNames[rk] || rk);
+
+    const knockoutRounds = Array.from(new Set(mainKoMatches.map(m => m.roundKey))) as string[];
+    knockoutRounds.sort((a, b) => (koOrder[a] || 0) - (koOrder[b] || 0));
 
   const hasGroupMatches = groupStageMatches.length > 0;
   const showGroupSlots = hasGroupMatches && !groupsFinished && groupSlots.length > 0;
-  const showKnockoutSection = groupsFinished && knockoutCards.length > 0;
+  const showKnockoutSection = groupsFinished && (mainKnockoutCards.length > 0 || tpKnockoutCards.length > 0);
+  const showTpTab = hasThirdPlaceBracket && tpKnockoutCards.length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -992,54 +1001,88 @@ export default function PublicView() {
             <div className="flex items-center gap-2 mb-4">
               <Trophy className="w-5 h-5 text-yellow-500" />
               <h2 className="text-xl font-display font-bold">Knockout Stage</h2>
-              {liveMatches.length > 0 && (
-                <Badge variant="default" className="ml-1 bg-green-600">{liveMatches.length} Live</Badge>
+              {liveMatches.filter(m => !m.roundKey?.startsWith('TP_')).length > 0 && (
+                <Badge variant="default" className="ml-1 bg-green-600">
+                  {liveMatches.filter(m => !m.roundKey?.startsWith('TP_')).length} Live
+                </Badge>
               )}
             </div>
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              {knockoutCards.map(({ match, isLive, label, allDone, hideNames }, idx) => {
-                if (allDone) {
-                  return (
-                    <Card key={`ko-done-${idx}`} className="border-2 border-dashed" data-testid={`completed-ko-${label.replace(/\s+/g, '-').toLowerCase()}`}>
-                      <CardContent className="py-12 text-center">
-                        <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-                        <h2 className="text-xl font-bold mb-2">{label} Complete</h2>
-                        <p className="text-muted-foreground">Waiting on other matches to finish</p>
-                      </CardContent>
-                    </Card>
-                  );
-                }
 
-                const ls = liveScorings.get(match!.id);
-                const isKnockout = match!.stage === 'KNOCKOUT';
-                // Only hide names for the very first knockout round (usually QF) until groups are done.
-                // For later rounds, if a player has progressed, they should show.
-                const isFirstKnockoutRound = isKnockout && match!.roundKey === knockoutRounds[0];
-                const effectiveHideNames = (isFirstKnockoutRound && !groupsFinished);
-                
-                const playerA = effectiveHideNames ? null : getPlayer(match!.playerAId);
-                const playerB = effectiveHideNames ? null : getPlayer(match!.playerBId);
-                const hideScorer = isKnockout && !groupsFinished;
-                const isCompleted = match!.status === 'COMPLETED';
+            {showTpTab && (
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setKoTab('main')}
+                  data-testid="button-ko-tab-main"
+                  className={cn(
+                    "px-4 py-2 rounded-lg text-sm font-semibold border-2 transition-colors",
+                    koTab === 'main'
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  Main Tournament
+                </button>
+                <button
+                  onClick={() => setKoTab('3rd-place')}
+                  data-testid="button-ko-tab-3rd"
+                  className={cn(
+                    "px-4 py-2 rounded-lg text-sm font-semibold border-2 transition-colors flex items-center gap-2",
+                    koTab === '3rd-place'
+                      ? "bg-amber-500 text-white border-amber-500"
+                      : "bg-background text-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  3rd Place
+                  {liveMatches.filter(m => m.roundKey?.startsWith('TP_')).length > 0 && (
+                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  )}
+                </button>
+              </div>
+            )}
 
-                if (isLive) {
-                  return <LiveMatchCard key={match!.id} match={match!} ls={ls} playerA={playerA} playerB={playerB} headerLabel={label} hideScorer={hideScorer} />;
-                }
-
-                return (
-                  <KnockoutMatchCard
-                    key={match!.id}
-                    match={match!}
-                    playerA={playerA}
-                    playerB={playerB}
-                    label={label}
-                    isCompleted={isCompleted}
-                    shareToken={shareToken || ''}
-                    hideScorer={hideScorer}
-                  />
-                );
-              })}
-            </div>
+            {(() => {
+              const activeCards = showTpTab && koTab === '3rd-place' ? tpKnockoutCards : mainKnockoutCards;
+              return (
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                  {activeCards.map(({ match, isLive, label, allDone }, idx) => {
+                    if (allDone) {
+                      return (
+                        <Card key={`ko-done-${idx}`} className="border-2 border-dashed" data-testid={`completed-ko-${label.replace(/\s+/g, '-').toLowerCase()}`}>
+                          <CardContent className="py-12 text-center">
+                            <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                            <h2 className="text-xl font-bold mb-2">{label} Complete</h2>
+                            <p className="text-muted-foreground">Waiting on other matches to finish</p>
+                          </CardContent>
+                        </Card>
+                      );
+                    }
+                    const ls = liveScorings.get(match!.id);
+                    const isKnockout = match!.stage === 'KNOCKOUT';
+                    const isFirstKnockoutRound = isKnockout && match!.roundKey === knockoutRounds[0];
+                    const effectiveHideNames = isFirstKnockoutRound && !groupsFinished;
+                    const playerA = effectiveHideNames ? null : getPlayer(match!.playerAId);
+                    const playerB = effectiveHideNames ? null : getPlayer(match!.playerBId);
+                    const hideScorer = isKnockout && !groupsFinished;
+                    const isCompleted = match!.status === 'COMPLETED';
+                    if (isLive) {
+                      return <LiveMatchCard key={match!.id} match={match!} ls={ls} playerA={playerA} playerB={playerB} headerLabel={label} hideScorer={hideScorer} />;
+                    }
+                    return (
+                      <KnockoutMatchCard
+                        key={match!.id}
+                        match={match!}
+                        playerA={playerA}
+                        playerB={playerB}
+                        label={label}
+                        isCompleted={isCompleted}
+                        shareToken={shareToken || ''}
+                        hideScorer={hideScorer}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 

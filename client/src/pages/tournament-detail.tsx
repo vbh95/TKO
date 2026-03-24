@@ -1391,7 +1391,12 @@ export default function TournamentDetail() {
                           <span className="w-2.5 h-2.5 bg-muted-foreground/30 rounded-full" />
                           Board {boardNum} — {group.name}
                           {nextMatch && (
-                            <span className="text-xs ml-auto">Next Up</span>
+                            <div className="flex items-center gap-1.5 ml-auto">
+                              {nextMatch.roundKey?.startsWith('TP_') && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600 dark:text-amber-400">3rd Place</Badge>
+                              )}
+                              <span className="text-xs">Next Up</span>
+                            </div>
                           )}
                         </CardTitle>
                       </CardHeader>
@@ -1424,6 +1429,7 @@ export default function TournamentDetail() {
                 const live = liveScorings.get(match.id);
                 const playerA = getPlayer(match.playerAId);
                 const playerB = getPlayer(match.playerBId);
+                const isTPMatch = match.roundKey?.startsWith('TP_');
                 const headerLabel = match.stage === 'GROUP'
                   ? `Board ${boardNum} — ${group.name}`
                   : match.roundKey === 'R16' ? `Board ${boardNum} — Round of 16`
@@ -1436,11 +1442,14 @@ export default function TournamentDetail() {
                   : `Board ${boardNum}`;
 
                 return (
-                  <Card key={match.id} className="border-2 border-primary shadow-xl overflow-hidden" data-testid={`board-slot-live-${boardNum}`}>
-                    <CardHeader className="bg-primary/10 border-b py-2.5 px-4">
+                  <Card key={match.id} className={cn("border-2 shadow-xl overflow-hidden", isTPMatch ? "border-amber-500" : "border-primary")} data-testid={`board-slot-live-${boardNum}`}>
+                    <CardHeader className={cn("border-b py-2.5 px-4", isTPMatch ? "bg-amber-500/10" : "bg-primary/10")}>
                       <CardTitle className="text-sm flex items-center gap-2">
                         <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
                         {headerLabel}
+                        {isTPMatch && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600 dark:text-amber-400 ml-0.5">3rd Place</Badge>
+                        )}
                         {live && (
                           <span className="text-xs text-muted-foreground ml-auto">
                             Leg {live.legsWonA + live.legsWonB + 1} / Best of {live.bestOf}
@@ -1450,7 +1459,7 @@ export default function TournamentDetail() {
                       {live && (
                         <div className="flex items-center justify-between mt-2">
                           <span className="truncate max-w-[38%] text-xl font-black">{live.playerAName || playerA?.name || 'TBD'}</span>
-                          <span className="text-primary font-black font-mono shrink-0 px-3 text-2xl tabular-nums">
+                          <span className={cn("font-black font-mono shrink-0 px-3 text-2xl tabular-nums", isTPMatch ? "text-amber-500" : "text-primary")}>
                             {live.legsWonA} — {live.legsWonB}
                           </span>
                           <span className="truncate max-w-[38%] text-right text-xl font-black">{live.playerBName || playerB?.name || 'TBD'}</span>
@@ -1461,8 +1470,8 @@ export default function TournamentDetail() {
                       {live ? (
                         <>
                           {live.lastLegResult && (
-                            <div className="rounded-lg bg-primary/10 border border-primary/30 px-3 py-2 text-center">
-                              <p className="text-xs font-bold uppercase tracking-wider text-primary mb-0.5">Leg Won</p>
+                            <div className={cn("rounded-lg border px-3 py-2 text-center", isTPMatch ? "bg-amber-500/10 border-amber-500/30" : "bg-primary/10 border-primary/30")}>
+                              <p className={cn("text-xs font-bold uppercase tracking-wider mb-0.5", isTPMatch ? "text-amber-600 dark:text-amber-400" : "text-primary")}>Leg Won</p>
                               <p className="text-sm font-black truncate">{live.lastLegResult.winnerName}</p>
                               {live.lastLegResult.checkout > 0 && (
                                 <p className="text-xs text-muted-foreground mt-0.5">
