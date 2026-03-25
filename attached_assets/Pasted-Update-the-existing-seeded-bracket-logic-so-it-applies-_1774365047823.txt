@@ -1,0 +1,55 @@
+Update the existing seeded bracket logic so it applies to the FULL knockout bracket, not just the first knockout round.
+
+Important:
+- Keep changes minimal
+- Do NOT refactor unrelated code
+- Do NOT change current behavior unless the seeded bracket / separation option is enabled
+- Preserve backwards compatibility for existing tournaments
+
+Current issue:
+The existing seeded bracket appears to only seed the first round after the groups.
+I need it to control the entire knockout bracket structure, including a Round of 16 if present.
+
+Required behavior:
+When enabled, qualifiers from the same group must be placed in opposite halves of the full knockout bracket so they cannot meet again until the final.
+
+Example:
+- Group A 1st and Group A 2nd both qualify
+- they must be placed in opposite halves
+- same for all groups
+
+This must apply across the whole knockout:
+- Last 16
+- Quarter-final
+- Semi-final
+They may only meet in the final.
+
+Implementation requirements:
+1. Inspect the current seeded bracket logic
+2. Identify where it only affects first-round pairings
+3. Change it so seeding determines full bracket slot placement instead of only first-round matchups
+4. Reuse the existing knockout generator if possible
+5. Only apply this when the seeded/separation option is enabled
+6. If not enabled, keep current knockout generation exactly the same
+
+Technical goal:
+- Seed entrants into bracket slots, not just first-round pairings
+- Ensure same-group qualifiers are assigned to opposite halves of the bracket tree
+- This should also work when the first knockout stage is a Round of 16
+
+UI / naming:
+If the current label says or implies “seed first round”, update the wording so it clearly means full bracket separation through to the final.
+Preferred wording:
+- “Keep same-group qualifiers apart until final”
+
+Safety:
+- Old tournaments must behave exactly as before
+- Existing tournaments without this option must remain unchanged
+- ROUND_ROBIN and KNOCKOUT-only tournaments must be unaffected
+- Only MULTI_STAGE knockout seeding should change when explicitly enabled
+
+After coding, provide:
+- files changed
+- what was changed in seeded bracket logic
+- confirmation that it now applies to the full knockout, including Round of 16 where relevant
+- confirmation that default behavior is unchanged
