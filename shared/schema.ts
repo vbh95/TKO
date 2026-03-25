@@ -291,6 +291,7 @@ export type TournamentSettings = {
   groupBestOf?: number;
   knockoutBestOf?: number;
   knockoutBestOfByRound?: {
+    lastSixteen?: number;
     quarterFinal?: number;
     semiFinal?: number;
     final?: number;

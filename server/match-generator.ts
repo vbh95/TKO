@@ -17,6 +17,7 @@ function getRoundKey(totalSlots: number, currentRound: number): string {
 
 function getBestOfForRound(roundKey: string, settings: TournamentSettings): number {
   if (settings.knockoutBestOfByRound) {
+    if (roundKey === "R16" && settings.knockoutBestOfByRound.lastSixteen) return settings.knockoutBestOfByRound.lastSixteen;
     if (roundKey === "QF" && settings.knockoutBestOfByRound.quarterFinal) return settings.knockoutBestOfByRound.quarterFinal;
     if (roundKey === "SF" && settings.knockoutBestOfByRound.semiFinal) return settings.knockoutBestOfByRound.semiFinal;
     if (roundKey === "F" && settings.knockoutBestOfByRound.final) return settings.knockoutBestOfByRound.final;

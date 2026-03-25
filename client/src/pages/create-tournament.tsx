@@ -43,6 +43,7 @@ export default function CreateTournament() {
     const [groupCount, setGroupCount] = useState(1);
     const [groupBestOf, setGroupBestOf] = useState(3);
     const [knockoutBestOf, setKnockoutBestOf] = useState(5);
+    const [r16BestOf, setR16BestOf] = useState(5);
     const [qfBestOf, setQfBestOf] = useState(5);
     const [sfBestOf, setSfBestOf] = useState(7);
     const [fBestOf, setFBestOf] = useState(9);
@@ -54,6 +55,18 @@ export default function CreateTournament() {
     const [groupScheduleMode, setGroupScheduleMode] = useState<'standard' | 'board_rotation'>('standard');
     const [groupNumBoards, setGroupNumBoards] = useState(2);
     const [enableThirdPlaceBracket, setEnableThirdPlaceBracket] = useState(false);
+
+    const koPlayerCount = (() => {
+      if (type === "MULTI_STAGE") return groupCount * 2;
+      if (isLegacy) return legacyPlayerCount;
+      if (isBulkMode) return bulkInput.split('\n').filter(p => p.trim() !== '').length;
+      return players.filter(p => p.trim() !== '').length;
+    })();
+    const koNextPow2 = (n: number) => { let p = 1; while (p < n) p *= 2; return p; };
+    const koTotalSlots = koNextPow2(Math.max(koPlayerCount, 2));
+    const showR16 = (type === "KNOCKOUT" || type === "MULTI_STAGE") && koTotalSlots >= 16;
+    const showQF = type === "DOUBLE_ELIMINATION" || ((type === "KNOCKOUT" || type === "MULTI_STAGE") && koTotalSlots >= 8);
+    const showSF = type === "DOUBLE_ELIMINATION" || ((type === "KNOCKOUT" || type === "MULTI_STAGE") && koTotalSlots >= 4);
 
     const handleAddPlayer = () => {
       if (players.length >= 48) return;
@@ -147,7 +160,8 @@ export default function CreateTournament() {
           groupBestOf: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? groupBestOf : undefined,
           knockoutBestOf: (type === "KNOCKOUT" || type === "DOUBLE_ELIMINATION") ? knockoutBestOf : undefined,
           knockoutBestOfByRound: (type === "KNOCKOUT" || type === "MULTI_STAGE") ? {
-            quarterFinal: qfBestOf,
+            ...(showR16 ? { lastSixteen: r16BestOf } : {}),
+            ...(showQF ? { quarterFinal: qfBestOf } : {}),
             semiFinal: sfBestOf,
             final: fBestOf
           } : undefined,
@@ -417,34 +431,54 @@ export default function CreateTournament() {
                   <div className="space-y-6 col-span-2 border rounded-xl p-4 bg-muted/30">
                     <Label className="text-base font-bold">Knockout Stage Formats</Label>
                     
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="qfBestOf">Quarter Finals</Label>
-                        <Select value={qfBestOf.toString()} onValueChange={(v) => setQfBestOf(parseInt(v))}>
-                          <SelectTrigger id="qfBestOf" className="h-10">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[1, 3, 5, 7, 9, 11, 21].map(n => (
-                              <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div className={`grid gap-4 ${showR16 ? "md:grid-cols-4" : showQF ? "md:grid-cols-3" : showSF ? "grid-cols-2" : "grid-cols-1"}`}>
+                      {showR16 && (
+                        <div className="space-y-2">
+                          <Label htmlFor="r16BestOf">Last 16</Label>
+                          <Select value={r16BestOf.toString()} onValueChange={(v) => setR16BestOf(parseInt(v))}>
+                            <SelectTrigger id="r16BestOf" className="h-10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                                <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
-                      <div className="space-y-2">
-                        <Label htmlFor="sfBestOf">Semi Finals</Label>
-                        <Select value={sfBestOf.toString()} onValueChange={(v) => setSfBestOf(parseInt(v))}>
-                          <SelectTrigger id="sfBestOf" className="h-10">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[1, 3, 5, 7, 9, 11, 21].map(n => (
-                              <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {showQF && (
+                        <div className="space-y-2">
+                          <Label htmlFor="qfBestOf">Quarter Finals</Label>
+                          <Select value={qfBestOf.toString()} onValueChange={(v) => setQfBestOf(parseInt(v))}>
+                            <SelectTrigger id="qfBestOf" className="h-10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                                <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {showSF && (
+                        <div className="space-y-2">
+                          <Label htmlFor="sfBestOf">Semi Finals</Label>
+                          <Select value={sfBestOf.toString()} onValueChange={(v) => setSfBestOf(parseInt(v))}>
+                            <SelectTrigger id="sfBestOf" className="h-10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[1, 3, 5, 7, 9, 11, 21].map(n => (
+                                <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
                       <div className="space-y-2">
                         <Label htmlFor="fBestOf">Grand Final</Label>
