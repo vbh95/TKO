@@ -528,11 +528,11 @@ export default function AdminDashboard() {
                         variant="outline"
                         size="sm"
                         className="w-full gap-1.5 text-xs"
-                        onClick={() => window.open(t.shareToken ? `/public/${t.shareToken}` : `/tournaments/${t.id}`, '_blank')}
+                        onClick={() => window.open(`/tournaments/${t.id}`, '_blank')}
                         data-testid={`button-view-live-${t.id}`}
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
-                        {t.shareToken ? "View Live" : "View Tournament"}
+                        View Tournament
                       </Button>
                     </div>
                   );

@@ -39,7 +39,8 @@ import {
   Lock,
   Unlock,
   Link as LinkIcon,
-  Monitor
+  Monitor,
+  ShieldAlert
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -402,6 +403,7 @@ export default function TournamentDetail() {
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isRecalcConfirmOpen, setIsRecalcConfirmOpen] = useState(false);
+  const [superUserPendingAction, setSuperUserPendingAction] = useState<{ label: string; fn: () => void } | null>(null);
   const [resetMatchTarget, setResetMatchTarget] = useState<any>(null);
   const [pendingBoardAssign, setPendingBoardAssign] = useState<{
     matchId: number;
@@ -537,7 +539,15 @@ export default function TournamentDetail() {
     );
   }
 
-  const { tournament, players, matches, groups, groupMemberships = [], ownerName = '', isOwner = true, isCollaborator = false } = data as any;
+  const { tournament, players, matches, groups, groupMemberships = [], ownerName = '', isOwner = true, isCollaborator = false, isSuperUserViewing = false } = data as any;
+
+  const withSuperUserConfirm = (label: string, fn: () => void) => {
+    if (isSuperUserViewing) {
+      setSuperUserPendingAction({ label, fn });
+    } else {
+      fn();
+    }
+  };
 
   const handleCopyLink = () => {
     const url = `${window.location.origin}/public/t/${tournament.shareToken}`;
@@ -903,7 +913,7 @@ export default function TournamentDetail() {
                             return (
                               <div
                                 key={match.id}
-                                onClick={() => setSelectedMatch(match)}
+                                onClick={() => withSuperUserConfirm('enter or edit scores for this match', () => setSelectedMatch(match))}
                                 className={cn(
                                   "rounded-lg border p-3 cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
                                   match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
@@ -1000,7 +1010,7 @@ export default function TournamentDetail() {
                                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setResetMatchTarget(match);
+                                          withSuperUserConfirm('reset this match', () => setResetMatchTarget(match));
                                         }}
                                         data-testid={`button-reset-match-${match.id}`}
                                         title="Reset Match"
@@ -1051,7 +1061,7 @@ export default function TournamentDetail() {
               return (
                 <Card
                   key={match.id}
-                  onClick={() => { if (!isEditingThis) setSelectedMatch(match); }}
+                  onClick={() => { if (!isEditingThis) withSuperUserConfirm('enter or edit scores for this match', () => setSelectedMatch(match)); }}
                   className={cn(
                     "overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
                     match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
@@ -1142,7 +1152,7 @@ export default function TournamentDetail() {
                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setResetMatchTarget(match);
+                              withSuperUserConfirm('reset this match', () => setResetMatchTarget(match));
                             }}
                             data-testid={`button-reset-knockout-${match.id}`}
                             title="Reset Match"
@@ -1195,7 +1205,7 @@ export default function TournamentDetail() {
               return (
                 <Card
                   key={match.id}
-                  onClick={() => setSelectedMatch(match)}
+                  onClick={() => withSuperUserConfirm('enter or edit scores for this match', () => setSelectedMatch(match))}
                   className={cn(
                     "overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
                     match.status === 'COMPLETED' ? "bg-muted/30" : "bg-card"
@@ -1924,7 +1934,7 @@ export default function TournamentDetail() {
                           </div>
                           <DialogFooter>
                             <Button variant="ghost" onClick={() => setIsBulkDialogOpen(false)}>Cancel</Button>
-                            <Button onClick={() => { bulkUpdate(bulkInput); setIsBulkDialogOpen(false); }} disabled={isUpdatingPlayers}>
+                            <Button onClick={() => withSuperUserConfirm('bulk update all player names', () => { bulkUpdate(bulkInput); setIsBulkDialogOpen(false); })} disabled={isUpdatingPlayers}>
                               {isUpdatingPlayers && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                               Save Changes
                             </Button>
@@ -2113,6 +2123,15 @@ export default function TournamentDetail() {
                 <span>You are a <span className="font-medium text-foreground">collaborator</span> on this tournament, owned by <span className="font-medium text-foreground">{ownerName}</span>.</span>
               </div>
             )}
+
+            {isSuperUserViewing && (
+              <div className="mt-4 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-orange-500/10 border border-orange-500/30 text-sm text-orange-700 dark:text-orange-400">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span>
+                  <span className="font-medium text-foreground">Super User View</span> — you are managing this tournament on behalf of <span className="font-medium text-foreground">{ownerName}</span>. All structural changes require confirmation before being committed.
+                </span>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 
@@ -2144,6 +2163,7 @@ export default function TournamentDetail() {
           tournament={tournament}
           isOwner={isOwner}
           isCollaborator={isCollaborator}
+          isSuperUserViewing={isSuperUserViewing}
           ownerName={ownerName}
           leaguesList={leaguesList}
           selectedLeagueId={selectedLeagueId}
@@ -2220,6 +2240,32 @@ export default function TournamentDetail() {
                   setPendingBoardAssign(null);
                 }}
                 data-testid="button-confirm-board-assign"
+              >
+                Confirm
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!superUserPendingAction} onOpenChange={(open) => { if (!open) setSuperUserPendingAction(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-orange-500" />
+                Confirm Super User Action
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                You are about to <span className="font-medium text-foreground">{superUserPendingAction?.label}</span> on a tournament you don't own. This change will be committed immediately and cannot be undone. Are you sure?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSuperUserPendingAction(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+                onClick={() => {
+                  superUserPendingAction?.fn();
+                  setSuperUserPendingAction(null);
+                }}
               >
                 Confirm
               </AlertDialogAction>
@@ -2332,7 +2378,8 @@ function SharePublicDialog({ open, onOpenChange, tournament, enableShare, regene
 }
 
 function TournamentSettingsDialog({
-  open, onOpenChange, tournament, isOwner, isCollaborator, ownerName,
+  open, onOpenChange, tournament, isOwner, isCollaborator, isSuperUserViewing,
+  ownerName,
   leaguesList, selectedLeagueId, setSelectedLeagueId,
   renameName, setRenameName,
   collaborators, newCollabEmail, setNewCollabEmail,
@@ -2344,6 +2391,7 @@ function TournamentSettingsDialog({
   tournament: any;
   isOwner: boolean;
   isCollaborator: boolean;
+  isSuperUserViewing: boolean;
   ownerName: string;
   leaguesList: Array<{ id: number; name: string }>;
   selectedLeagueId: string;
@@ -2595,6 +2643,7 @@ function TournamentSettingsDialog({
                 </div>
               </div>
 
+              {!isSuperUserViewing && (<>
               <Separator />
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-destructive">Danger Zone</Label>
@@ -2636,6 +2685,7 @@ function TournamentSettingsDialog({
                   </div>
                 )}
               </div>
+              </>)}
             </>
           )}
         </div>

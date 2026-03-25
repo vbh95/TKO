@@ -1067,8 +1067,9 @@ export async function registerRoutes(
   });
 
   // === TOURNAMENT AUTH HELPER ===
-  async function isAuthorizedForTournament(tournament: { id: number; userId: number }, userId: number): Promise<boolean> {
+  async function isAuthorizedForTournament(tournament: { id: number; userId: number }, userId: number, isSuperUser = false): Promise<boolean> {
     if (tournament.userId === userId) return true;
+    if (isSuperUser) return true;
     return storage.isTournamentCollaborator(tournament.id, userId);
   }
 
@@ -1078,7 +1079,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const tournament = await storage.getTournament(id);
       if (!tournament) return res.status(404).json({ message: "Not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
 
       const { players: playerList, replace } = api.tournaments.bulkPlayers.input.parse(req.body);
 
@@ -1132,7 +1133,7 @@ export async function registerRoutes(
       const playerId = parseInt(req.params.playerId);
       const tournament = await storage.getTournament(id);
       if (!tournament) return res.status(404).json({ message: "Not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
       const tournamentPlayers = await storage.getPlayersByTournamentId(id);
       const playerExists = tournamentPlayers.find(p => p.id === playerId);
       if (!playerExists) return res.status(404).json({ message: "Player not found in this tournament" });
@@ -1151,7 +1152,7 @@ export async function registerRoutes(
       const playerId = parseInt(req.params.playerId);
       const tournament = await storage.getTournament(id);
       if (!tournament) return res.status(404).json({ message: "Not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
       if (!tournament.isLegacy) return res.status(400).json({ message: "Player deletion is only available for legacy tournaments" });
       const tournamentPlayers = await storage.getPlayersByTournamentId(id);
       if (!tournamentPlayers.find(p => p.id === playerId)) return res.status(404).json({ message: "Player not found in this tournament" });
@@ -1168,7 +1169,7 @@ export async function registerRoutes(
       const playerId = parseInt(req.params.playerId);
       const tournament = await storage.getTournament(id);
       if (!tournament) return res.status(404).json({ message: "Not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
       if (!tournament.isLegacy) return res.status(400).json({ message: "Group reassignment is only available for legacy tournaments" });
       const tournamentPlayers = await storage.getPlayersByTournamentId(id);
       if (!tournamentPlayers.find(p => p.id === playerId)) return res.status(404).json({ message: "Player not found in this tournament" });
@@ -1190,7 +1191,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const tournament = await storage.getTournament(id);
       if (!tournament) return res.status(404).json({ message: "Not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
       if (!tournament.isLegacy) return res.status(400).json({ message: "Manual match creation is only available for legacy tournaments" });
       const { playerAId, playerBId, stage, roundKey, groupId, bestOf } = req.body;
       if (!playerAId || !playerBId) return res.status(400).json({ message: "Both players are required" });
@@ -1237,7 +1238,7 @@ export async function registerRoutes(
       const matchId = parseInt(req.params.matchId);
       const tournament = await storage.getTournament(id);
       if (!tournament) return res.status(404).json({ message: "Not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
       if (!tournament.isLegacy) return res.status(400).json({ message: "Match deletion is only available for legacy tournaments" });
       const existingMatches = await storage.getMatchesByTournamentId(id);
       if (!existingMatches.find(m => m.id === matchId)) {
@@ -1256,7 +1257,7 @@ export async function registerRoutes(
       const matchId = parseInt(req.params.matchId);
       const tournament = await storage.getTournament(id);
       if (!tournament) return res.status(404).json({ message: "Not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
       if (!tournament.isLegacy) return res.status(400).json({ message: "Only available for legacy tournaments" });
       const existingMatches = await storage.getMatchesByTournamentId(id);
       const match = existingMatches.find(m => m.id === matchId);
@@ -1289,7 +1290,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const tournament = await storage.getTournament(id);
       if (!tournament) return res.status(404).json({ message: "Not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
       if (!tournament.isLegacy) return res.status(400).json({ message: "Recalculate is only available for legacy tournaments" });
       const settings = (tournament.settings || {}) as TournamentSettings;
       await regenerateGroupMatchesFromMemberships(id, settings);
@@ -1324,17 +1325,19 @@ export async function registerRoutes(
     const currentUserId = (req.user as any).id;
     
     if (!tournament) return res.status(404).json({ message: "Not found" });
-    if (!(await isAuthorizedForTournament(tournament, currentUserId))) return res.status(401).json({ message: "Unauthorized" });
+    if (!(await isAuthorizedForTournament(tournament, currentUserId, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
     
     const players = await storage.getPlayersByTournamentId(id);
     const groups = await storage.getGroupsByTournamentId(id);
     const matches = await storage.getMatchesByTournamentId(id);
     const groupMemberships = await storage.getGroupMembershipsByTournamentId(id);
     const ownerUser = await storage.getUser(tournament.userId);
+    const currentIsSuperUser = !!(req.user as any).isSuperUser;
     const isOwner = tournament.userId === currentUserId;
-    const isCollaborator = !isOwner;
+    const isSuperUserViewing = currentIsSuperUser && !isOwner;
+    const isCollaborator = !isOwner && !isSuperUserViewing;
     
-    res.json({ tournament, players, groups, matches, groupMemberships, ownerName: ownerUser?.name || '', isOwner, isCollaborator });
+    res.json({ tournament, players, groups, matches, groupMemberships, ownerName: ownerUser?.name || '', isOwner, isCollaborator, isSuperUserViewing });
   });
 
   app.post(api.tournaments.create.path, isAuthenticated, async (req, res) => {
@@ -1401,7 +1404,7 @@ export async function registerRoutes(
      const id = parseInt(req.params.id);
      const tournament = await storage.getTournament(id);
      if (!tournament) return res.status(404).json({ message: "Not found" });
-     if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+     if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
 
      const updated = await storage.updateTournament(id, req.body);
      res.json(updated);
@@ -1465,7 +1468,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const tournament = await storage.getTournament(id);
       if (!tournament) return res.status(404).json({ message: "Not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
       const collaborators = await storage.getTournamentCollaborators(id);
       res.json(collaborators);
     } catch {
@@ -1522,7 +1525,7 @@ export async function registerRoutes(
       const match = await storage.getMatch(matchId);
       if (!match) return res.status(404).json({ message: "Match not found" });
       const tournament = await storage.getTournament(match.tournamentId);
-      if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
       const note = await storage.getMatchNote(matchId);
       res.json(note || null);
     } catch (err) {
@@ -1539,7 +1542,7 @@ export async function registerRoutes(
       if (!match) return res.status(404).json({ message: "Not found" });
 
       const tournament = await storage.getTournament(match.tournamentId);
-      if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
 
       const { scorerName } = req.body;
       const updatedMatch = await storage.updateMatch(id, {
@@ -1557,7 +1560,7 @@ export async function registerRoutes(
       const tournamentId = parseInt(req.params.id);
       const matchId = parseInt(req.params.matchId);
       const tournament = await storage.getTournament(tournamentId);
-      if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id))) {
+      if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
@@ -1630,7 +1633,7 @@ export async function registerRoutes(
     
     // Check ownership via tournament
     const tournament = await storage.getTournament(match.tournamentId);
-    if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+    if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
     
     const input = api.matches.update.input.parse(req.body);
     
@@ -1808,7 +1811,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
     const id = Number(req.params.id);
     const tournament = await storage.getTournament(id);
-    if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(404).json({ message: "Not found" });
+    if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(404).json({ message: "Not found" });
 
     const shareToken = tournament.shareToken || randomBytes(16).toString("hex");
     const updated = await storage.updateTournament(id, {
@@ -1822,7 +1825,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
     const id = Number(req.params.id);
     const tournament = await storage.getTournament(id);
-    if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(404).json({ message: "Not found" });
+    if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(404).json({ message: "Not found" });
 
     const updated = await storage.updateTournament(id, {
       shareEnabled: false,
@@ -1834,7 +1837,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
     const id = Number(req.params.id);
     const tournament = await storage.getTournament(id);
-    if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(404).json({ message: "Not found" });
+    if (!tournament || !(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(404).json({ message: "Not found" });
 
     const newToken = randomBytes(16).toString("hex");
     const updated = await storage.updateTournament(id, {
@@ -1870,7 +1873,7 @@ export async function registerRoutes(
       const tournamentId = parseInt(req.params.id);
       const tournament = await storage.getTournament(tournamentId);
       if (!tournament) return res.status(404).json({ message: "Tournament not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
 
       const { boardNumber } = req.body;
       if (!boardNumber || typeof boardNumber !== 'number') {
@@ -1907,7 +1910,7 @@ export async function registerRoutes(
       const tournamentId = parseInt(req.params.id);
       const tournament = await storage.getTournament(tournamentId);
       if (!tournament) return res.status(404).json({ message: "Tournament not found" });
-      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id))) return res.status(401).json({ message: "Unauthorized" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
 
       const sessions = await storage.getBoardSessionsByTournamentId(tournamentId);
       res.json(sessions);
