@@ -1252,11 +1252,9 @@ export default function ScorerPage() {
   const waitingMatches = matches.filter(m => m.status === 'PENDING' && (!m.playerAId || !m.playerBId));
   const inProgressMatch = matches.find(m => m.status === 'IN_PROGRESS');
 
-  const isTPContext = inProgressMatch
-    ? isTPMatch(inProgressMatch)
-    : nextUpMatch
-    ? isTPMatch(nextUpMatch)
-    : false;
+  const isTPContext =
+    (inProgressMatch ? isTPMatch(inProgressMatch) : false) ||
+    (nextUpMatch ? isTPMatch(nextUpMatch) : false);
 
   const upcomingMatches = [
     ...naturalGroupQueue.filter(m => m !== nextUpMatch),
