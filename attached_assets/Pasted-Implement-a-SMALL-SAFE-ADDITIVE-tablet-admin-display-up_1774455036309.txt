@@ -1,0 +1,90 @@
+Implement a SMALL, SAFE, ADDITIVE tablet/admin display update for the optional 3rd-place knockout bracket.
+
+CRITICAL RULES
+- Do NOT refactor unrelated code
+- Do NOT change the current main tournament tablet flow
+- The current tablet display for main tournament matches must remain exactly as it is now
+- Only add new display behavior when a match belongs to the 3rd-place knockout bracket
+- Keep edits minimal
+- Preserve backwards compatibility
+
+FEATURE GOAL
+When tablets/admin load or preview 3rd-place knockout matches, those matches must be clearly identified as 3rd-place matches.
+
+Requirements:
+1. Main tournament display remains unchanged
+   - current tablet behavior for main tournament matches must stay exactly as it is now
+   - current styling, labels, and match info for main matches must not be altered
+
+2. 3rd-place knockout matches must be clearly identified
+   - when a current match, next-up match, or upcoming match belongs to the 3rd-place knockout bracket:
+     - show a clear label such as:
+       "3rd Place"
+       or
+       "3rd Place Knockout"
+     - use the existing orange 3rd-place color already used elsewhere in the project if available
+   - this should help scorers/admin instantly identify that the tablet is now serving the 3rd-place bracket
+
+3. When a tablet shifts from main tournament to 3rd-place bracket:
+   - it should only display relevant 3rd-place knockout information
+   - do NOT mix main-bracket upcoming matches with 3rd-place upcoming matches on the same board state
+   - if the active/current/next board schedule is now for 3rd-place, the board response/UI should be filtered to 3rd-place matches only
+
+4. Relevant views
+   - apply this to tablet/scorer display
+   - apply the same clear identification to admin-facing next/upcoming match displays if those already consume the same board/match data
+   - do not redesign pages; only add minimal label/color treatment where matches are already rendered
+
+IMPLEMENTATION REQUIREMENTS
+1. Inspect existing code first and identify:
+   - how matches are distinguished between main knockout and 3rd-place knockout
+   - how tablet board-data is returned
+   - where current / next / upcoming matches are rendered in tablet UI
+   - where admin next/upcoming board info is rendered
+   - whether an existing orange 3rd-place badge/color token/class already exists
+
+2. Match classification
+   - reuse the existing bracket marker for 3rd-place matches if already implemented
+   - if none exists yet, use the lightest-touch metadata already added for the 3rd-place bracket
+   - do NOT invent a large new model if unnecessary
+
+3. Data filtering
+   - when the board/tablet is currently serving 3rd-place matches, return/render only relevant 3rd-place matches for:
+     - current
+     - next up
+     - upcoming
+   - do not include main bracket matches in that board state
+   - preserve current logic unchanged for main tournament states
+
+4. UI treatment
+   - add a small, clear label/badge for 3rd-place matches
+   - style it using the existing orange 3rd-place colour if available
+   - keep all other UI unchanged
+   - do not redesign match cards or tablet layout
+
+5. Safety / fallback
+   - if tournament has no 3rd-place bracket, everything behaves exactly as today
+   - if a match is not marked as 3rd-place, render using current unchanged logic
+   - old tournaments must remain unaffected
+
+PREFERRED BEHAVIOR EXAMPLES
+- Board/tablet showing main Round of 16:
+  - looks exactly the same as now
+- Board/tablet later switches to 3rd-place QF:
+  - current match shows a visible orange “3rd Place” label
+  - next/upcoming list contains only 3rd-place matches for that board
+  - no main-bracket upcoming matches appear in that 3rd-place board state
+
+LIKELY FILES TO INSPECT
+- server/routes.ts
+- tablet/scorer board-data endpoint code
+- client tablet scoring/display components
+- admin board display components
+- any shared match/badge styling utilities
+
+DELIVERABLES
+After coding, provide a very short summary:
+- files changed
+- how 3rd-place matches are identified
+- where the orange label was added
+- confirmation that main tournament tablet display remains unchanged
