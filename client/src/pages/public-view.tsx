@@ -657,7 +657,7 @@ export default function PublicView() {
   const { data, isLoading, error, refetch } = usePublicTournament(shareToken || "");
   const { socket, joinPublic, on } = useSocket();
   const [liveScorings, setLiveScorings] = useState<Map<number, LiveScoring>>(new Map());
-  const [koTab, setKoTab] = useState<'main' | '3rd-place'>('main');
+  const [activeCompetition, setActiveCompetition] = useState<'main' | '3rd-place'>('main');
   const matchesRef = useRef(data?.matches);
   matchesRef.current = data?.matches;
 
@@ -756,39 +756,73 @@ export default function PublicView() {
   };
 
   const roundDisplayNames: Record<string, string> = { QF: 'Quarter-Final', SF: 'Semi-Final', F: 'Final', GF: 'Grand Final' };
+  const tpRoundDisplayNames: Record<string, string> = { TP_QF: 'Quarter-Final', TP_SF: 'Semi-Final', TP_F: 'Final' };
+  const tpRoundSortOrder: Record<string, number> = { 'Quarter-Final': 1, 'Semi-Final': 2, 'Final': 3 };
 
-  const matchesByRound = matches.reduce((acc, match) => {
-    const rawKey = match.groupId ? (groups.find(g => g.id === match.groupId)?.name || 'Group') : (match.roundKey || 'Other');
-    const key = roundDisplayNames[rawKey] || rawKey;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(match);
+  const buildMainMatchesByRound = () => {
+    const acc: Record<string, typeof matches> = {};
+    for (const match of matches) {
+      if (match.roundKey?.startsWith('TP_')) continue;
+      const rawKey = match.groupId ? (groups.find(g => g.id === match.groupId)?.name || 'Group') : (match.roundKey || 'Other');
+      const key = roundDisplayNames[rawKey] || rawKey;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(match);
+    }
     return acc;
-  }, {} as Record<string, typeof matches>);
+  };
 
-  const sortedRoundEntries = Object.entries(matchesByRound).sort(([a, aMatches], [b, bMatches]) => {
-    const aIsGroup = groups.some(g => g.name === a);
-    const bIsGroup = groups.some(g => g.name === b);
-    const aAllCompleted = aMatches.every(m => m.status === 'COMPLETED');
-    const bAllCompleted = bMatches.every(m => m.status === 'COMPLETED');
+  const buildTpMatchesByRound = () => {
+    const acc: Record<string, typeof matches> = {};
+    for (const match of matches) {
+      if (!match.roundKey?.startsWith('TP_')) continue;
+      const key = tpRoundDisplayNames[match.roundKey] || match.roundKey;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(match);
+    }
+    return acc;
+  };
 
-    if (aIsGroup && bIsGroup) {
+  const mainMatchesByRound = buildMainMatchesByRound();
+  const tpMatchesByRound = buildTpMatchesByRound();
+
+  const sortMainRoundEntries = (entries: [string, typeof matches][]) =>
+    entries.sort(([a, aMatches], [b, bMatches]) => {
+      const aIsGroup = groups.some(g => g.name === a);
+      const bIsGroup = groups.some(g => g.name === b);
+      const aAllCompleted = aMatches.every(m => m.status === 'COMPLETED');
+      const bAllCompleted = bMatches.every(m => m.status === 'COMPLETED');
+      if (aIsGroup && bIsGroup) {
+        if (aAllCompleted && !bAllCompleted) return 1;
+        if (!aAllCompleted && bAllCompleted) return -1;
+        return a.localeCompare(b);
+      }
+      if (!aIsGroup && !bIsGroup) {
+        const aOrder = knockoutRoundOrder[a] ?? 0;
+        const bOrder = knockoutRoundOrder[b] ?? 0;
+        if (aAllCompleted && bAllCompleted) return bOrder - aOrder;
+        if (aAllCompleted && !bAllCompleted) return 1;
+        if (!aAllCompleted && bAllCompleted) return -1;
+        return aOrder - bOrder;
+      }
+      if (aIsGroup && aAllCompleted) return 1;
+      if (bIsGroup && bAllCompleted) return -1;
+      if (aIsGroup) return -1;
+      return 1;
+    });
+
+  const sortTpRoundEntries = (entries: [string, typeof matches][]) =>
+    entries.sort(([a, aMatches], [b, bMatches]) => {
+      const aAllCompleted = aMatches.every(m => m.status === 'COMPLETED');
+      const bAllCompleted = bMatches.every(m => m.status === 'COMPLETED');
       if (aAllCompleted && !bAllCompleted) return 1;
       if (!aAllCompleted && bAllCompleted) return -1;
-      return a.localeCompare(b);
-    }
-    if (!aIsGroup && !bIsGroup) {
-      const aOrder = knockoutRoundOrder[a] ?? 0;
-      const bOrder = knockoutRoundOrder[b] ?? 0;
-      if (aAllCompleted && bAllCompleted) return bOrder - aOrder;
-      if (aAllCompleted && !bAllCompleted) return 1;
-      if (!aAllCompleted && bAllCompleted) return -1;
-      return aOrder - bOrder;
-    }
-    if (aIsGroup && aAllCompleted) return 1;
-    if (bIsGroup && bAllCompleted) return -1;
-    if (aIsGroup) return -1;
-    return 1;
-  });
+      return (tpRoundSortOrder[a] ?? 0) - (tpRoundSortOrder[b] ?? 0);
+    });
+
+  const sortedMainRoundEntries = sortMainRoundEntries(Object.entries(mainMatchesByRound));
+  const sortedTpRoundEntries = sortTpRoundEntries(Object.entries(tpMatchesByRound));
+
+  const sortedRoundEntries = activeCompetition === '3rd-place' ? sortedTpRoundEntries : sortedMainRoundEntries;
 
   for (const [, roundMatches] of sortedRoundEntries) {
     roundMatches.sort((a, b) => {
@@ -905,21 +939,58 @@ export default function PublicView() {
       </div>
 
       <div className="container max-w-6xl mx-auto px-4 pb-12">
-        <div className="flex flex-wrap items-center gap-3 py-4 mb-4 border-b">
+        <div className="flex flex-wrap items-center gap-3 py-4 border-b">
           <h1 className="text-xl md:text-2xl font-display font-bold" data-testid="text-tournament-name">{tournament.name}</h1>
           <Badge variant="outline">
             {tournament.type.replace('_', ' ')}
           </Badge>
           <span className="text-muted-foreground text-sm">{players.length} Players</span>
-          {liveMatches.length > 0 && (
-            <span className="flex items-center gap-1 text-sm">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              {liveMatches.length} Live {liveMatches.length === 1 ? 'Game' : 'Games'}
-            </span>
-          )}
+          {(() => {
+            const activeLiveCount = activeCompetition === '3rd-place'
+              ? liveMatches.filter(m => m.roundKey?.startsWith('TP_')).length
+              : liveMatches.filter(m => !m.roundKey?.startsWith('TP_')).length;
+            return activeLiveCount > 0 ? (
+              <span className="flex items-center gap-1 text-sm">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                {activeLiveCount} Live {activeLiveCount === 1 ? 'Game' : 'Games'}
+              </span>
+            ) : null;
+          })()}
         </div>
 
-        {showGroupSlots && (
+        {showTpTab && (
+          <div className="flex gap-2 pt-4 mb-4" data-testid="competition-toggle">
+            <button
+              onClick={() => setActiveCompetition('main')}
+              data-testid="button-competition-main"
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-semibold border-2 transition-colors",
+                activeCompetition === 'main'
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-foreground border-border hover:bg-muted"
+              )}
+            >
+              Main Tournament
+            </button>
+            <button
+              onClick={() => setActiveCompetition('3rd-place')}
+              data-testid="button-competition-3rd"
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-semibold border-2 transition-colors flex items-center gap-2",
+                activeCompetition === '3rd-place'
+                  ? "bg-amber-500 text-white border-amber-500"
+                  : "bg-background text-foreground border-border hover:bg-muted"
+              )}
+            >
+              3rd Place Tournament
+              {liveMatches.filter(m => m.roundKey?.startsWith('TP_')).length > 0 && (
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              )}
+            </button>
+          </div>
+        )}
+
+        {showGroupSlots && activeCompetition === 'main' && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
@@ -993,49 +1064,22 @@ export default function PublicView() {
         {showKnockoutSection && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
-              <Trophy className="w-5 h-5 text-yellow-500" />
-              <h2 className="text-xl font-display font-bold">Knockout Stage</h2>
-              {liveMatches.filter(m => !m.roundKey?.startsWith('TP_')).length > 0 && (
-                <Badge variant="default" className="ml-1 bg-green-600">
-                  {liveMatches.filter(m => !m.roundKey?.startsWith('TP_')).length} Live
-                </Badge>
-              )}
+              <Trophy className={cn("w-5 h-5", activeCompetition === '3rd-place' ? "text-amber-500" : "text-yellow-500")} />
+              <h2 className="text-xl font-display font-bold">
+                {activeCompetition === '3rd-place' ? '3rd Place Bracket' : 'Knockout Stage'}
+              </h2>
+              {(() => {
+                const koLiveCount = activeCompetition === '3rd-place'
+                  ? liveMatches.filter(m => m.roundKey?.startsWith('TP_')).length
+                  : liveMatches.filter(m => !m.roundKey?.startsWith('TP_')).length;
+                return koLiveCount > 0 ? (
+                  <Badge variant="default" className="ml-1 bg-green-600">{koLiveCount} Live</Badge>
+                ) : null;
+              })()}
             </div>
 
-            {showTpTab && (
-              <div className="flex gap-2 mb-4">
-                <button
-                  onClick={() => setKoTab('main')}
-                  data-testid="button-ko-tab-main"
-                  className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-semibold border-2 transition-colors",
-                    koTab === 'main'
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background text-foreground border-border hover:bg-muted"
-                  )}
-                >
-                  Main Tournament
-                </button>
-                <button
-                  onClick={() => setKoTab('3rd-place')}
-                  data-testid="button-ko-tab-3rd"
-                  className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-semibold border-2 transition-colors flex items-center gap-2",
-                    koTab === '3rd-place'
-                      ? "bg-amber-500 text-white border-amber-500"
-                      : "bg-background text-foreground border-border hover:bg-muted"
-                  )}
-                >
-                  3rd Place
-                  {liveMatches.filter(m => m.roundKey?.startsWith('TP_')).length > 0 && (
-                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  )}
-                </button>
-              </div>
-            )}
-
             {(() => {
-              const activeCards = showTpTab && koTab === '3rd-place' ? tpKnockoutCards : mainKnockoutCards;
+              const activeCards = activeCompetition === '3rd-place' ? tpKnockoutCards : mainKnockoutCards;
               return (
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                   {activeCards.map(({ match, isLive, label, allDone }, idx) => {
@@ -1080,253 +1124,395 @@ export default function PublicView() {
           </div>
         )}
 
-        <Tabs defaultValue="standings" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
-            <TabsTrigger value="standings">Standings</TabsTrigger>
-            <TabsTrigger value="matches">Matches</TabsTrigger>
-            <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-          </TabsList>
+        {activeCompetition === 'main' ? (
+          <Tabs defaultValue="standings" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
+              <TabsTrigger value="standings">Standings</TabsTrigger>
+              <TabsTrigger value="matches">Matches</TabsTrigger>
+              <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="standings" className="space-y-6">
-            {groupStandings.map(({ group, standings }) => (
-              <Card key={group?.id ?? 'all'} className="shadow-md overflow-hidden" data-testid={`standings-${group?.id ?? 'all'}`}>
-                <CardHeader className="py-4 px-4 border-b">
-                  <CardTitle className="text-foreground flex items-center gap-2 text-lg font-bold">
-                    {group ? group.name : 'Standings'}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <table className="w-full table-fixed">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="w-[6%] py-3 px-3 text-center text-sm font-medium text-muted-foreground">#</th>
-                            <th className="w-[24%] py-3 px-3 text-left text-sm font-medium text-muted-foreground">Player</th>
-                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">P</th>
-                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">W</th>
-                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">L</th>
-                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">LW</th>
-                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">LL</th>
-                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">+/-</th>
-                        <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">Pts</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {standings.map((player, idx) => {
-                        const qualifying = idx < 2;
-                        return (
-                        <tr key={player.id} className={cn("border-b last:border-0 hover:bg-muted/40 transition-colors", qualifying && "bg-green-50 dark:bg-green-950/30")} data-testid={`row-standing-${player.id}`}>
-                          <td className="py-4 px-3 text-sm text-muted-foreground font-medium">
-                            <div className="flex items-center justify-center gap-1.5 text-center">
-                              {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
-                              {idx + 1}
-                            </div>
-                          </td>
-                          <td className={cn("py-4 px-3 font-bold text-sm truncate", qualifying && "text-green-700 dark:text-green-400")}>{player.name}</td>
-                          <td className="py-4 px-2 text-center text-sm tabular-nums">{player.played}</td>
-                          <td className="py-4 px-2 text-center text-sm tabular-nums text-green-600 dark:text-green-400 font-medium">{player.won}</td>
-                          <td className="py-4 px-2 text-center text-sm tabular-nums text-destructive font-medium">{player.lost}</td>
-                          <td className="py-4 px-2 text-center text-sm tabular-nums">{player.legsFor}</td>
-                          <td className="py-4 px-2 text-center text-sm tabular-nums">{player.legsAgainst}</td>
-                          <td className={cn(
-                            "py-4 px-2 text-center text-sm tabular-nums font-medium",
-                            player.diff > 0 ? "text-green-600" : player.diff < 0 ? "text-destructive" : ""
-                          )}>
-                            {player.diff > 0 ? `+${player.diff}` : player.diff}
-                          </td>
-                          <td className={cn(
-                            "py-4 px-2 text-center font-bold text-base",
-                            qualifying ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
-                          )}>{player.pts}</td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
-            ))}
-            <div className="rounded-lg border border-border bg-muted/30 px-5 py-4 space-y-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-foreground">Standings Criteria</p>
-              <p className="text-sm text-muted-foreground">Group standings are determined by the following criteria, applied in order:</p>
-              <ol className="space-y-1.5 text-sm">
-                <li><span className="font-bold text-foreground">1. Points</span><span className="text-muted-foreground"> — {ptsWin} for a win. The player with the most points is ranked highest.</span></li>
-                <li><span className="font-bold text-foreground">2. Leg Difference</span><span className="text-muted-foreground"> — If tied on points, the player with the better leg difference (legs won minus legs lost) is ranked higher.</span></li>
-                <li><span className="font-bold text-foreground">3. Legs Won</span><span className="text-muted-foreground"> — If still tied, the player with the most legs won is ranked higher.</span></li>
-                <li><span className="font-bold text-foreground">4. Head-to-Head</span><span className="text-muted-foreground"> — If still tied, the result between the tied players is used. The same criteria (points, leg difference, legs won) are applied to only the matches played between the tied players.</span></li>
-              </ol>
-              <p className="text-xs text-muted-foreground/60 pt-1">If players remain tied after all criteria, they share the same effective position.</p>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="matches" className="space-y-6">
-            {sortedRoundEntries.map(([roundName, roundMatches]) => (
-              <Card key={roundName} className="overflow-hidden">
-                <CardHeader className="bg-muted/50 border-b">
-                  <CardTitle className="text-lg">{roundName}</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y">
-                    {roundMatches.map((match) => {
-                      const isKnockout = !match.groupId;
-                      const isFirstKnockoutRound = isKnockout && match.roundKey === knockoutRounds[0];
-                      const hideNames = isFirstKnockoutRound && !groupsFinished;
-                      const playerA = hideNames ? null : getPlayer(match.playerAId);
-                      const playerB = hideNames ? null : getPlayer(match.playerBId);
-                      const hideScorer = isKnockout && !groupsFinished;
-                      return (
-                        <CompletedMatchRow
-                          key={match.id}
-                          match={match}
-                          playerA={playerA}
-                          playerB={playerB}
-                          shareToken={shareToken || ''}
-                          scorerName={hideScorer ? null : (match.scorerName || null)}
-                        />
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-
-          <TabsContent value="leaderboard">
-            {(() => {
-              const tpPriority: Record<string, number> = { 'TP_F': 3, 'TP_SF': 2, 'TP_QF': 1 };
-              const roundPriority: Record<string, number> = { 'F': 5, 'SF': 4, 'QF': 3, 'R16': 2, 'R32': 1, 'group': 0 };
-
-              const getPlayerBestRound = (playerId: number) => {
-                let bestRound = 'group';
-                let bestPriority = 0;
-                let tpBestRound = 'group';
-                let tpBestPriority = 0;
-                let wonFinal = false;
-                let wonTpFinal = false;
-                const playerMatches = matches.filter((m: any) => m.playerAId === playerId || m.playerBId === playerId);
-                for (const m of playerMatches) {
-                  if (m.stage === 'KNOCKOUT') {
-                    if (!m.roundKey?.startsWith('TP_')) {
-                      const p = roundPriority[m.roundKey] || 0;
-                      if (p > bestPriority) { bestPriority = p; bestRound = m.roundKey; }
-                    } else {
-                      const p = tpPriority[m.roundKey] || 0;
-                      if (p > tpBestPriority) { tpBestPriority = p; tpBestRound = m.roundKey; }
-                    }
-                  }
-                  if (m.roundKey === 'F' && m.status === 'COMPLETED' && m.winnerId === playerId) wonFinal = true;
-                  if (m.roundKey === 'TP_F' && m.status === 'COMPLETED' && m.winnerId === playerId) wonTpFinal = true;
-                }
-                if (bestRound === 'group' && tpBestPriority > 0) return { bestRound: tpBestRound, wonFinal: wonTpFinal };
-                return { bestRound, wonFinal };
-              };
-
-              const getLabel = (bestRound: string, wonFinal: boolean) => {
-                if (bestRound === 'F') return wonFinal ? 'Champion' : 'Runner-Up';
-                if (bestRound === 'SF') return 'Semi-Finalist';
-                if (bestRound === 'QF') return 'Quarter-Finalist';
-                if (bestRound === 'R16') return 'R16';
-                if (bestRound === 'R32') return 'R32';
-                if (bestRound === 'TP_F') return wonFinal ? '3rd Place Winner' : '3rd Place R-Up';
-                if (bestRound === 'TP_SF') return '3rd Place SF';
-                if (bestRound === 'TP_QF') return '3rd Place QF';
-                return 'Group Stage';
-              };
-
-              const getBadgeColor = (bestRound: string, wonFinal: boolean) => {
-                if (bestRound === 'F' && wonFinal) return 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
-                if (bestRound === 'F') return 'bg-gray-200/50 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300 border-gray-400/30';
-                if (bestRound === 'SF') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-400/30';
-                if (bestRound === 'QF') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-400/30';
-                if (bestRound === 'R16') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-400/30';
-                if (bestRound === 'R32') return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border-teal-400/30';
-                if (bestRound === 'TP_F' && wonFinal) return 'bg-amber-500 text-white border-amber-600';
-                if (bestRound === 'TP_F') return 'bg-amber-400 text-white border-amber-500';
-                if (bestRound === 'TP_SF') return 'bg-amber-300 text-amber-900 border-amber-400';
-                if (bestRound === 'TP_QF') return 'bg-amber-200 text-amber-900 border-amber-300';
-                return 'bg-muted text-muted-foreground border-border';
-              };
-
-              const getPoints = (bestRound: string, wonFinal: boolean) => {
-                if (bestRound === 'F' && wonFinal) return 40;
-                if (bestRound === 'F') return 30;
-                if (bestRound === 'SF') return 20;
-                if (bestRound === 'QF') return 10;
-                if (bestRound === 'R16') return 8;
-                if (bestRound === 'R32') return 6;
-                if (bestRound === 'TP_F' && wonFinal) return 7.5;
-                if (bestRound === 'TP_F') return 7;
-                if (bestRound === 'TP_SF') return 6.5;
-                if (bestRound === 'TP_QF') return 6;
-                return 5;
-              };
-
-              const getTotalLegsWon = (playerId: number) => {
-                let total = 0;
-                for (const m of matches) {
-                  if (m.status !== 'COMPLETED') continue;
-                  if (m.playerAId === playerId) total += (m.scoreA || 0);
-                  if (m.playerBId === playerId) total += (m.scoreB || 0);
-                }
-                return total;
-              };
-
-              const leaderboard = players.map((p: any) => {
-                const { bestRound, wonFinal } = getPlayerBestRound(p.id);
-                return {
-                  ...p,
-                  bestRound,
-                  wonFinal,
-                  label: getLabel(bestRound, wonFinal),
-                  points: getPoints(bestRound, wonFinal),
-                  legsWon: getTotalLegsWon(p.id),
-                };
-              }).sort((a: any, b: any) => b.points - a.points || b.legsWon - a.legsWon);
-
-              return (
-                <Card className="shadow-md overflow-hidden">
+            <TabsContent value="standings" className="space-y-6">
+              {groupStandings.map(({ group, standings }) => (
+                <Card key={group?.id ?? 'all'} className="shadow-md overflow-hidden" data-testid={`standings-${group?.id ?? 'all'}`}>
                   <CardHeader className="py-4 px-4 border-b">
-                    <CardTitle className="text-foreground text-lg font-bold">Leaderboard</CardTitle>
+                    <CardTitle className="text-foreground flex items-center gap-2 text-lg font-bold">
+                      {group ? group.name : 'Standings'}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="hover:bg-transparent border-b border-muted-foreground/20">
-                          <TableHead className="w-[48px] px-3 font-bold text-muted-foreground/70">#</TableHead>
-                          <TableHead className="px-3 font-bold text-muted-foreground/70">Player</TableHead>
-                          <TableHead className="text-center px-2 font-bold text-muted-foreground/70">Position</TableHead>
-                          <TableHead className="text-center px-2 font-bold text-muted-foreground/70">Legs</TableHead>
-                          <TableHead className="text-center px-3 font-black text-muted-foreground/70">Pts</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {leaderboard.map((player: any, idx: number) => (
-                          <TableRow key={player.id} data-testid={`leaderboard-row-${player.id}`} className="border-b border-muted-foreground/10 hover:bg-muted/5 transition-colors">
-                            <TableCell className="font-bold text-muted-foreground px-3 py-3 text-sm">
-                              <div className="flex items-center gap-1.5">
-                                {idx + 1}
-                                {player.wonFinal && (
-                                  <Trophy className={cn("w-3.5 h-3.5", player.bestRound?.startsWith('TP_') ? 'text-amber-500' : 'text-yellow-500')} />
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-3 py-3 font-semibold text-sm">{player.name}</TableCell>
-                            <TableCell className="text-center px-2 py-3">
-                              <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border whitespace-nowrap", getBadgeColor(player.bestRound, player.wonFinal))}>
-                                {player.label === 'Group Stage' ? 'Group' : player.label}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-center font-semibold px-2 py-3 text-sm text-muted-foreground/90">{player.legsWon}</TableCell>
-                            <TableCell className="text-center font-bold text-green-500 dark:text-green-400 text-base px-3 py-3">{player.points}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <table className="w-full table-fixed">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="w-[6%] py-3 px-3 text-center text-sm font-medium text-muted-foreground">#</th>
+                          <th className="w-[24%] py-3 px-3 text-left text-sm font-medium text-muted-foreground">Player</th>
+                          <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">P</th>
+                          <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">W</th>
+                          <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">L</th>
+                          <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">LW</th>
+                          <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">LL</th>
+                          <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">+/-</th>
+                          <th className="w-[10%] py-3 px-2 text-center text-sm font-medium text-muted-foreground">Pts</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {standings.map((player, idx) => {
+                          const qualifying = idx < 2;
+                          return (
+                            <tr key={player.id} className={cn("border-b last:border-0 hover:bg-muted/40 transition-colors", qualifying && "bg-green-50 dark:bg-green-950/30")} data-testid={`row-standing-${player.id}`}>
+                              <td className="py-4 px-3 text-sm text-muted-foreground font-medium">
+                                <div className="flex items-center justify-center gap-1.5 text-center">
+                                  {qualifying && <div className="w-2 h-2 rounded-full bg-green-500" />}
+                                  {idx + 1}
+                                </div>
+                              </td>
+                              <td className={cn("py-4 px-3 font-bold text-sm truncate", qualifying && "text-green-700 dark:text-green-400")}>{player.name}</td>
+                              <td className="py-4 px-2 text-center text-sm tabular-nums">{player.played}</td>
+                              <td className="py-4 px-2 text-center text-sm tabular-nums text-green-600 dark:text-green-400 font-medium">{player.won}</td>
+                              <td className="py-4 px-2 text-center text-sm tabular-nums text-destructive font-medium">{player.lost}</td>
+                              <td className="py-4 px-2 text-center text-sm tabular-nums">{player.legsFor}</td>
+                              <td className="py-4 px-2 text-center text-sm tabular-nums">{player.legsAgainst}</td>
+                              <td className={cn(
+                                "py-4 px-2 text-center text-sm tabular-nums font-medium",
+                                player.diff > 0 ? "text-green-600" : player.diff < 0 ? "text-destructive" : ""
+                              )}>
+                                {player.diff > 0 ? `+${player.diff}` : player.diff}
+                              </td>
+                              <td className={cn(
+                                "py-4 px-2 text-center font-bold text-base",
+                                qualifying ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                              )}>{player.pts}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </CardContent>
                 </Card>
-              );
-            })()}
-          </TabsContent>
-        </Tabs>
+              ))}
+              <div className="rounded-lg border border-border bg-muted/30 px-5 py-4 space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-foreground">Standings Criteria</p>
+                <p className="text-sm text-muted-foreground">Group standings are determined by the following criteria, applied in order:</p>
+                <ol className="space-y-1.5 text-sm">
+                  <li><span className="font-bold text-foreground">1. Points</span><span className="text-muted-foreground"> — {ptsWin} for a win. The player with the most points is ranked highest.</span></li>
+                  <li><span className="font-bold text-foreground">2. Leg Difference</span><span className="text-muted-foreground"> — If tied on points, the player with the better leg difference (legs won minus legs lost) is ranked higher.</span></li>
+                  <li><span className="font-bold text-foreground">3. Legs Won</span><span className="text-muted-foreground"> — If still tied, the player with the most legs won is ranked higher.</span></li>
+                  <li><span className="font-bold text-foreground">4. Head-to-Head</span><span className="text-muted-foreground"> — If still tied, the result between the tied players is used. The same criteria (points, leg difference, legs won) are applied to only the matches played between the tied players.</span></li>
+                </ol>
+                <p className="text-xs text-muted-foreground/60 pt-1">If players remain tied after all criteria, they share the same effective position.</p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="matches" className="space-y-6">
+              {sortedRoundEntries.map(([roundName, roundMatches]) => (
+                <Card key={roundName} className="overflow-hidden">
+                  <CardHeader className="bg-muted/50 border-b">
+                    <CardTitle className="text-lg">{roundName}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y">
+                      {roundMatches.map((match) => {
+                        const isKnockout = !match.groupId;
+                        const isFirstKnockoutRound = isKnockout && match.roundKey === knockoutRounds[0];
+                        const hideNames = isFirstKnockoutRound && !groupsFinished;
+                        const playerA = hideNames ? null : getPlayer(match.playerAId);
+                        const playerB = hideNames ? null : getPlayer(match.playerBId);
+                        const hideScorer = isKnockout && !groupsFinished;
+                        return (
+                          <CompletedMatchRow
+                            key={match.id}
+                            match={match}
+                            playerA={playerA}
+                            playerB={playerB}
+                            shareToken={shareToken || ''}
+                            scorerName={hideScorer ? null : (match.scorerName || null)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="leaderboard">
+              {(() => {
+                const roundPriority: Record<string, number> = { 'F': 5, 'SF': 4, 'QF': 3, 'R16': 2, 'R32': 1, 'group': 0 };
+
+                const getPlayerBestRound = (playerId: number) => {
+                  let bestRound = 'group';
+                  let bestPriority = 0;
+                  let wonFinal = false;
+                  const playerMatches = matches.filter((m: any) => m.playerAId === playerId || m.playerBId === playerId);
+                  for (const m of playerMatches) {
+                    if (m.stage === 'KNOCKOUT' && !m.roundKey?.startsWith('TP_')) {
+                      const p = roundPriority[m.roundKey] || 0;
+                      if (p > bestPriority) { bestPriority = p; bestRound = m.roundKey; }
+                    }
+                    if (m.roundKey === 'F' && m.status === 'COMPLETED' && m.winnerId === playerId) wonFinal = true;
+                  }
+                  return { bestRound, wonFinal };
+                };
+
+                const getLabel = (bestRound: string, wonFinal: boolean) => {
+                  if (bestRound === 'F') return wonFinal ? 'Champion' : 'Runner-Up';
+                  if (bestRound === 'SF') return 'Semi-Finalist';
+                  if (bestRound === 'QF') return 'Quarter-Finalist';
+                  if (bestRound === 'R16') return 'R16';
+                  if (bestRound === 'R32') return 'R32';
+                  return 'Group Stage';
+                };
+
+                const getBadgeColor = (bestRound: string, wonFinal: boolean) => {
+                  if (bestRound === 'F' && wonFinal) return 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
+                  if (bestRound === 'F') return 'bg-gray-200/50 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300 border-gray-400/30';
+                  if (bestRound === 'SF') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-400/30';
+                  if (bestRound === 'QF') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-400/30';
+                  if (bestRound === 'R16') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-400/30';
+                  if (bestRound === 'R32') return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border-teal-400/30';
+                  return 'bg-muted text-muted-foreground border-border';
+                };
+
+                const getPoints = (bestRound: string, wonFinal: boolean) => {
+                  if (bestRound === 'F' && wonFinal) return 40;
+                  if (bestRound === 'F') return 30;
+                  if (bestRound === 'SF') return 20;
+                  if (bestRound === 'QF') return 10;
+                  if (bestRound === 'R16') return 8;
+                  if (bestRound === 'R32') return 6;
+                  return 5;
+                };
+
+                const getTotalLegsWon = (playerId: number) => {
+                  let total = 0;
+                  for (const m of matches) {
+                    if (m.status !== 'COMPLETED' || m.roundKey?.startsWith('TP_')) continue;
+                    if (m.playerAId === playerId) total += (m.scoreA || 0);
+                    if (m.playerBId === playerId) total += (m.scoreB || 0);
+                  }
+                  return total;
+                };
+
+                const leaderboard = players.map((p: any) => {
+                  const { bestRound, wonFinal } = getPlayerBestRound(p.id);
+                  return {
+                    ...p,
+                    bestRound,
+                    wonFinal,
+                    label: getLabel(bestRound, wonFinal),
+                    points: getPoints(bestRound, wonFinal),
+                    legsWon: getTotalLegsWon(p.id),
+                  };
+                }).sort((a: any, b: any) => b.points - a.points || b.legsWon - a.legsWon);
+
+                return (
+                  <Card className="shadow-md overflow-hidden">
+                    <CardHeader className="py-4 px-4 border-b">
+                      <CardTitle className="text-foreground text-lg font-bold">Leaderboard</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="hover:bg-transparent border-b border-muted-foreground/20">
+                            <TableHead className="w-[48px] px-3 font-bold text-muted-foreground/70">#</TableHead>
+                            <TableHead className="px-3 font-bold text-muted-foreground/70">Player</TableHead>
+                            <TableHead className="text-center px-2 font-bold text-muted-foreground/70">Position</TableHead>
+                            <TableHead className="text-center px-2 font-bold text-muted-foreground/70">Legs</TableHead>
+                            <TableHead className="text-center px-3 font-black text-muted-foreground/70">Pts</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {leaderboard.map((player: any, idx: number) => (
+                            <TableRow key={player.id} data-testid={`leaderboard-row-${player.id}`} className="border-b border-muted-foreground/10 hover:bg-muted/5 transition-colors">
+                              <TableCell className="font-bold text-muted-foreground px-3 py-3 text-sm">
+                                <div className="flex items-center gap-1.5">
+                                  {idx + 1}
+                                  {player.wonFinal && <Trophy className="w-3.5 h-3.5 text-yellow-500" />}
+                                </div>
+                              </TableCell>
+                              <TableCell className="px-3 py-3 font-semibold text-sm">{player.name}</TableCell>
+                              <TableCell className="text-center px-2 py-3">
+                                <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border whitespace-nowrap", getBadgeColor(player.bestRound, player.wonFinal))}>
+                                  {player.label === 'Group Stage' ? 'Group' : player.label}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center font-semibold px-2 py-3 text-sm text-muted-foreground/90">{player.legsWon}</TableCell>
+                              <TableCell className="text-center font-bold text-green-500 dark:text-green-400 text-base px-3 py-3">{player.points}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <Tabs defaultValue="matches" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+              <TabsTrigger value="matches">Matches</TabsTrigger>
+              <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="matches" className="space-y-6">
+              {sortedRoundEntries.length === 0 ? (
+                <Card className="overflow-hidden">
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    No 3rd place matches yet
+                  </CardContent>
+                </Card>
+              ) : sortedRoundEntries.map(([roundName, roundMatches]) => (
+                <Card key={roundName} className="overflow-hidden border-amber-200 dark:border-amber-800">
+                  <CardHeader className="bg-amber-50/50 dark:bg-amber-900/10 border-b border-amber-200 dark:border-amber-800">
+                    <CardTitle className="text-lg text-amber-800 dark:text-amber-300">{roundName}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y">
+                      {roundMatches.map((match) => {
+                        const playerA = getPlayer(match.playerAId);
+                        const playerB = getPlayer(match.playerBId);
+                        return (
+                          <CompletedMatchRow
+                            key={match.id}
+                            match={match}
+                            playerA={playerA}
+                            playerB={playerB}
+                            shareToken={shareToken || ''}
+                            scorerName={match.scorerName || null}
+                          />
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="leaderboard">
+              {(() => {
+                const tpPriority: Record<string, number> = { 'TP_F': 3, 'TP_SF': 2, 'TP_QF': 1 };
+
+                const tpPlayerIds = new Set<number>();
+                for (const m of matches) {
+                  if (!m.roundKey?.startsWith('TP_')) continue;
+                  if (m.playerAId) tpPlayerIds.add(m.playerAId);
+                  if (m.playerBId) tpPlayerIds.add(m.playerBId);
+                }
+
+                const getTpBestRound = (playerId: number) => {
+                  let bestRound = 'TP_QF';
+                  let bestPriority = 0;
+                  let wonFinal = false;
+                  for (const m of matches) {
+                    if (!m.roundKey?.startsWith('TP_')) continue;
+                    if (m.playerAId !== playerId && m.playerBId !== playerId) continue;
+                    const p = tpPriority[m.roundKey] || 0;
+                    if (p > bestPriority) { bestPriority = p; bestRound = m.roundKey; }
+                    if (m.roundKey === 'TP_F' && m.status === 'COMPLETED' && m.winnerId === playerId) wonFinal = true;
+                  }
+                  return { bestRound, wonFinal };
+                };
+
+                const getTpLabel = (bestRound: string, wonFinal: boolean) => {
+                  if (bestRound === 'TP_F') return wonFinal ? 'Winner' : 'Runner-Up';
+                  if (bestRound === 'TP_SF') return 'Semi-Finalist';
+                  return 'Quarter-Finalist';
+                };
+
+                const getTpBadgeColor = (bestRound: string, wonFinal: boolean) => {
+                  if (bestRound === 'TP_F' && wonFinal) return 'bg-amber-500 text-white border-amber-600';
+                  if (bestRound === 'TP_F') return 'bg-amber-400 text-white border-amber-500';
+                  if (bestRound === 'TP_SF') return 'bg-amber-300 text-amber-900 border-amber-400';
+                  return 'bg-amber-200 text-amber-900 border-amber-300';
+                };
+
+                const getTpPoints = (bestRound: string, wonFinal: boolean) => {
+                  if (bestRound === 'TP_F' && wonFinal) return 7.5;
+                  if (bestRound === 'TP_F') return 7;
+                  if (bestRound === 'TP_SF') return 6.5;
+                  return 6;
+                };
+
+                const getTpLegsWon = (playerId: number) => {
+                  let total = 0;
+                  for (const m of matches) {
+                    if (!m.roundKey?.startsWith('TP_') || m.status !== 'COMPLETED') continue;
+                    if (m.playerAId === playerId) total += (m.scoreA || 0);
+                    if (m.playerBId === playerId) total += (m.scoreB || 0);
+                  }
+                  return total;
+                };
+
+                const tpLeaderboard = players
+                  .filter((p: any) => tpPlayerIds.has(p.id))
+                  .map((p: any) => {
+                    const { bestRound, wonFinal } = getTpBestRound(p.id);
+                    return {
+                      ...p,
+                      bestRound,
+                      wonFinal,
+                      label: getTpLabel(bestRound, wonFinal),
+                      points: getTpPoints(bestRound, wonFinal),
+                      legsWon: getTpLegsWon(p.id),
+                    };
+                  })
+                  .sort((a: any, b: any) => b.points - a.points || b.legsWon - a.legsWon);
+
+                if (tpLeaderboard.length === 0) {
+                  return (
+                    <Card className="shadow-md overflow-hidden">
+                      <CardContent className="py-12 text-center text-muted-foreground">
+                        No 3rd place leaderboard data yet
+                      </CardContent>
+                    </Card>
+                  );
+                }
+
+                return (
+                  <Card className="shadow-md overflow-hidden border-amber-200 dark:border-amber-800">
+                    <CardHeader className="py-4 px-4 border-b border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
+                      <CardTitle className="text-amber-800 dark:text-amber-300 text-lg font-bold">3rd Place Leaderboard</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="hover:bg-transparent border-b border-muted-foreground/20">
+                            <TableHead className="w-[48px] px-3 font-bold text-muted-foreground/70">#</TableHead>
+                            <TableHead className="px-3 font-bold text-muted-foreground/70">Player</TableHead>
+                            <TableHead className="text-center px-2 font-bold text-muted-foreground/70">Position</TableHead>
+                            <TableHead className="text-center px-2 font-bold text-muted-foreground/70">Legs</TableHead>
+                            <TableHead className="text-center px-3 font-black text-muted-foreground/70">Pts</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tpLeaderboard.map((player: any, idx: number) => (
+                            <TableRow key={player.id} data-testid={`tp-leaderboard-row-${player.id}`} className="border-b border-muted-foreground/10 hover:bg-muted/5 transition-colors">
+                              <TableCell className="font-bold text-muted-foreground px-3 py-3 text-sm">
+                                <div className="flex items-center gap-1.5">
+                                  {idx + 1}
+                                  {player.wonFinal && <Trophy className="w-3.5 h-3.5 text-amber-500" />}
+                                </div>
+                              </TableCell>
+                              <TableCell className="px-3 py-3 font-semibold text-sm">{player.name}</TableCell>
+                              <TableCell className="text-center px-2 py-3">
+                                <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border whitespace-nowrap", getTpBadgeColor(player.bestRound, player.wonFinal))}>
+                                  {player.label}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center font-semibold px-2 py-3 text-sm text-muted-foreground/90">{player.legsWon}</TableCell>
+                              <TableCell className="text-center font-bold text-amber-500 text-base px-3 py-3">{player.points}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </div>
   );
