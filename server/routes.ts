@@ -199,12 +199,47 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     }
   }
 
+  // For full-bracket seeding, build a reordered pairings array so that same-group
+  // qualifiers are placed in opposite halves of the entire bracket tree and can only
+  // meet in the final. The cross-pairing (1st vs 2nd of adjacent group) is preserved;
+  // only the MATCH POSITIONS are rearranged.
+  //
+  // Strategy: the pairings array is built in group-pair clusters of 2 (or 1 for the odd
+  // last group). For full-bracket seeding, cluster k's "first" match (aPos=0) goes to
+  // bracket position k (top half), and cluster k's "second" match (aPos=1) goes to
+  // bracket position (totalMatches-1-k) (bottom half, mirrored). This guarantees that
+  // any two players from the same group end up in opposite halves.
+  const seededPairings: Pairing[] = (() => {
+    if (!settings?.seeded) return pairings;
+    // Collect clusters: each cluster is [firstMatch, secondMatch?]
+    type Cluster = [Pairing] | [Pairing, Pairing];
+    const clusters: Cluster[] = [];
+    for (let i = 0; i < groupCount; i += 2) {
+      const oppIdx = i + 1;
+      if (oppIdx < groupCount) {
+        clusters.push([
+          { aGroupIdx: i, aPos: 0, bGroupIdx: oppIdx, bPos: 1 },
+          { aGroupIdx: i, aPos: 1, bGroupIdx: oppIdx, bPos: 0 },
+        ]);
+      } else {
+        clusters.push([{ aGroupIdx: i, aPos: 0, bGroupIdx: i, bPos: 1 }]);
+      }
+    }
+    // Build ordered list: put all "first" matches in top half in order,
+    // then "second" matches in bottom half in reverse order.
+    const firstMatches = clusters.map(c => c[0]);
+    const secondMatches = clusters.filter((c): c is [Pairing, Pairing] => c.length === 2).map(c => c[1]).reverse();
+    return [...firstMatches, ...secondMatches];
+  })();
+
+  const activePairings = settings?.seeded ? seededPairings : pairings;
+
   const groupComplete = isGroupFullyComplete(completedGroupId);
 
   if (!groupComplete) {
     const updatedQFIds: number[] = [];
-    for (let i = 0; i < firstRoundMatches.length && i < pairings.length; i++) {
-      const pairing = pairings[i];
+    for (let i = 0; i < firstRoundMatches.length && i < activePairings.length; i++) {
+      const pairing = activePairings[i];
       const km = firstRoundMatches[i];
       if (km.status !== 'PENDING') continue;
       const clearUpdates: any = {};
@@ -247,8 +282,9 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
 
   const allGroupsDone = groupsList.every(g => isGroupFullyComplete(g.id));
   const updatedQFIds: number[] = [];
-  for (let i = 0; i < firstRoundMatches.length && i < pairings.length; i++) {
-    const pairing = pairings[i];
+
+  for (let i = 0; i < firstRoundMatches.length && i < activePairings.length; i++) {
+    const pairing = activePairings[i];
     const updates: any = {};
     let needsUpdate = false;
 

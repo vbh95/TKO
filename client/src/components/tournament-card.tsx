@@ -667,7 +667,11 @@ function TournamentSettingsDialog({ tournament, open, onOpenChange }: { tourname
                       <div className="flex items-center justify-between pt-1">
                         <div className="space-y-0.5">
                           <Label className="text-sm">Seeded Bracket</Label>
-                          <p className="text-xs text-muted-foreground">Highest seeds play lowest seeds</p>
+                          <p className="text-xs text-muted-foreground">
+                            {type === "MULTI_STAGE"
+                              ? "Keep same-group qualifiers apart until final"
+                              : "Highest seeds play lowest seeds"}
+                          </p>
                         </div>
                         <Switch checked={seeded} onCheckedChange={setSeeded} data-testid="switch-seeded" />
                       </div>

@@ -486,7 +486,11 @@ export default function CreateTournament() {
                   <div className="space-y-2 flex items-center justify-between border rounded-xl p-4">
                     <div className="space-y-0.5">
                       <Label className="text-base">Seeded Bracket</Label>
-                      <p className="text-xs text-muted-foreground">Highest seeds play lowest seeds in first round</p>
+                      <p className="text-xs text-muted-foreground">
+                        {type === "MULTI_STAGE"
+                          ? "Keep same-group qualifiers apart until final"
+                          : "Highest seeds play lowest seeds in first round"}
+                      </p>
                     </div>
                     <Switch checked={seeded} onCheckedChange={setSeeded} />
                   </div>
