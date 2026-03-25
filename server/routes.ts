@@ -211,6 +211,24 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
   // any two players from the same group end up in opposite halves.
   const seededPairings: Pairing[] = (() => {
     if (!settings?.seeded) return pairings;
+    // Special case: seeded + board_rotation + 8 groups + 2 qualifiers per group → R16.
+    // Use cross-table mirror pairings: A1 vs H2, B1 vs G2, …, H1 vs A2.
+    if (
+      groupCount === 8 &&
+      settings.groupScheduleMode === 'board_rotation' &&
+      (settings.promotedPerGroup ?? 2) === 2
+    ) {
+      return [
+        { aGroupIdx: 0, aPos: 0, bGroupIdx: 7, bPos: 1 }, // A1 vs H2
+        { aGroupIdx: 1, aPos: 0, bGroupIdx: 6, bPos: 1 }, // B1 vs G2
+        { aGroupIdx: 2, aPos: 0, bGroupIdx: 5, bPos: 1 }, // C1 vs F2
+        { aGroupIdx: 3, aPos: 0, bGroupIdx: 4, bPos: 1 }, // D1 vs E2
+        { aGroupIdx: 4, aPos: 0, bGroupIdx: 3, bPos: 1 }, // E1 vs D2
+        { aGroupIdx: 5, aPos: 0, bGroupIdx: 2, bPos: 1 }, // F1 vs C2
+        { aGroupIdx: 6, aPos: 0, bGroupIdx: 1, bPos: 1 }, // G1 vs B2
+        { aGroupIdx: 7, aPos: 0, bGroupIdx: 0, bPos: 1 }, // H1 vs A2
+      ];
+    }
     // Collect clusters: each cluster is [firstMatch, secondMatch?]
     type Cluster = [Pairing] | [Pairing, Pairing];
     const clusters: Cluster[] = [];
