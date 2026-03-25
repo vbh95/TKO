@@ -917,7 +917,7 @@ export default function PublicView() {
   const hasGroupMatches = groupStageMatches.length > 0;
   const showGroupSlots = hasGroupMatches && !groupsFinished && groupSlots.length > 0;
   const showKnockoutSection = groupsFinished && (mainKnockoutCards.length > 0 || tpKnockoutCards.length > 0);
-  const showTpTab = hasThirdPlaceBracket && tpKnockoutCards.length > 0;
+  const showTpTab = hasThirdPlaceBracket;
 
   return (
     <div className="min-h-screen bg-background">
@@ -1080,6 +1080,16 @@ export default function PublicView() {
 
             {(() => {
               const activeCards = activeCompetition === '3rd-place' ? tpKnockoutCards : mainKnockoutCards;
+              if (activeCards.length === 0) {
+                return (
+                  <Card className="border-2 border-dashed border-amber-300 dark:border-amber-700">
+                    <CardContent className="py-12 text-center">
+                      <Trophy className="w-10 h-10 text-amber-400 mx-auto mb-4" />
+                      <p className="text-muted-foreground text-sm">Waiting for match info</p>
+                    </CardContent>
+                  </Card>
+                );
+              }
               return (
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                   {activeCards.map(({ match, isLive, label, allDone }, idx) => {
@@ -1357,9 +1367,10 @@ export default function PublicView() {
 
             <TabsContent value="matches" className="space-y-6">
               {sortedRoundEntries.length === 0 ? (
-                <Card className="overflow-hidden">
-                  <CardContent className="py-12 text-center text-muted-foreground">
-                    No 3rd place matches yet
+                <Card className="border-2 border-dashed border-amber-300 dark:border-amber-700">
+                  <CardContent className="py-12 text-center">
+                    <Trophy className="w-10 h-10 text-amber-400 mx-auto mb-4" />
+                    <p className="text-muted-foreground text-sm">Waiting for match info</p>
                   </CardContent>
                 </Card>
               ) : sortedRoundEntries.map(([roundName, roundMatches]) => (
@@ -1461,9 +1472,10 @@ export default function PublicView() {
 
                 if (tpLeaderboard.length === 0) {
                   return (
-                    <Card className="shadow-md overflow-hidden">
-                      <CardContent className="py-12 text-center text-muted-foreground">
-                        No 3rd place leaderboard data yet
+                    <Card className="border-2 border-dashed border-amber-300 dark:border-amber-700">
+                      <CardContent className="py-12 text-center">
+                        <Trophy className="w-10 h-10 text-amber-400 mx-auto mb-4" />
+                        <p className="text-muted-foreground text-sm">Waiting for match info</p>
                       </CardContent>
                     </Card>
                   );
