@@ -211,11 +211,14 @@ export default function BoardView() {
 
       <div className="container max-w-3xl mx-auto px-4 pb-12 space-y-6">
         {currentMatch && (
-          <Card className="border-2 border-primary shadow-xl overflow-hidden" data-testid="card-current-match">
-            <CardHeader className="bg-primary/10 border-b pb-3">
+          <Card className={currentMatch.roundKey?.startsWith('TP_') ? "border-2 border-amber-500 shadow-xl overflow-hidden" : "border-2 border-primary shadow-xl overflow-hidden"} data-testid="card-current-match">
+            <CardHeader className={currentMatch.roundKey?.startsWith('TP_') ? "bg-amber-500/10 border-b pb-3" : "bg-primary/10 border-b pb-3"}>
               <CardTitle className="text-lg flex items-center gap-2">
                 <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
                 Now Playing
+                {currentMatch.roundKey?.startsWith('TP_') && (
+                  <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700">3rd Place</Badge>
+                )}
                 {liveScoring && (
                   <span className="text-xs text-muted-foreground ml-auto">
                     Leg {(liveScoring.legsWonA + liveScoring.legsWonB + 1)} — Best of {liveScoring.bestOf}
@@ -324,9 +327,14 @@ export default function BoardView() {
         )}
 
         {!currentMatch && nextPending && (
-          <Card className="border border-dashed border-primary/50" data-testid="card-next-match">
+          <Card className={nextPending.roundKey?.startsWith('TP_') ? "border border-dashed border-amber-400/70" : "border border-dashed border-primary/50"} data-testid="card-next-match">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg text-muted-foreground">Up Next</CardTitle>
+              <CardTitle className="text-lg text-muted-foreground flex items-center gap-2">
+                Up Next
+                {nextPending.roundKey?.startsWith('TP_') && (
+                  <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700">3rd Place</Badge>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between text-center">

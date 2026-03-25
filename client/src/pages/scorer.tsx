@@ -1205,9 +1205,14 @@ export default function ScorerPage() {
   const bestOf = (tournament.settings as any)?.groupBestOf || 3;
   const legsToWin = Math.ceil(bestOf / 2);
 
+  const isTPMatch = (match: BoardData['matches'][0]) => !!match.roundKey?.startsWith('TP_');
+
   const getMatchTypeLabel = (match: BoardData['matches'][0]) => {
     if (match.groupId) return 'Group';
     const rk = match.roundKey;
+    if (rk === 'TP_F') return '3rd Place Final';
+    if (rk === 'TP_SF') return '3rd Place SF';
+    if (rk === 'TP_QF') return '3rd Place QF';
     if (rk === 'F') return 'Final';
     if (rk === 'SF') return 'Semi-Final';
     if (rk === 'QF') return 'Quarter-Final';
@@ -1244,13 +1249,19 @@ export default function ScorerPage() {
 
   const nextUpMatch = adminAssigned[0] || naturalGroupQueue[0] || null;
 
+  const waitingMatches = matches.filter(m => m.status === 'PENDING' && (!m.playerAId || !m.playerBId));
+  const inProgressMatch = matches.find(m => m.status === 'IN_PROGRESS');
+
+  const isTPContext = inProgressMatch
+    ? isTPMatch(inProgressMatch)
+    : nextUpMatch
+    ? isTPMatch(nextUpMatch)
+    : false;
+
   const upcomingMatches = [
     ...naturalGroupQueue.filter(m => m !== nextUpMatch),
     ...adminAssigned.filter(m => m !== nextUpMatch && !naturalGroupQueue.includes(m)),
-  ];
-
-  const waitingMatches = matches.filter(m => m.status === 'PENDING' && (!m.playerAId || !m.playerBId));
-  const inProgressMatch = matches.find(m => m.status === 'IN_PROGRESS');
+  ].filter(m => isTPMatch(m) === isTPContext);
 
 
   const handleTapMatch = (matchId: number) => {
@@ -2089,13 +2100,16 @@ export default function ScorerPage() {
       <div className="container max-w-3xl mx-auto px-4 py-6 space-y-6">
         {inProgressMatch && (
           <Card
-            className="border-2 border-green-500 shadow-xl"
+            className={isTPMatch(inProgressMatch) ? "border-2 border-amber-500 shadow-xl" : "border-2 border-green-500 shadow-xl"}
             data-testid={`card-match-in-progress-${inProgressMatch.id}`}
           >
-            <CardHeader className="bg-green-500/10 border-b pb-3">
+            <CardHeader className={isTPMatch(inProgressMatch) ? "bg-amber-500/10 border-b pb-3" : "bg-green-500/10 border-b pb-3"}>
               <CardTitle className="text-lg flex items-center gap-2">
-                <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                <span className={isTPMatch(inProgressMatch) ? "w-3 h-3 bg-amber-500 rounded-full animate-pulse" : "w-3 h-3 bg-green-500 rounded-full animate-pulse"} />
                 Now Playing
+                {isTPMatch(inProgressMatch) && (
+                  <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700">3rd Place</Badge>
+                )}
                 <Badge variant="secondary" className="ml-auto text-xs">{getMatchTypeLabel(inProgressMatch)}</Badge>
               </CardTitle>
             </CardHeader>
@@ -2163,11 +2177,14 @@ export default function ScorerPage() {
         )}
 
         {!inProgressMatch && nextUpMatch && (
-          <Card className="border-2 border-primary shadow-xl" data-testid="card-next-up">
-            <CardHeader className="bg-primary/10 border-b pb-3">
+          <Card className={isTPMatch(nextUpMatch) ? "border-2 border-amber-500 shadow-xl" : "border-2 border-primary shadow-xl"} data-testid="card-next-up">
+            <CardHeader className={isTPMatch(nextUpMatch) ? "bg-amber-500/10 border-b pb-3" : "bg-primary/10 border-b pb-3"}>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Play className="w-5 h-5 text-primary" />
+                <Play className={isTPMatch(nextUpMatch) ? "w-5 h-5 text-amber-600" : "w-5 h-5 text-primary"} />
                 Next Up
+                {isTPMatch(nextUpMatch) && (
+                  <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700">3rd Place</Badge>
+                )}
                 <Badge variant="secondary" className="ml-auto text-xs">{getMatchTypeLabel(nextUpMatch)}</Badge>
               </CardTitle>
             </CardHeader>
@@ -2241,7 +2258,7 @@ export default function ScorerPage() {
                       data-testid={`row-upcoming-match-${match.id}`}
                     >
                       <div className="flex-1 flex flex-col items-center gap-1">
-                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">{getMatchTypeLabel(match)}</span>
+                        <span className={`text-[10px] uppercase font-semibold ${isTPMatch(match) ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>{getMatchTypeLabel(match)}</span>
                         <div className="flex items-center justify-center gap-3 text-center w-full">
                           <span className="flex-1 font-medium text-right">{getPlayer(match.playerAId)?.name || "TBD"}</span>
                           <span className="text-muted-foreground text-sm shrink-0">vs</span>
