@@ -660,8 +660,8 @@ export default function TournamentDetail() {
     const groupCount = groups.length;
     const pairings: { a: string; b: string }[] = [];
 
-    const isSeeded = !!(tournament as any)?.settings?.seeded;
-    const isBoardRotation = (tournament as any)?.settings?.groupScheduleMode === 'board_rotation';
+    const isSeeded = !!settings?.seeded;
+    const isBoardRotation = settings?.groupScheduleMode === 'board_rotation';
 
     if (isSeeded && isBoardRotation && groupCount === 8) {
       // Mirror pairings: A1 vs H2, B1 vs G2, C1 vs F2, D1 vs E2,
