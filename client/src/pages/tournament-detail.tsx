@@ -660,7 +660,17 @@ export default function TournamentDetail() {
     const groupCount = groups.length;
     const pairings: { a: string; b: string }[] = [];
 
-    if (groupCount === 4) {
+    const isSeeded = !!(tournament as any)?.settings?.seeded;
+    const isBoardRotation = (tournament as any)?.settings?.groupScheduleMode === 'board_rotation';
+
+    if (isSeeded && isBoardRotation && groupCount === 8) {
+      // Mirror pairings: A1 vs H2, B1 vs G2, C1 vs F2, D1 vs E2,
+      //                  E1 vs D2, F1 vs C2, G1 vs B2, H1 vs A2
+      for (let i = 0; i < 8; i++) {
+        const oppIdx = 7 - i;
+        pairings.push({ a: `1st ${groups[i].name}`, b: `2nd ${groups[oppIdx].name}` });
+      }
+    } else if (groupCount === 4) {
       // QF1: 1st Group A vs 2nd Group B
       pairings.push({ a: `1st ${groups[0].name}`, b: `2nd ${groups[1].name}` });
       // QF2: 2nd Group C vs 1st Group D
