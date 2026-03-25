@@ -1,0 +1,58 @@
+On the PUBLIC TOURNAMENT PAGE ONLY, add a clean spectator toggle / tab system that lets users switch between:
+1) Main Tournament
+2) 3rd Place Tournament
+
+Requirements:
+- Do NOT alter or break any existing working logic, calculations, scoring flows, scheduling, board assignments, admin behaviour, tablet behaviour, or tournament generation.
+- Scope this change only to the public-facing tournament page and only to how data is displayed there.
+- Reuse the existing data sources, state, selectors, and APIs wherever possible instead of rewriting logic.
+- Keep changes minimal and targeted.
+
+Main behaviour:
+- If no 3rd place knockout exists, show only the Main Tournament view exactly as normal now.
+- If a 3rd place knockout has been generated, show tabs/toggles for:
+  - Main Tournament
+  - 3rd Place Tournament
+- The selected tab must control ALL public page sections so they only show data for that competition.
+
+Main Tournament tab:
+- Must show ONLY main tournament data.
+- This includes:
+  - live scoring/live match view
+  - upcoming matches
+  - completed matches
+  - leaderboard
+- Exclude all 3rd place knockout matches/data from this tab.
+
+3rd Place Tournament tab:
+- Must show ONLY 3rd place knockout data.
+- This includes:
+  - live scoring/live match view
+  - upcoming matches
+  - completed matches
+  - leaderboard
+- Exclude all main tournament matches/data from this tab.
+
+Implementation rules:
+- Do not duplicate business logic if existing filtering/grouping utilities can be extended safely.
+- Add a competition-type filter layer to the public page data mapping so each section renders only the currently selected competition.
+- Preserve current styling and responsive behaviour.
+- Clearly label the tabs.
+- If helpful, use the existing 3rd place colour styling for the 3rd place tab/view, but do not redesign the whole page.
+- Default to Main Tournament when both exist.
+- If the current live match belongs to the inactive tab, do not show it until that tab is selected.
+- Leaderboards must also respect the selected competition and not mix data between main and 3rd place views.
+
+Safety constraints:
+- Do not touch admin pages unless absolutely required for shared display-only components.
+- Do not modify tablet scoring logic.
+- Do not modify match generation logic.
+- Do not modify board allocation logic.
+- Do not modify existing main tournament behaviour except to filter public display correctly by selected tab.
+- Avoid broad refactors.
+
+Before finishing:
+- Ensure the public page still works exactly as before for tournaments without a 3rd place knockout.
+- Ensure the Main Tournament tab shows only main tournament data.
+- Ensure the 3rd Place Tournament tab shows only 3rd place data.
+- Ensure live scoring, upcoming/completed matches, and leaderboard all follow the active tab consistently.
