@@ -55,6 +55,9 @@ export default function CreateTournament() {
     const [groupScheduleMode, setGroupScheduleMode] = useState<'standard' | 'board_rotation'>('standard');
     const [groupNumBoards, setGroupNumBoards] = useState(2);
     const [enableThirdPlaceBracket, setEnableThirdPlaceBracket] = useState(false);
+    const [tpQfBestOf, setTpQfBestOf] = useState(3);
+    const [tpSfBestOf, setTpSfBestOf] = useState(5);
+    const [tpFBestOf, setTpFBestOf] = useState(7);
 
     const koPlayerCount = (() => {
       if (type === "MULTI_STAGE") return groupCount * 2;
@@ -67,6 +70,7 @@ export default function CreateTournament() {
     const showR16 = (type === "KNOCKOUT" || type === "MULTI_STAGE") && koTotalSlots >= 16;
     const showQF = type === "DOUBLE_ELIMINATION" || ((type === "KNOCKOUT" || type === "MULTI_STAGE") && koTotalSlots >= 8);
     const showSF = type === "DOUBLE_ELIMINATION" || ((type === "KNOCKOUT" || type === "MULTI_STAGE") && koTotalSlots >= 4);
+    const showTpQF = groupCount >= 5;
 
     const handleAddPlayer = () => {
       if (players.length >= 48) return;
@@ -173,6 +177,11 @@ export default function CreateTournament() {
           groupScheduleMode: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") && groupCount >= 4 ? groupScheduleMode : undefined,
           numberOfBoards: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") && groupCount >= 4 && groupScheduleMode === 'board_rotation' ? groupNumBoards : undefined,
           enableThirdPlaceBracket: type === "MULTI_STAGE" && groupCount >= 4 && groupScheduleMode === 'board_rotation' && enableThirdPlaceBracket ? true : undefined,
+          thirdPlaceBestOfByRound: type === "MULTI_STAGE" && groupCount >= 4 && groupScheduleMode === 'board_rotation' && enableThirdPlaceBracket ? {
+            ...(showTpQF ? { quarterFinal: tpQfBestOf } : {}),
+            semiFinal: tpSfBestOf,
+            final: tpFBestOf,
+          } : undefined,
         }
       }, {
         onSuccess: async (newTournament) => {
@@ -347,6 +356,55 @@ export default function CreateTournament() {
                           onCheckedChange={setEnableThirdPlaceBracket}
                           data-testid="toggle-third-place-bracket"
                         />
+                      </div>
+                    )}
+
+                    {type === "MULTI_STAGE" && groupCount >= 4 && groupScheduleMode === 'board_rotation' && enableThirdPlaceBracket && (
+                      <div className="space-y-3 border rounded-xl p-3 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/40">
+                        <Label className="text-sm font-semibold text-amber-800 dark:text-amber-300">3rd Place Bracket Formats</Label>
+                        <div className={`grid gap-3 ${showTpQF ? "md:grid-cols-3" : "grid-cols-2"}`}>
+                          {showTpQF && (
+                            <div className="space-y-1.5">
+                              <Label htmlFor="tpQfBestOf" className="text-xs text-muted-foreground">Quarter Finals</Label>
+                              <Select value={tpQfBestOf.toString()} onValueChange={(v) => setTpQfBestOf(parseInt(v))}>
+                                <SelectTrigger id="tpQfBestOf" className="h-9" data-testid="select-tp-qf-best-of">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {[1, 3, 5, 7, 9, 11].map(n => (
+                                    <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                          <div className="space-y-1.5">
+                            <Label htmlFor="tpSfBestOf" className="text-xs text-muted-foreground">Semi Finals</Label>
+                            <Select value={tpSfBestOf.toString()} onValueChange={(v) => setTpSfBestOf(parseInt(v))}>
+                              <SelectTrigger id="tpSfBestOf" className="h-9" data-testid="select-tp-sf-best-of">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[1, 3, 5, 7, 9, 11].map(n => (
+                                  <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="tpFBestOf" className="text-xs text-muted-foreground">Final</Label>
+                            <Select value={tpFBestOf.toString()} onValueChange={(v) => setTpFBestOf(parseInt(v))}>
+                              <SelectTrigger id="tpFBestOf" className="h-9" data-testid="select-tp-f-best-of">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[1, 3, 5, 7, 9, 11].map(n => (
+                                  <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                       </div>
                     )}
 

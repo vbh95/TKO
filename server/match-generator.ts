@@ -536,10 +536,13 @@ export async function generateMultiStageMatches(
     for (let round = 0; round < tpRounds; round++) {
       const matchCount = tpSlots / Math.pow(2, round + 1);
       const tpRoundKey = getTpRoundKey(tpSlots, round);
-      const bestOf = getBestOfForRound(
-        tpRoundKey === 'TP_F' ? 'F' : tpRoundKey === 'TP_SF' ? 'SF' : 'QF',
-        settings
-      );
+      const tp = settings.thirdPlaceBestOfByRound;
+      const bestOf = tp
+        ? (tpRoundKey === 'TP_QF' && tp.quarterFinal ? tp.quarterFinal
+          : tpRoundKey === 'TP_SF' && tp.semiFinal ? tp.semiFinal
+          : tpRoundKey === 'TP_F' && tp.final ? tp.final
+          : getBestOfForRound(tpRoundKey === 'TP_F' ? 'F' : tpRoundKey === 'TP_SF' ? 'SF' : 'QF', settings))
+        : getBestOfForRound(tpRoundKey === 'TP_F' ? 'F' : tpRoundKey === 'TP_SF' ? 'SF' : 'QF', settings);
       for (let m = 0; m < matchCount; m++) {
         await storage.createMatch({
           tournamentId,

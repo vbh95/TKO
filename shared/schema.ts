@@ -304,6 +304,11 @@ export type TournamentSettings = {
   groupScheduleMode?: 'standard' | 'board_rotation';
   numberOfBoards?: number;
   enableThirdPlaceBracket?: boolean;
+  thirdPlaceBestOfByRound?: {
+    quarterFinal?: number;
+    semiFinal?: number;
+    final?: number;
+  };
 };
 
 export type CreateTournamentRequest = {
