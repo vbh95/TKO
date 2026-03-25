@@ -1,0 +1,82 @@
+Do not scan, refactor, or rewrite the whole project. Make only a minimal, isolated patch at the smallest safe insertion point in the existing tournament knockout match-generation logic.
+
+Task:
+Only for the exact scenario where:
+- seeding = enabled
+- board rotation = enabled
+- there are 8 groups (A to H)
+- top 2 players qualify from each group
+- knockout begins at the Round of 16
+
+change ONLY the seeded Round of 16 matchup calculation and knockout path calculation so the initial main knockout bracket is generated in this exact order:
+
+Round of 16 matchup order:
+1. A1 vs H2
+2. B1 vs G2
+3. C1 vs F2
+4. D1 vs E2
+5. E1 vs D2
+6. F1 vs C2
+7. G1 vs B2
+8. H1 vs A2
+
+Quarter-final path:
+- Winner of Match 1 vs Winner of Match 2
+- Winner of Match 3 vs Winner of Match 4
+- Winner of Match 5 vs Winner of Match 6
+- Winner of Match 7 vs Winner of Match 8
+
+Semi-final path:
+- Winner of QF1 vs Winner of QF2
+- Winner of QF3 vs Winner of QF4
+
+Final:
+- Winner of SF1 vs Winner of SF2
+
+Critical restriction:
+Do NOT change any board-assignment logic, board-rotation logic, board-reallocation logic, board filters, board display logic, tablet allocation logic, or any existing logic that moves later main knockout matches to Boards 1 and 2 and/or reserves Boards 3 and 4 for a 3rd place knockout. All board-related behaviour must remain exactly as it currently works.
+
+This task is ONLY to alter which players are paired against which players, and therefore the resulting knockout path, for this exact seeded scenario.
+
+Required outcome:
+- same-group players cannot meet again before the final
+- group winners remain separated correctly through the bracket
+- the bracket sides remain logically grouped as A/B, C/D, E/F, G/H until later rounds
+- existing current behaviour remains unchanged for every other tournament setup
+- all board assignment behaviour remains unchanged and continues to be handled by existing code
+
+Strict constraints:
+- only edit the code directly responsible for seeded matchup generation / bracket ordering for this exact scenario
+- do not edit board assignment code
+- do not edit UI, styles, wording, routes, schemas, APIs, tablet scoring, display logic, standings logic, or unrelated tournament creation logic
+- do not refactor unrelated functions
+- do not rename working functions/types unless absolutely required
+- do not add dependencies
+- do not alter behaviour for:
+  - non-seeded tournaments
+  - seeded tournaments without board rotation
+  - other group counts
+  - other knockout sizes
+  - existing live or completed tournament flows
+  - any board allocation or tablet allocation logic
+- prefer adding one narrow conditional/template branch instead of modifying general logic broadly
+- reuse existing helpers and data structures where possible
+- keep the patch as small as possible to reduce risk
+
+Implementation approach:
+1. Identify the exact smallest safe place where the seeded Round of 16 matchups are calculated.
+2. Add a narrowly scoped special-case matchup template for only this 8-group / 16-qualifier / Round-of-16 seeded + board-rotation scenario.
+3. Do not touch any code that assigns or reallocates boards.
+4. Let the existing board logic continue to operate on the newly generated matchup order.
+
+Before changing code:
+- inspect only the minimum relevant files/functions needed to locate the seeded matchup generation path
+- avoid broad project-wide searches
+- avoid touching any file unless necessary for this exact change
+
+After changing code:
+- provide a short report with only:
+  - exact files changed
+  - exact functions changed
+  - one concise explanation of how the special-case matchup logic is isolated
+  - confirmation that no board-assignment logic was changed
