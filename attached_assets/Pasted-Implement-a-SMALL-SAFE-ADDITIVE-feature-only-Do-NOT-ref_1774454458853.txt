@@ -1,0 +1,55 @@
+Implement a SMALL, SAFE, ADDITIVE feature only. Do NOT refactor unrelated code. Do NOT change current behavior unless the 3rd-place bracket is enabled.
+
+Feature:
+When the optional 3rd-place bracket is enabled in tournament creation, show separate leg settings for each round of the 3rd-place knockout only.
+
+Required behavior:
+- If enableThirdPlaceBracket is false or not set:
+  - do not show any 3rd-place knockout leg options
+  - do not change current logic
+- If enableThirdPlaceBracket is true:
+  - show round-specific leg settings for the 3rd-place bracket only
+  - keep these completely separate from the main knockout leg settings
+
+Examples:
+- If the 3rd-place bracket has 8 qualifiers, show:
+  - 3rd-place QF legs
+  - 3rd-place SF legs
+  - 3rd-place Final legs
+- If the 3rd-place bracket has 4 qualifiers, show:
+  - 3rd-place SF legs
+  - 3rd-place Final legs
+
+Implementation requirements:
+1. Inspect existing code first and find:
+   - tournament settings type
+   - create-tournament form
+   - existing main knockout leg settings
+   - 3rd-place bracket generation logic
+   - where knockout match legs are assigned
+2. Add separate optional settings in tournament settings JSON only if possible, e.g.:
+   - thirdPlaceKnockoutLegSettings
+3. In create-tournament UI:
+   - only show these fields when enableThirdPlaceBracket is enabled
+   - only show rounds that actually exist for the 3rd-place bracket size if easy to determine
+4. In 3rd-place bracket generation:
+   - assign legs using these 3rd-place round settings when present
+   - do NOT let them affect the main knockout
+5. Fallback logic:
+   - if no 3rd-place round-specific legs are set, use existing/default leg logic safely
+6. Do NOT change:
+   - main knockout leg logic unless already intended
+   - standard tournaments
+   - tournaments without 3rd-place bracket enabled
+
+Important:
+- Minimal edits only
+- No unrelated refactors
+- No DB migration unless absolutely necessary
+- Preserve backwards compatibility
+
+After coding, provide a short summary:
+- files changed
+- settings added
+- when the 3rd-place leg options appear
+- confirmation that main knockout legs remain separate and unchanged
