@@ -511,7 +511,7 @@ function LiveMatchCard({ match, ls, playerA, playerB, headerLabel, hideScorer }:
   ls: LiveScoring | undefined;
   playerA: any;
   playerB: any;
-  headerLabel: string;
+  headerLabel: React.ReactNode;
   hideScorer?: boolean;
 }) {
   return (
@@ -657,7 +657,7 @@ export default function PublicView() {
   const { data, isLoading, error, refetch } = usePublicTournament(shareToken || "");
   const { socket, joinPublic, on } = useSocket();
   const [liveScorings, setLiveScorings] = useState<Map<number, LiveScoring>>(new Map());
-  const [activeCompetition, setActiveCompetition] = useState<'main' | '3rd-place'>('main');
+  const [activeCompetition, setActiveCompetition] = useState<'main' | '3rd-place' | 'all-live'>('main');
   const matchesRef = useRef(data?.matches);
   matchesRef.current = data?.matches;
 
@@ -946,9 +946,11 @@ export default function PublicView() {
           </Badge>
           <span className="text-muted-foreground text-sm">{players.length} Players</span>
           {(() => {
-            const activeLiveCount = activeCompetition === '3rd-place'
-              ? liveMatches.filter(m => m.roundKey?.startsWith('TP_')).length
-              : liveMatches.filter(m => !m.roundKey?.startsWith('TP_')).length;
+            const activeLiveCount = activeCompetition === 'all-live'
+              ? liveMatches.length
+              : activeCompetition === '3rd-place'
+                ? liveMatches.filter(m => m.roundKey?.startsWith('TP_')).length
+                : liveMatches.filter(m => !m.roundKey?.startsWith('TP_')).length;
             return activeLiveCount > 0 ? (
               <span className="flex items-center gap-1 text-sm">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -959,7 +961,25 @@ export default function PublicView() {
         </div>
 
         {showTpTab && (
-          <div className="flex gap-2 pt-4 mb-4" data-testid="competition-toggle">
+          <div className="flex flex-wrap gap-2 pt-4 mb-4" data-testid="competition-toggle">
+            <button
+              onClick={() => setActiveCompetition('all-live')}
+              data-testid="button-competition-all-live"
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-semibold border-2 transition-colors flex items-center gap-2",
+                activeCompetition === 'all-live'
+                  ? "bg-green-600 text-white border-green-600"
+                  : "bg-background text-foreground border-border hover:bg-muted"
+              )}
+            >
+              All Live
+              {liveMatches.length > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  <span className={cn("text-xs font-bold", activeCompetition === 'all-live' ? "text-white" : "text-green-600")}>{liveMatches.length}</span>
+                </span>
+              )}
+            </button>
             <button
               onClick={() => setActiveCompetition('main')}
               data-testid="button-competition-main"
@@ -1061,7 +1081,67 @@ export default function PublicView() {
           </div>
         )}
 
-        {showKnockoutSection && (
+        {activeCompetition === 'all-live' && (
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+              <h2 className="text-xl font-display font-bold">All Live Games</h2>
+              {liveMatches.length > 0 && (
+                <Badge variant="default" className="ml-1 bg-green-600">{liveMatches.length} Live</Badge>
+              )}
+            </div>
+
+            {liveMatches.length === 0 ? (
+              <Card className="border-2 border-dashed">
+                <CardContent className="py-16 text-center">
+                  <span className="w-12 h-12 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mx-auto mb-4">
+                    <span className="w-3 h-3 bg-muted-foreground/30 rounded-full" />
+                  </span>
+                  <p className="text-muted-foreground font-medium">No live games right now</p>
+                  <p className="text-sm text-muted-foreground/60 mt-1">Check back when matches are in progress</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                {liveMatches.map((match: any) => {
+                  const ls = liveScorings.get(match.id);
+                  const isGroupMatch = !!match.groupId;
+                  const isTpMatch = match.roundKey?.startsWith('TP_');
+                  const contextLabel = isGroupMatch ? 'Group Stage' : isTpMatch ? '3rd Place' : 'Main Bracket';
+                  const contextColor = isGroupMatch
+                    ? 'bg-muted text-muted-foreground border-border'
+                    : isTpMatch
+                      ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-400/40'
+                      : 'bg-primary/10 text-primary border-primary/30';
+                  const playerA = getPlayer(match.playerAId);
+                  const playerB = getPlayer(match.playerBId);
+                  const headerLabel = (
+                    <span className="flex items-center gap-2 w-full">
+                      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border", contextColor)}>
+                        {contextLabel}
+                      </span>
+                      {match.boardNumber && (
+                        <span className="text-xs text-muted-foreground ml-auto">Board {match.boardNumber}</span>
+                      )}
+                    </span>
+                  );
+                  return (
+                    <LiveMatchCard
+                      key={match.id}
+                      match={match}
+                      ls={ls}
+                      playerA={playerA}
+                      playerB={playerB}
+                      headerLabel={headerLabel}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {showKnockoutSection && activeCompetition !== 'all-live' && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <Trophy className={cn("w-5 h-5", activeCompetition === '3rd-place' ? "text-amber-500" : "text-yellow-500")} />
@@ -1134,7 +1214,7 @@ export default function PublicView() {
           </div>
         )}
 
-        {activeCompetition === 'main' ? (
+        {activeCompetition !== 'all-live' && activeCompetition === 'main' ? (
           <Tabs defaultValue="standings" className="space-y-6">
             <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
               <TabsTrigger value="standings">Standings</TabsTrigger>
@@ -1358,7 +1438,7 @@ export default function PublicView() {
               })()}
             </TabsContent>
           </Tabs>
-        ) : (
+        ) : activeCompetition === '3rd-place' ? (
           <Tabs defaultValue="matches" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
               <TabsTrigger value="matches">Matches</TabsTrigger>
@@ -1524,7 +1604,7 @@ export default function PublicView() {
               })()}
             </TabsContent>
           </Tabs>
-        )}
+        ) : null}
       </div>
     </div>
   );
