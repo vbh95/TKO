@@ -2550,7 +2550,12 @@ export async function registerRoutes(
             }
           } else if (match.stage === 'KNOCKOUT') {
             const knockoutMatches = await storage.getMatchesByTournamentId(tournamentId);
-            const sorted = [...knockoutMatches].filter(m => m.stage === 'KNOCKOUT').sort((a: any, b: any) => a.order - b.order);
+            const koOnly = knockoutMatches.filter(m => m.stage === 'KNOCKOUT');
+            const isThirdPlaceMatch = match.roundKey.startsWith('TP_');
+            const relevantKo = isThirdPlaceMatch
+              ? koOnly.filter(m => m.roundKey.startsWith('TP_'))
+              : koOnly.filter(m => !m.roundKey.startsWith('TP_'));
+            const sorted = [...relevantKo].sort((a: any, b: any) => a.order - b.order);
             const roundKeys: string[] = [];
             for (const m of sorted) {
               if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
