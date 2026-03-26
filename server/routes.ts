@@ -34,6 +34,48 @@ interface PromoteGroupParams {
   settings?: TournamentSettings;
 }
 
+async function repairTpBracket(
+  tournamentId: number,
+  settings: TournamentSettings | undefined
+): Promise<boolean> {
+  const enableTp = !!(settings?.enableThirdPlaceBracket && settings?.groupScheduleMode === 'board_rotation');
+  if (!enableTp) return false;
+
+  const allMatches = await storage.getMatchesByTournamentId(tournamentId);
+  const groupMatches = allMatches.filter(m => m.stage === 'GROUP');
+  const tpMatches = allMatches.filter(m => m.stage === 'KNOCKOUT' && m.roundKey.startsWith('TP_'));
+
+  if (groupMatches.length === 0 || tpMatches.length === 0) return false;
+
+  const allGroupsDone = groupMatches.every(m => m.status === 'COMPLETED');
+  if (!allGroupsDone) return false;
+
+  const tpSorted = [...tpMatches].sort((a: any, b: any) => a.order - b.order);
+  const tpFirstKey = tpSorted[0]?.roundKey;
+  if (!tpFirstKey) return false;
+  const tpFirstMatches = tpSorted.filter(m => m.roundKey === tpFirstKey);
+  const needsRepair = tpFirstMatches.some(m => !m.playerAId || !m.playerBId);
+  if (!needsRepair) return false;
+
+  const groupsList = await storage.getGroupsByTournamentId(tournamentId);
+  if (groupsList.length === 0) return false;
+  const firstGroup = [...groupsList].sort((a: any, b: any) => a.id - b.id)[0];
+
+  const settingsAny = (settings || {}) as any;
+  await promoteGroupToKnockout({
+    tournamentId,
+    completedGroupId: firstGroup.id,
+    currentMatchId: -1,
+    currentMatchWinnerId: null,
+    ptsWin: settingsAny.pointsForWin ?? 2,
+    ptsLoss: settingsAny.pointsForLoss ?? 0,
+    shareToken: null,
+    settings,
+  });
+
+  return true;
+}
+
 async function promoteGroupToKnockout(params: PromoteGroupParams) {
   const { tournamentId, completedGroupId, currentMatchId, currentMatchWinnerId, ptsWin, ptsLoss, shareToken, settings } = params;
   const enableTp = !!(settings?.enableThirdPlaceBracket && settings?.groupScheduleMode === 'board_rotation');
@@ -1329,13 +1371,20 @@ export async function registerRoutes(
     
     const players = await storage.getPlayersByTournamentId(id);
     const groups = await storage.getGroupsByTournamentId(id);
-    const matches = await storage.getMatchesByTournamentId(id);
+    let matches = await storage.getMatchesByTournamentId(id);
     const groupMemberships = await storage.getGroupMembershipsByTournamentId(id);
     const ownerUser = await storage.getUser(tournament.userId);
     const currentIsSuperUser = !!(req.user as any).isSuperUser;
     const isOwner = tournament.userId === currentUserId;
     const isSuperUserViewing = currentIsSuperUser && !isOwner;
     const isCollaborator = !isOwner && !isSuperUserViewing;
+
+    try {
+      const repaired = await repairTpBracket(id, tournament.settings as TournamentSettings | undefined);
+      if (repaired) {
+        matches = await storage.getMatchesByTournamentId(id);
+      }
+    } catch {}
     
     res.json({ tournament, players, groups, matches, groupMemberships, ownerName: ownerUser?.name || '', isOwner, isCollaborator, isSuperUserViewing });
   });
@@ -1986,12 +2035,19 @@ export async function registerRoutes(
       const tournament = await storage.getTournament(tournamentId);
       if (!tournament) return res.status(404).json({ message: "Tournament not found" });
 
-      const [playersList, groupsList, allMatches, allMemberships] = await Promise.all([
+      const [playersList, groupsList, allMemberships] = await Promise.all([
         storage.getPlayersByTournamentId(tournamentId),
         storage.getGroupsByTournamentId(tournamentId),
-        storage.getMatchesByTournamentId(tournamentId),
         storage.getGroupMembershipsByTournamentId(tournamentId),
       ]);
+
+      let allMatches = await storage.getMatchesByTournamentId(tournamentId);
+      try {
+        const repaired = await repairTpBracket(tournamentId, tournament.settings as TournamentSettings | undefined);
+        if (repaired) {
+          allMatches = await storage.getMatchesByTournamentId(tournamentId);
+        }
+      } catch {}
 
       const sortedGroups = groupsList.sort((a, b) => a.name.localeCompare(b.name));
       const isKnockoutOnly = sortedGroups.length === 0;
