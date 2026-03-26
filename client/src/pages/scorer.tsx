@@ -1416,7 +1416,7 @@ export default function ScorerPage() {
             </Button>
             <div className="flex-1 min-w-0">
               <p className="text-xs text-primary-foreground/80 truncate">
-                {tournament.name} — {group.name} — Board {boardNumber}
+                {tournament.name} — Board {boardNumber}
               </p>
             </div>
           </div>
@@ -1882,7 +1882,7 @@ export default function ScorerPage() {
             </Button>
             <div className="flex-1 min-w-0">
               <p className="text-xs text-primary-foreground/80 truncate">
-                {tournament.name} — {group.name} — Board {boardNumber}
+                {tournament.name} — Board {boardNumber}
               </p>
             </div>
           </div>
@@ -2058,7 +2058,7 @@ export default function ScorerPage() {
                 <h1 className="text-xl md:text-2xl font-display font-bold" data-testid="text-tournament-name">{tournament.name}</h1>
               </div>
               <p className="text-primary-foreground/80 text-sm">
-                {group.name} — Board {boardNumber} Scorer
+                Board {boardNumber} Scorer
               </p>
               <div className="flex items-center gap-1 mt-1.5 opacity-60">
                 <span className="text-[10px] text-primary-foreground/70 uppercase tracking-wide">Powered by</span>
