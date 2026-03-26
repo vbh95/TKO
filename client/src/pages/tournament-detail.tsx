@@ -1251,6 +1251,40 @@ export default function TournamentDetail() {
                         </div>
                       </div>
                     </div>
+                    <div className="flex items-center justify-between mt-3">
+                      <div className="flex-1">
+                        <InlineScorerEdit
+                          matchId={match.id}
+                          tournamentId={tournamentId}
+                          currentName={match.scorerName || null}
+                          isLegacy={tournament.isLegacy || false}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {match.status === 'COMPLETED' && !tournament.isLegacy && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              withSuperUserConfirm('reset this match', () => setResetMatchTarget(match));
+                            }}
+                            data-testid={`button-reset-tp-${match.id}`}
+                            title="Reset Match"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {match.status === 'COMPLETED' && (
+                      <AdminMatchStats
+                        matchId={match.id}
+                        playerAName={labelA}
+                        playerBName={labelB}
+                      />
+                    )}
                   </CardContent>
                 </Card>
               );
