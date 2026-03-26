@@ -2393,6 +2393,7 @@ export async function registerRoutes(
                 ptsWin,
                 ptsLoss,
                 shareToken: tournament?.shareToken || null,
+                settings: tournament?.settings as TournamentSettings | undefined,
               });
             }
           } else if (match.stage === 'KNOCKOUT') {
