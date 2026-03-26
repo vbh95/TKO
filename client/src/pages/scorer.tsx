@@ -1872,6 +1872,7 @@ export default function ScorerPage() {
               size="icon"
               className="text-primary-foreground shrink-0 h-8 w-8"
               onClick={() => {
+                userNavigatedBackRef.current = true;
                 setMatchReport(null);
                 setView("matchList");
               }}
@@ -2033,6 +2034,7 @@ export default function ScorerPage() {
           <Button
             className="w-full mt-6 h-12 text-base font-semibold bg-primary hover:bg-primary/90"
             onClick={() => {
+              userNavigatedBackRef.current = true;
               setMatchReport(null);
               setView("matchList");
             }}
