@@ -1982,6 +1982,7 @@ export async function registerRoutes(
 
   // === PUBLIC ===
   app.get(api.public.get.path, async (req, res) => {
+    const t0 = Date.now();
     const { shareToken } = req.params;
     const tournament = await storage.getTournamentByShareToken(shareToken);
     if (!tournament) return res.status(404).json({ message: "Tournament not found" });
@@ -1991,6 +1992,8 @@ export async function registerRoutes(
       storage.getGroupsByTournamentId(tournament.id),
       storage.getMatchesByTournamentId(tournament.id),
     ]);
+
+    console.log(`[perf] GET /api/public/t/${shareToken} total=${Date.now() - t0}ms`);
 
     res.json({
       tournament,
@@ -3059,6 +3062,7 @@ export async function registerRoutes(
 
   // === PUBLIC LEAGUE ENDPOINT ===
   app.get("/api/public/league/:shareToken", async (req, res) => {
+    const t0 = Date.now();
     const { shareToken } = req.params;
     const league = await storage.getLeagueByShareToken(shareToken);
     if (!league) return res.status(404).json({ message: "League not found" });
@@ -3097,15 +3101,20 @@ export async function registerRoutes(
     }>> = {};
 
     for (const t of leagueTournaments) {
-      const allMatches = await storage.getMatchesByTournamentId(t.id);
-      const playersList = await storage.getPlayersByTournamentId(t.id);
+      const tT = Date.now();
+      const [allMatches, playersList] = await Promise.all([
+        storage.getMatchesByTournamentId(t.id),
+        storage.getPlayersByTournamentId(t.id),
+      ]);
       const completedMatches = allMatches.filter(m => m.status === 'COMPLETED');
 
+      const tNotes = Date.now();
+      const notesList = await storage.getMatchNotesByMatchIds(completedMatches.map(m => m.id));
       const matchNoteMap: Record<number, any> = {};
-      for (const m of completedMatches) {
-        const note = await storage.getMatchNote(m.id);
-        if (note) matchNoteMap[m.id] = note;
+      for (const note of notesList) {
+        matchNoteMap[note.matchId] = note;
       }
+      console.log(`[perf] league ${league.id} tournament ${t.id} fetch=${Date.now() - tT}ms notes(${completedMatches.length})=${Date.now() - tNotes}ms`);
 
       const eliminationMatches = completedMatches.filter(m =>
         m.stage === 'KNOCKOUT' || m.stage === 'WINNERS_BRACKET' || m.stage === 'LOSERS_BRACKET' || m.stage === 'GRAND_FINAL'
@@ -3207,6 +3216,8 @@ export async function registerRoutes(
       if (diffB !== diffA) return diffB - diffA;
       return b.tournaments - a.tournaments;
     });
+
+    console.log(`[perf] GET /api/public/league/${shareToken} total=${Date.now() - t0}ms tournaments=${leagueTournaments.length}`);
 
     res.json({
       league: {

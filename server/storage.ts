@@ -67,6 +67,7 @@ export interface IStorage {
   
   // Match Notes
   getMatchNote(matchId: number): Promise<MatchNote | undefined>;
+  getMatchNotesByMatchIds(matchIds: number[]): Promise<MatchNote[]>;
   createMatchNote(note: InsertMatchNote): Promise<MatchNote>;
   updateMatchNote(matchId: number, note: Partial<InsertMatchNote>): Promise<MatchNote>;
   
@@ -319,7 +320,12 @@ export class DatabaseStorage implements IStorage {
     const [note] = await db.select().from(matchNotes).where(eq(matchNotes.matchId, matchId));
     return note;
   }
-  
+
+  async getMatchNotesByMatchIds(matchIds: number[]): Promise<MatchNote[]> {
+    if (matchIds.length === 0) return [];
+    return await db.select().from(matchNotes).where(inArray(matchNotes.matchId, matchIds));
+  }
+
   async createMatchNote(note: InsertMatchNote): Promise<MatchNote> {
     const [newNote] = await db.insert(matchNotes).values(note).returning();
     return newNote;
