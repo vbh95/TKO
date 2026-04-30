@@ -110,17 +110,25 @@ export default function PublicLeague() {
 
   useEffect(() => {
     const sendHeight = () => {
-      const height = document.documentElement.scrollHeight;
+      const height = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight,
+        document.body.offsetHeight,
+        document.documentElement.offsetHeight,
+      );
       window.parent.postMessage({ type: "TKO_IFRAME_HEIGHT", height }, "*");
     };
 
+    const sendHeightDelayed = () => setTimeout(sendHeight, 100);
+
     sendHeight();
-    window.addEventListener("resize", sendHeight);
-    const observer = new ResizeObserver(sendHeight);
+    sendHeightDelayed();
+    window.addEventListener("resize", sendHeightDelayed);
+    const observer = new ResizeObserver(sendHeightDelayed);
     observer.observe(document.body);
 
     return () => {
-      window.removeEventListener("resize", sendHeight);
+      window.removeEventListener("resize", sendHeightDelayed);
       observer.disconnect();
     };
   }, []);
