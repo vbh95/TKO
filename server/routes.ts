@@ -796,9 +796,13 @@ async function computePlayerExtras(
       const leagueTournaments = await storage.getTournamentsByLeagueId(leagueId);
       for (const t of leagueTournaments) {
         const tPlayers = await storage.getPlayersByTournamentId(t.id);
+        const seenInThisTournament = new Set<string>();
         for (const tp of tPlayers) {
           const key = tp.name.replace(/\s+/g, ' ').toLowerCase().trim();
-          tournamentsAttended[key] = (tournamentsAttended[key] || 0) + 1;
+          if (!seenInThisTournament.has(key)) {
+            seenInThisTournament.add(key);
+            tournamentsAttended[key] = (tournamentsAttended[key] || 0) + 1;
+          }
         }
       }
     } catch {

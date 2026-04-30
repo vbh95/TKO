@@ -141,6 +141,12 @@ export function calcStandings<P extends PlayerLike>(
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.diff !== a.diff) return b.diff - a.diff;
     if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
+    const da = avgDartsPerLegWon(a, a.legsFor);
+    const db = avgDartsPerLegWon(b, b.legsFor);
+    if (da !== db) return da - db;
+    const taA = a.tournamentsAttended ?? 0;
+    const taB = b.tournamentsAttended ?? 0;
+    if (taB !== taA) return taB - taA;
     return a.id - b.id;
   });
 
