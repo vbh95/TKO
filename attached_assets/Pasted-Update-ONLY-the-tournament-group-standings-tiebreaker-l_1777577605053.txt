@@ -1,0 +1,61 @@
+Update ONLY the tournament group standings tiebreaker logic. Do not alter league table ranking criteria, league leaderboard logic, historical tournament results, completed match data, database schema, or any stored previous results.
+
+Scope:
+- Only change the sorting/ranking logic used for tournament group standings.
+- Do not change the overall league table criteria.
+- Do not recalculate or rewrite old tournaments in the database.
+- This should only affect how group standings are sorted/displayed going forward.
+
+Required tournament group standings order:
+
+1. Points — highest first
+2. Legs Won — highest first
+3. Leg Difference — highest first
+4. Average darts used per leg won — lowest first
+5. Tournaments Attended — highest first
+
+Important:
+- Do not use raw total darts thrown as the tiebreaker.
+- Raw total darts unfairly penalises players who played/won more legs.
+- Use average darts per leg won instead.
+
+Formula:
+
+averageDartsPerLegWon = winningLegDarts / legsWon
+
+Safety:
+- If legsWon === 0, treat averageDartsPerLegWon as Infinity.
+- This prevents players with no leg wins ranking above players who have won legs.
+- If winningLegDarts is missing for older data, safely fall back to the current existing darts/visit calculation so old tournaments still display without errors.
+
+Sort logic:
+
+points DESC
+legsWon DESC
+legDifference DESC
+averageDartsPerLegWon ASC
+tournamentsAttended DESC
+
+Do not add alphabetical sorting unless it already exists as a final fallback. If a final fallback is needed to prevent random reordering, keep the existing stable fallback only.
+
+Do not change:
+- League table ranking criteria
+- League standings page
+- Public league leaderboard
+- Player history endpoint
+- Match scoring logic
+- Checkout logic
+- Tournament creation logic
+- Board assignments
+- Knockout standings
+- Database schema
+- Existing completed tournament records
+
+After implementation, verify:
+- Group standings still rank by points first
+- If points are tied, legs won decides
+- If still tied, leg difference decides
+- If still tied, lower average darts per leg won decides
+- If still tied, more tournaments attended decides
+- League table ranking remains completely unchanged
+- Previous completed tournaments are not modified in storage
