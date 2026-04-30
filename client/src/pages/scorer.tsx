@@ -102,7 +102,7 @@ interface MatchStats {
   winnerId: number | null;
   playerAId: number | null;
   playerBId: number | null;
-  legHistory: Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B' }>;
+  legHistory: Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B'; checkoutDartsUsed?: number }>;
 }
 
 type ScorerView = "matchList" | "bullThrow" | "scoring" | "matchReport";
@@ -125,7 +125,7 @@ interface ScorerState {
   legStartingThrower: 'A' | 'B';
   checkoutStats: { attemptsA: number; attemptsB: number; successA: number; successB: number; finishA: number; finishB: number; first9PointsA: number; first9DartsA: number; first9PointsB: number; first9DartsB: number };
   swapPlayers: boolean;
-  legHistory: Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B' }>;
+  legHistory: Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B'; checkoutDartsUsed?: number }>;
 }
 
 function saveScorerState(state: ScorerState) {
@@ -548,6 +548,8 @@ export default function ScorerPage() {
   const [matchScoresOpen, setMatchScoresOpen] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState<{ player: 'A' | 'B'; newLegsA: number; newLegsB: number; newVisits: Visit[]; checkoutScore: number } | null>(null);
   const [pendingDartsAtDouble, setPendingDartsAtDouble] = useState(false);
+  const [selectedDartsAtDouble, setSelectedDartsAtDouble] = useState<number | null>(null);
+  const [selectedCheckoutDartsUsed, setSelectedCheckoutDartsUsed] = useState<number | null>(null);
   const [impossibleWarning, setImpossibleWarning] = useState<string | null>(null);
   const [checkoutAttemptsA, setCheckoutAttemptsA] = useState(0);
   const [checkoutAttemptsB, setCheckoutAttemptsB] = useState(0);
@@ -555,8 +557,8 @@ export default function ScorerPage() {
   const [checkoutSuccessB, setCheckoutSuccessB] = useState(0);
   const [highestFinishA, setHighestFinishA] = useState(0);
   const [highestFinishB, setHighestFinishB] = useState(0);
-  const checkoutStatsRef = useRef({ attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 });
-  const legHistoryRef = useRef<Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B' }>>([]);
+  const checkoutStatsRef = useRef({ attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0, totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0 });
+  const legHistoryRef = useRef<Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B'; checkoutDartsUsed?: number }>>([]);
   const [swapPlayers, setSwapPlayers] = useState(false);
 
   useEffect(() => {
@@ -998,15 +1000,19 @@ export default function ScorerPage() {
     setPendingDartsAtDouble(true);
   };
 
-  const confirmCheckout = (dartsAtDouble: number) => {
+  const confirmCheckout = (dartsAtDouble: number, checkoutDartsUsed: number) => {
+    if (checkoutDartsUsed < dartsAtDouble) return;
     if (!pendingCheckout || !activeMatchId) return;
     setPendingDartsAtDouble(false);
+    setSelectedDartsAtDouble(null);
+    setSelectedCheckoutDartsUsed(null);
     const { player, newLegsA, newLegsB, newVisits, checkoutScore } = pendingCheckout;
 
     if (player === 'A') {
       checkoutStatsRef.current.attemptsA += dartsAtDouble;
       checkoutStatsRef.current.successA += 1;
       checkoutStatsRef.current.finishA = Math.max(checkoutStatsRef.current.finishA, checkoutScore);
+      checkoutStatsRef.current.totalCheckoutDartsUsedA += checkoutDartsUsed;
       setCheckoutAttemptsA(checkoutStatsRef.current.attemptsA);
       setCheckoutSuccessA(checkoutStatsRef.current.successA);
       setHighestFinishA(checkoutStatsRef.current.finishA);
@@ -1014,6 +1020,7 @@ export default function ScorerPage() {
       checkoutStatsRef.current.attemptsB += dartsAtDouble;
       checkoutStatsRef.current.successB += 1;
       checkoutStatsRef.current.finishB = Math.max(checkoutStatsRef.current.finishB, checkoutScore);
+      checkoutStatsRef.current.totalCheckoutDartsUsedB += checkoutDartsUsed;
       setCheckoutAttemptsB(checkoutStatsRef.current.attemptsB);
       setCheckoutSuccessB(checkoutStatsRef.current.successB);
       setHighestFinishB(checkoutStatsRef.current.finishB);
@@ -1044,7 +1051,7 @@ export default function ScorerPage() {
 
     const allVisitsIncludingCurrent = [...allMatchVisits, ...newVisits];
 
-    legHistoryRef.current = [...legHistoryRef.current, { startingThrower: legStartingThrower, visits: newVisits, winner: player }];
+    legHistoryRef.current = [...legHistoryRef.current, { startingThrower: legStartingThrower, visits: newVisits, winner: player, checkoutDartsUsed }];
 
     // Accumulate first-9-darts data for this leg (first 3 visits per player = 9 darts each)
     const legFirst9A = newVisits.filter(v => v.player === 'A').slice(0, 3);
@@ -1083,6 +1090,8 @@ export default function ScorerPage() {
         checkoutAttemptsB: cs.attemptsB,
         checkoutSuccessA: cs.successA,
         checkoutSuccessB: cs.successB,
+        checkoutDartsUsedA: cs.totalCheckoutDartsUsedA,
+        checkoutDartsUsedB: cs.totalCheckoutDartsUsedB,
         first9PointsA: cs.first9PointsA,
         first9DartsA: cs.first9DartsA,
         first9PointsB: cs.first9PointsB,
@@ -1140,6 +1149,8 @@ export default function ScorerPage() {
     }
     setPendingCheckout(null);
     setPendingDartsAtDouble(false);
+    setSelectedDartsAtDouble(null);
+    setSelectedCheckoutDartsUsed(null);
   };
 
   const handleUndo = () => {
@@ -1717,24 +1728,85 @@ export default function ScorerPage() {
 
           {pendingCheckout && pendingDartsAtDouble && (
             <div className="bg-primary rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="darts-at-double">
-              <div className="text-center mb-2 md:mb-3">
+              <div className="text-center mb-3 md:mb-4">
                 <Target className="w-6 h-6 md:w-10 md:h-10 text-primary-foreground mx-auto mb-1" />
-                <p className="text-primary-foreground font-bold text-base md:text-xl">Darts at Double?</p>
-                <p className="text-primary-foreground/70 text-xs md:text-sm">How many darts were used on the double</p>
+                <p className="text-primary-foreground font-bold text-base md:text-xl">Checkout Stats</p>
               </div>
-              <div className="flex gap-2 md:gap-3">
-                {[1, 2, 3].map(n => (
-                  <button
-                    key={n}
-                    className="flex-1 h-12 md:h-16 rounded-xl bg-primary-foreground/20 text-primary-foreground font-bold text-lg md:text-2xl touch-manipulation active:bg-primary-foreground/30 transition-colors"
-                    onClick={() => confirmCheckout(n)}
-                    disabled={updateScoreMutation.isPending}
-                    data-testid={`button-darts-at-double-${n}`}
-                  >
-                    {n}
-                  </button>
-                ))}
+
+              <div className="mb-3 md:mb-4">
+                <p className="text-primary-foreground/70 text-xs font-semibold uppercase tracking-wider mb-2">
+                  Darts Used On A Double
+                </p>
+                <div className="flex gap-2 md:gap-3">
+                  {[1, 2, 3].map(n => (
+                    <button
+                      key={n}
+                      className={cn(
+                        "flex-1 h-12 md:h-16 rounded-xl font-bold text-lg md:text-2xl touch-manipulation transition-colors",
+                        selectedDartsAtDouble === n
+                          ? "bg-primary-foreground text-primary"
+                          : "bg-primary-foreground/20 text-primary-foreground active:bg-primary-foreground/30"
+                      )}
+                      onClick={() => {
+                        setSelectedDartsAtDouble(n);
+                        if (selectedCheckoutDartsUsed !== null && selectedCheckoutDartsUsed < n) {
+                          setSelectedCheckoutDartsUsed(null);
+                        }
+                      }}
+                      disabled={updateScoreMutation.isPending}
+                      data-testid={`button-darts-at-double-${n}`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              <div className="mb-3 md:mb-4">
+                <p className="text-primary-foreground/70 text-xs font-semibold uppercase tracking-wider mb-2">
+                  Darts Used For Checkout
+                </p>
+                <div className="flex gap-2 md:gap-3">
+                  {[1, 2, 3].map(n => {
+                    const tooFew = selectedDartsAtDouble !== null && n < selectedDartsAtDouble;
+                    return (
+                      <button
+                        key={n}
+                        className={cn(
+                          "flex-1 h-12 md:h-16 rounded-xl font-bold text-lg md:text-2xl touch-manipulation transition-colors",
+                          tooFew ? "opacity-30 pointer-events-none" : "",
+                          selectedCheckoutDartsUsed === n
+                            ? "bg-primary-foreground text-primary"
+                            : "bg-primary-foreground/20 text-primary-foreground active:bg-primary-foreground/30"
+                        )}
+                        onClick={() => setSelectedCheckoutDartsUsed(n)}
+                        disabled={updateScoreMutation.isPending || !!tooFew}
+                        data-testid={`button-checkout-darts-used-${n}`}
+                      >
+                        {n}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button
+                className={cn(
+                  "w-full h-10 md:h-14 rounded-xl font-semibold text-sm md:text-base touch-manipulation transition-colors",
+                  selectedDartsAtDouble !== null && selectedCheckoutDartsUsed !== null
+                    ? "bg-primary-foreground text-primary"
+                    : "bg-primary-foreground/10 text-primary-foreground/40 pointer-events-none"
+                )}
+                onClick={() => {
+                  if (selectedDartsAtDouble !== null && selectedCheckoutDartsUsed !== null) {
+                    confirmCheckout(selectedDartsAtDouble, selectedCheckoutDartsUsed);
+                  }
+                }}
+                disabled={updateScoreMutation.isPending || selectedDartsAtDouble === null || selectedCheckoutDartsUsed === null}
+                data-testid="button-confirm-darts-selection"
+              >
+                Confirm
+              </button>
             </div>
           )}
 
