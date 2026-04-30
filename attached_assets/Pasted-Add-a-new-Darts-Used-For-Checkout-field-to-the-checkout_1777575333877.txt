@@ -1,0 +1,47 @@
+Add a new “Darts Used For Checkout” field to the checkout confirmation flow, without changing or breaking the existing “Darts Thrown At Double” logic.
+
+Current logic already records darts thrown at a double. Keep that working exactly as it currently does.
+
+Required change:
+When a player checks out and the modal/prompt appears, it should show TWO separate sections:
+
+1. “Darts Used On A Double”
+   - Existing logic
+   - Options should remain as currently implemented
+
+2. “Darts Used For Checkout”
+   - New field
+   - Options should allow the scorer to select how many total darts were used in the checkout visit
+   - Valid values should be 1, 2, or 3
+   - This value must be saved separately from darts thrown at double
+
+Do not reuse or overwrite the existing darts-at-double value.
+
+Data requirements:
+- Add a new field/property for checkout darts used, for example:
+  checkoutDartsUsed
+- Store it wherever leg checkout/stat data is currently stored
+- Include it in any match/leg stats object used for saving completed legs
+- Do not alter existing fields unless absolutely required
+
+UI requirements:
+- Match the current modal styling
+- Display “DARTS USED ON A DOUBLE” first
+- Display “DARTS USED FOR CHECKOUT” underneath
+- Each section should have selectable buttons
+- Confirm button should only submit once both required values are selected
+- Default selections should be sensible, but do not assume both values are always the same
+
+Important rules:
+- Darts used for checkout must be independent from darts thrown at double
+- It is valid for checkoutDartsUsed to be greater than dartsThrownAtDouble
+- It should not be valid for checkoutDartsUsed to be less than dartsThrownAtDouble
+- Do not change scoring, bust logic, leg winning logic, match completion logic, tournament logic, board assignment logic, seeded logic, or public leaderboard logic
+- Only change the checkout confirmation modal and the related save/stat handling needed for this new value
+
+After making the change, check that:
+- A 1-dart checkout can save checkoutDartsUsed = 1
+- A 2-dart checkout can save checkoutDartsUsed = 2
+- A 3-dart checkout can save checkoutDartsUsed = 3
+- Existing darts thrown at double stats still save correctly
+- Existing checkout/win flow still works
