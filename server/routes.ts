@@ -1984,6 +1984,7 @@ export async function registerRoutes(
   app.get(api.public.get.path, async (req, res) => {
     const t0 = Date.now();
     const { shareToken } = req.params;
+    console.log(`[perf] GET /api/public/t/${shareToken} start`);
     const tournament = await storage.getTournamentByShareToken(shareToken);
     if (!tournament) return res.status(404).json({ message: "Tournament not found" });
 
@@ -3190,6 +3191,7 @@ export async function registerRoutes(
         if (stage === 'WINNER') playerAgg[key].wins += 1;
       }
     }
+    console.log(`[perf] league ${league.id} tournament loop done=${Date.now() - t0}ms`);
 
     const manualResults = await storage.getLeagueManualResults(league.id);
     const manualTournamentsByPlayer: Record<string, Set<string>> = {};
@@ -3207,6 +3209,7 @@ export async function registerRoutes(
     for (const [key, labels] of Object.entries(manualTournamentsByPlayer)) {
       if (playerAgg[key]) playerAgg[key].tournaments += labels.size;
     }
+    console.log(`[perf] league ${league.id} manual results applied=${Date.now() - t0}ms`);
 
     const standings = Object.values(playerAgg).sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
