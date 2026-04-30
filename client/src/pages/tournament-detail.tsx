@@ -542,7 +542,13 @@ export default function TournamentDetail() {
     );
   }
 
-  const { tournament, players, matches, groups, groupMemberships = [], ownerName = '', isOwner = true, isCollaborator = false, isSuperUserViewing = false } = data as any;
+  const { tournament, players, matches, groups, groupMemberships = [], ownerName = '', isOwner = true, isCollaborator = false, isSuperUserViewing = false, playerWinningLegDarts = {}, tournamentsAttended = {} } = data as any;
+
+  const augmentedPlayers = (players as any[]).map((p: any) => ({
+    ...p,
+    winningLegDarts: playerWinningLegDarts[p.id] ?? null,
+    tournamentsAttended: tournamentsAttended[p.name?.replace(/\s+/g, ' ').toLowerCase().trim()] ?? 0,
+  }));
 
   const withSuperUserConfirm = (label: string, fn: () => void) => {
     if (isSuperUserViewing) {
@@ -792,14 +798,14 @@ export default function TournamentDetail() {
         const memberPlayerIds = groupMemberships
           .filter((gm: any) => gm.groupId === group.id)
           .map((gm: any) => gm.playerId);
-        const groupPlayers = players.filter((p: Player) => memberPlayerIds.includes(p.id));
+        const groupPlayers = augmentedPlayers.filter((p: any) => memberPlayerIds.includes(p.id));
         const groupMatches = matches.filter((m: any) => m.groupId === group.id);
         return {
           group,
           standings: computeStandings(groupPlayers, groupMatches),
         };
       })
-    : [{ group: { name: "All Players" }, standings: computeStandings(players, matches) }];
+    : [{ group: { name: "All Players" }, standings: computeStandings(augmentedPlayers, matches) }];
 
   const handleResetMatch = async (matchId: number) => {
     try {
@@ -1685,6 +1691,8 @@ export default function TournamentDetail() {
                 <li><span className="font-bold text-foreground">2. Leg Difference</span><span className="text-muted-foreground"> — If tied on points, the player with the better leg difference (legs won minus legs lost) is ranked higher.</span></li>
                 <li><span className="font-bold text-foreground">3. Legs Won</span><span className="text-muted-foreground"> — If still tied, the player with the most legs won is ranked higher.</span></li>
                 <li><span className="font-bold text-foreground">4. Head-to-Head</span><span className="text-muted-foreground"> — If still tied, the result between the tied players is used. The same criteria (points, leg difference, legs won) are applied to only the matches played between the tied players.</span></li>
+                <li><span className="font-bold text-foreground">5. Average Darts Per Leg Won</span><span className="text-muted-foreground"> — If still tied, the player who checks out in fewer darts on average (across all group legs they won) is ranked higher.</span></li>
+                <li><span className="font-bold text-foreground">6. Tournaments Attended</span><span className="text-muted-foreground"> — If still tied, the player who has attended more tournaments in this league is ranked higher.</span></li>
               </ol>
               <p className="text-xs text-muted-foreground/60 pt-1">If players remain tied after all criteria, they share the same effective position.</p>
             </div>

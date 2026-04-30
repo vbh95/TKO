@@ -749,6 +749,66 @@ async function comparePassword(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+async function computePlayerExtras(
+  leagueId: number | null,
+  matchesList: Array<{ id: number; stage: string; status: string; playerAId: number | null; playerBId: number | null; winnerId: number | null }>,
+): Promise<{
+  playerWinningLegDarts: Record<number, number>;
+  tournamentsAttended: Record<string, number>;
+}> {
+  const playerWinningLegDarts: Record<number, number> = {};
+  const completedGroupMatches = matchesList.filter(m => m.stage === 'GROUP' && m.status === 'COMPLETED');
+
+  if (completedGroupMatches.length > 0) {
+    const notes = await storage.getMatchNotesByMatchIds(completedGroupMatches.map(m => m.id));
+    for (const match of completedGroupMatches) {
+      const note = notes.find(n => n.matchId === match.id);
+      if (!note) continue;
+
+      const legHistory = note.legHistory as Array<{
+        winner: 'A' | 'B';
+        visits: Array<{ player: 'A' | 'B'; score: number }>;
+        checkoutDartsUsed?: number;
+      }> | null;
+
+      if (legHistory && Array.isArray(legHistory) && legHistory.length > 0) {
+        for (const leg of legHistory) {
+          const winnerPlayerId = leg.winner === 'A' ? match.playerAId : match.playerBId;
+          if (!winnerPlayerId) continue;
+          const winnerVisits = leg.visits.filter(v => v.player === leg.winner);
+          const darts = Math.max(1, (winnerVisits.length - 1) * 3 + (leg.checkoutDartsUsed ?? 3));
+          playerWinningLegDarts[winnerPlayerId] = (playerWinningLegDarts[winnerPlayerId] || 0) + darts;
+        }
+      } else if (match.winnerId != null) {
+        const isA = match.winnerId === match.playerAId;
+        const winnerPlayerId = isA ? match.playerAId : match.playerBId;
+        const totalVisits = isA ? note.totalVisitsA : note.totalVisitsB;
+        if (winnerPlayerId && totalVisits != null) {
+          playerWinningLegDarts[winnerPlayerId] = (playerWinningLegDarts[winnerPlayerId] || 0) + totalVisits * 3;
+        }
+      }
+    }
+  }
+
+  const tournamentsAttended: Record<string, number> = {};
+  if (leagueId) {
+    try {
+      const leagueTournaments = await storage.getTournamentsByLeagueId(leagueId);
+      for (const t of leagueTournaments) {
+        const tPlayers = await storage.getPlayersByTournamentId(t.id);
+        for (const tp of tPlayers) {
+          const key = tp.name.replace(/\s+/g, ' ').toLowerCase().trim();
+          tournamentsAttended[key] = (tournamentsAttended[key] || 0) + 1;
+        }
+      }
+    } catch {
+      // tournamentsAttended is an optional tiebreaker — silently ignore errors
+    }
+  }
+
+  return { playerWinningLegDarts, tournamentsAttended };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1470,7 +1530,12 @@ export async function registerRoutes(
       console.error('[TP repair] Failed to repair TP bracket on tournament load:', err);
     }
 
-    res.json({ tournament, players, groups, matches, groupMemberships, ownerName: ownerUser?.name || '', isOwner, isCollaborator, isSuperUserViewing });
+    const { playerWinningLegDarts, tournamentsAttended } = await computePlayerExtras(
+      (tournament as any).leagueId ?? null,
+      matches,
+    );
+
+    res.json({ tournament, players, groups, matches, groupMemberships, ownerName: ownerUser?.name || '', isOwner, isCollaborator, isSuperUserViewing, playerWinningLegDarts, tournamentsAttended });
   });
 
   app.post(api.tournaments.create.path, isAuthenticated, async (req, res) => {
@@ -1994,6 +2059,11 @@ export async function registerRoutes(
       storage.getMatchesByTournamentId(tournament.id),
     ]);
 
+    const { playerWinningLegDarts, tournamentsAttended } = await computePlayerExtras(
+      (tournament as any).leagueId ?? null,
+      matchesList,
+    );
+
     console.log(`[perf] GET /api/public/t/${shareToken} total=${Date.now() - t0}ms`);
 
     res.json({
@@ -2001,6 +2071,8 @@ export async function registerRoutes(
       players: playersList,
       groups: groupsList,
       matches: matchesList,
+      playerWinningLegDarts,
+      tournamentsAttended,
     });
   });
 

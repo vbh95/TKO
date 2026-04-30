@@ -22,6 +22,12 @@ export type StandingEntry = PlayerLike & {
   pts: number;
 };
 
+function avgDartsPerLegWon(entry: PlayerLike, overallLegsFor: number): number {
+  if (overallLegsFor <= 0) return Infinity;
+  if (entry.winningLegDarts == null) return Infinity;
+  return entry.winningLegDarts / overallLegsFor;
+}
+
 function computeStats<P extends PlayerLike>(
   playerList: P[],
   completedMatches: MatchLike[],
@@ -71,6 +77,12 @@ function resolveH2HTied(
   if (pairings.size < expectedPairings) {
     return tiedGroup.sort((a, b) => {
       if (a.played !== b.played) return a.played - b.played;
+      const da = avgDartsPerLegWon(a, a.legsFor);
+      const db = avgDartsPerLegWon(b, b.legsFor);
+      if (da !== db) return da - db;
+      const taA = a.tournamentsAttended ?? 0;
+      const taB = b.tournamentsAttended ?? 0;
+      if (taB !== taA) return taB - taA;
       return a.id - b.id;
     });
   }
@@ -85,6 +97,12 @@ function resolveH2HTied(
   if (!counts.every(c => c === counts[0])) {
     return tiedGroup.sort((a, b) => {
       if (a.played !== b.played) return a.played - b.played;
+      const da = avgDartsPerLegWon(a, a.legsFor);
+      const db = avgDartsPerLegWon(b, b.legsFor);
+      if (da !== db) return da - db;
+      const taA = a.tournamentsAttended ?? 0;
+      const taB = b.tournamentsAttended ?? 0;
+      if (taB !== taA) return taB - taA;
       return a.id - b.id;
     });
   }
@@ -95,6 +113,15 @@ function resolveH2HTied(
     if (b.diff !== a.diff) return b.diff - a.diff;
     if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
     if (a.played !== b.played) return a.played - b.played;
+    // Avg darts per leg won: use overall group legsFor from tiedGroup (not H2H legsFor)
+    const origA = tiedGroup.find(p => p.id === a.id);
+    const origB = tiedGroup.find(p => p.id === b.id);
+    const da = avgDartsPerLegWon(origA!, origA?.legsFor ?? 0);
+    const db = avgDartsPerLegWon(origB!, origB?.legsFor ?? 0);
+    if (da !== db) return da - db;
+    const taA = origA?.tournamentsAttended ?? 0;
+    const taB = origB?.tournamentsAttended ?? 0;
+    if (taB !== taA) return taB - taA;
     return a.id - b.id;
   });
 

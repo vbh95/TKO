@@ -724,27 +724,33 @@ export default function PublicView() {
     );
   }
 
-  const { tournament, players, matches, groups } = data;
+  const { tournament, players, matches, groups, playerWinningLegDarts = {}, tournamentsAttended = {} } = data as any;
 
   const ptsWin = (tournament.settings as any)?.pointsForWin ?? 2;
   const ptsLoss = (tournament.settings as any)?.pointsForLoss ?? 0;
 
-  const computeStandings = (playerList: typeof players, matchList: typeof matches) => {
+  const augmentedPlayers = (players as any[]).map((p: any) => ({
+    ...p,
+    winningLegDarts: (playerWinningLegDarts as Record<number, number>)[p.id] ?? null,
+    tournamentsAttended: (tournamentsAttended as Record<string, number>)[p.name?.replace(/\s+/g, ' ').toLowerCase().trim()] ?? 0,
+  }));
+
+  const computeStandings = (playerList: any[], matchList: typeof matches) => {
     return calcStandings(playerList, matchList, ptsWin, ptsLoss);
   };
 
-  const groupStandings = groups.length > 0
-    ? groups.map(group => {
-        const groupMatches = matches.filter(m => m.groupId === group.id);
+  const groupStandings = (groups as any[]).length > 0
+    ? (groups as any[]).map((group: any) => {
+        const groupMatches = (matches as any[]).filter((m: any) => m.groupId === group.id);
         const groupPlayerIds = new Set<number>();
-        groupMatches.forEach(m => {
+        groupMatches.forEach((m: any) => {
           if (m.playerAId) groupPlayerIds.add(m.playerAId);
           if (m.playerBId) groupPlayerIds.add(m.playerBId);
         });
-        const groupPlayers = players.filter(p => groupPlayerIds.has(p.id));
+        const groupPlayers = augmentedPlayers.filter((p: any) => groupPlayerIds.has(p.id));
         return { group, standings: computeStandings(groupPlayers, groupMatches) };
       })
-    : [{ group: null, standings: computeStandings(players, matches) }];
+    : [{ group: null, standings: computeStandings(augmentedPlayers, matches) }];
 
   const knockoutRoundOrder: Record<string, number> = {
     'QF': 1,
@@ -1294,6 +1300,8 @@ export default function PublicView() {
                   <li><span className="font-bold text-foreground">2. Leg Difference</span><span className="text-muted-foreground"> — If tied on points, the player with the better leg difference (legs won minus legs lost) is ranked higher.</span></li>
                   <li><span className="font-bold text-foreground">3. Legs Won</span><span className="text-muted-foreground"> — If still tied, the player with the most legs won is ranked higher.</span></li>
                   <li><span className="font-bold text-foreground">4. Head-to-Head</span><span className="text-muted-foreground"> — If still tied, the result between the tied players is used. The same criteria (points, leg difference, legs won) are applied to only the matches played between the tied players.</span></li>
+                  <li><span className="font-bold text-foreground">5. Average Darts Per Leg Won</span><span className="text-muted-foreground"> — If still tied, the player who checks out in fewer darts on average (across all group legs they won) is ranked higher.</span></li>
+                  <li><span className="font-bold text-foreground">6. Tournaments Attended</span><span className="text-muted-foreground"> — If still tied, the player who has attended more tournaments in this league is ranked higher.</span></li>
                 </ol>
                 <p className="text-xs text-muted-foreground/60 pt-1">If players remain tied after all criteria, they share the same effective position.</p>
               </div>
