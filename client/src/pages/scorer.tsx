@@ -93,6 +93,8 @@ interface MatchStats {
   checkoutAttemptsB: number;
   checkoutSuccessA: number;
   checkoutSuccessB: number;
+  checkoutDartsUsedA?: number;
+  checkoutDartsUsedB?: number;
   first9PointsA: number;
   first9DartsA: number;
   first9PointsB: number;
@@ -786,6 +788,8 @@ export default function ScorerPage() {
           checkoutAttemptsB: cs.attemptsB,
           checkoutSuccessA: cs.successA,
           checkoutSuccessB: cs.successB,
+          checkoutDartsUsedA: cs.totalCheckoutDartsUsedA,
+          checkoutDartsUsedB: cs.totalCheckoutDartsUsedB,
           first9PointsA: cs.first9PointsA,
           first9DartsA: cs.first9DartsA,
           first9PointsB: cs.first9PointsB,
@@ -835,6 +839,8 @@ export default function ScorerPage() {
           checkoutAttemptsB: cs.attemptsB,
           checkoutSuccessA: cs.successA,
           checkoutSuccessB: cs.successB,
+          checkoutDartsUsedA: cs.totalCheckoutDartsUsedA,
+          checkoutDartsUsedB: cs.totalCheckoutDartsUsedB,
           first9PointsA: cs.first9PointsA,
           first9DartsA: cs.first9DartsA,
           first9PointsB: cs.first9PointsB,
@@ -1933,6 +1939,9 @@ export default function ScorerPage() {
       { label: '180s', valA: stats.ton80sA, valB: stats.ton80sB },
       { label: '140+', valA: stats.ton40sA, valB: stats.ton40sB },
       { label: '100+', valA: stats.tonsA, valB: stats.tonsB },
+      ...((stats.checkoutDartsUsedA != null || stats.checkoutDartsUsedB != null)
+        ? [{ label: 'Checkout Darts Used', valA: stats.checkoutDartsUsedA ?? '-', valB: stats.checkoutDartsUsedB ?? '-' }]
+        : []),
     ];
 
     return (

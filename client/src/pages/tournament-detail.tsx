@@ -287,6 +287,9 @@ function AdminMatchStats({ matchId, playerAName, playerBName }: { matchId: numbe
     { label: '140+', valA: notes.ton40sA ?? '-', valB: notes.ton40sB ?? '-' },
     { label: '100+', valA: notes.tonsA ?? '-', valB: notes.tonsB ?? '-' },
     { label: 'Darts Thrown', valA: notes.totalVisitsA != null ? notes.totalVisitsA * 3 : '-', valB: notes.totalVisitsB != null ? notes.totalVisitsB * 3 : '-' },
+    ...((notes.checkoutDartsUsedA != null || notes.checkoutDartsUsedB != null)
+      ? [{ label: 'Checkout Darts Used', valA: notes.checkoutDartsUsedA ?? '-', valB: notes.checkoutDartsUsedB ?? '-' }]
+      : []),
   ] : [];
 
   const hasLegHistory = notes && Array.isArray(notes.legHistory) && notes.legHistory.length > 0;
