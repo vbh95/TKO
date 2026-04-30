@@ -15,7 +15,16 @@ setupSocketIO(httpServer);
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  frameguard: false,
 }));
+
+app.use((req, res, next) => {
+  const isPublic = req.path.startsWith('/public/') || req.path.startsWith('/overlay/');
+  if (!isPublic) {
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  }
+  next();
+});
 
 declare module "http" {
   interface IncomingMessage {
