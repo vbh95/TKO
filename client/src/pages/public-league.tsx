@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -107,6 +107,23 @@ export default function PublicLeague() {
   const searchString = useSearch();
   const isEmbed = new URLSearchParams(searchString).get('embed') === 'true';
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sendHeight = () => {
+      const height = document.documentElement.scrollHeight;
+      window.parent.postMessage({ type: "TKO_IFRAME_HEIGHT", height }, "*");
+    };
+
+    sendHeight();
+    window.addEventListener("resize", sendHeight);
+    const observer = new ResizeObserver(sendHeight);
+    observer.observe(document.body);
+
+    return () => {
+      window.removeEventListener("resize", sendHeight);
+      observer.disconnect();
+    };
+  }, []);
 
   const { data, isLoading, error } = useQuery<PublicLeagueData>({
     queryKey: ['/api/public/league', shareToken],
