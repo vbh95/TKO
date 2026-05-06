@@ -1,0 +1,41 @@
+Investigate and fix a bug where, in rare cases, a darts match at 1-1 becomes 2-1 when the user clicks to continue to the next game, cloning the previous leg and forcing a winner.
+
+Do not change tournament structure, standings logic, board allocation, seeded bracket logic, public pages, or any unrelated behaviour.
+
+Only inspect and modify the match scoring / leg completion / continue-to-next-match flow.
+
+Required fix:
+1. Ensure a completed leg cannot be inserted twice for the same match, same leg number, same winner, or same submit action.
+2. Ensure clicking “continue”, “next game”, “next match”, or similar navigation buttons never records another leg result.
+3. Separate “complete leg” logic from “navigate/continue” logic if they are currently linked.
+4. Add a guard so match finalisation only happens after the correct number of unique legs have been recorded.
+5. Add protection against duplicate mutation calls, double-clicks, stale state, React StrictMode double execution, or repeated useEffect triggers.
+6. If the app auto-creates the next leg or finalises the match after a leg is saved, make this idempotent so running the same logic twice cannot duplicate a leg.
+7. Do not alter any existing correct scoring behaviour for normal matches.
+
+Specifically search for logic around:
+- completeLeg
+- submitLeg
+- finishLeg
+- saveLeg
+- recordLeg
+- match winner calculation
+- finaliseMatch / finalizeMatch
+- continue button
+- next game / next match button
+- mutation onSuccess handlers
+- useEffect blocks that react to leg count or match score changes
+
+Expected behaviour:
+- At 1-1, the match must remain 1-1 until a real deciding leg is played and submitted.
+- Pressing continue/next must only navigate or load the next screen.
+- The previous leg must never be cloned.
+- A match can only become 2-1 if a third unique leg was actually scored and saved.
+
+Add a minimal defensive check in the backend/API/database layer if possible so duplicate leg submissions for the same match and leg number are rejected or ignored safely.
+
+After the fix, test:
+- Best of 3 match: Player A wins leg 1, Player B wins leg 2. Confirm score stays 1-1 when continuing.
+- Then submit a genuine third leg. Confirm the winner becomes 2-1.
+- Rapid double-click the leg submit button. Confirm no duplicate leg is created.
+- Navigate away and back after 1-1. Confirm no extra leg appears.

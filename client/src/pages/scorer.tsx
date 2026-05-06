@@ -561,6 +561,8 @@ export default function ScorerPage() {
   const [highestFinishB, setHighestFinishB] = useState(0);
   const checkoutStatsRef = useRef({ attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0, totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0 });
   const legHistoryRef = useRef<Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B'; checkoutDartsUsed?: number }>>([]);
+  const isSubmittingLegRef = useRef(false);
+  const legResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [swapPlayers, setSwapPlayers] = useState(false);
 
   useEffect(() => {
@@ -570,6 +572,7 @@ export default function ScorerPage() {
     body.style.overscrollBehavior = 'none';
     body.style.touchAction = 'pan-x pan-y';
     return () => {
+      if (legResetTimerRef.current !== null) clearTimeout(legResetTimerRef.current);
       html.style.overscrollBehavior = '';
       body.style.overscrollBehavior = '';
       body.style.touchAction = '';
@@ -858,6 +861,7 @@ export default function ScorerPage() {
         clearScorerState(completedMatch.id);
         return;
       }
+      isSubmittingLegRef.current = false;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -883,6 +887,7 @@ export default function ScorerPage() {
     setLegStartingThrower(startingThrower);
     setLegVisits([]);
     setInputValue("");
+    isSubmittingLegRef.current = false;
   };
 
   const persistCurrentState = useCallback((overrides?: Partial<ScorerState>) => {
@@ -1007,11 +1012,16 @@ export default function ScorerPage() {
   };
 
   const confirmCheckout = (dartsAtDouble: number, checkoutDartsUsed: number) => {
+    if (isSubmittingLegRef.current) return;
     if (checkoutDartsUsed < dartsAtDouble) return;
     if (!pendingCheckout || !activeMatchId) return;
+    isSubmittingLegRef.current = true;
+
+    setPendingCheckout(null);
     setPendingDartsAtDouble(false);
     setSelectedDartsAtDouble(null);
     setSelectedCheckoutDartsUsed(null);
+
     const { player, newLegsA, newLegsB, newVisits, checkoutScore } = pendingCheckout;
 
     if (player === 'A') {
@@ -1031,8 +1041,12 @@ export default function ScorerPage() {
       setCheckoutSuccessB(checkoutStatsRef.current.successB);
       setHighestFinishB(checkoutStatsRef.current.finishB);
     }
+
     const activeM = data?.matches.find(m => m.id === activeMatchId);
-    if (!activeM) return;
+    if (!activeM) {
+      isSubmittingLegRef.current = false;
+      return;
+    }
     const matchBestOf = activeM.bestOf || 3;
     const matchLegsToWin = Math.ceil(matchBestOf / 2);
     const isPlayerA = player === 'A';
@@ -1057,7 +1071,10 @@ export default function ScorerPage() {
 
     const allVisitsIncludingCurrent = [...allMatchVisits, ...newVisits];
 
-    legHistoryRef.current = [...legHistoryRef.current, { startingThrower: legStartingThrower, visits: newVisits, winner: player, checkoutDartsUsed }];
+    const expectedLegCount = newLegsA + newLegsB;
+    if (legHistoryRef.current.length < expectedLegCount) {
+      legHistoryRef.current = [...legHistoryRef.current, { startingThrower: legStartingThrower, visits: newVisits, winner: player, checkoutDartsUsed }];
+    }
 
     // Accumulate first-9-darts data for this leg (first 3 visits per player = 9 darts each)
     const legFirst9A = newVisits.filter(v => v.player === 'A').slice(0, 3);
@@ -1116,7 +1133,6 @@ export default function ScorerPage() {
     setAllMatchVisits(allVisitsIncludingCurrent);
 
     if (newLegsA < matchLegsToWin && newLegsB < matchLegsToWin) {
-
       const nextStarter = legStartingThrower === 'A' ? 'B' : 'A';
       persistCurrentState({
         legsWonA: newLegsA,
@@ -1129,12 +1145,15 @@ export default function ScorerPage() {
         legVisits: [],
         legHistory: legHistoryRef.current,
       });
-      setTimeout(() => resetLeg(nextStarter), 1500);
+      clearTimeout(legResetTimerRef.current ?? undefined);
+      legResetTimerRef.current = setTimeout(() => {
+        legResetTimerRef.current = null;
+        resetLeg(nextStarter);
+      }, 1500);
     } else {
+      isSubmittingLegRef.current = false;
       clearScorerState(activeMatchId);
     }
-
-    setPendingCheckout(null);
   };
 
   const cancelCheckout = () => {

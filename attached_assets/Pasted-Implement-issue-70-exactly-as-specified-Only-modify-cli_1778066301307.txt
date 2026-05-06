@@ -1,0 +1,54 @@
+Implement issue #70 exactly as specified.
+
+Only modify:
+- client/src/pages/scorer.tsx
+- server/routes.ts
+
+Do not touch tournament structure, brackets, standings, public pages, board allocation, or match report display.
+
+Client fix in scorer.tsx:
+1. Add:
+   const isSubmittingLegRef = useRef(false);
+   const legResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+2. At the very start of confirmCheckout, before checking pendingCheckout:
+   if (isSubmittingLegRef.current) return;
+   isSubmittingLegRef.current = true;
+
+3. Immediately after the guards pass, before any mutation or leg history side effects:
+   setPendingCheckout(null);
+   setPendingDartsAtDouble(false);
+
+4. When appending to legHistoryRef.current, prevent duplicate append:
+   - calculate expectedLegCount = newLegsA + newLegsB
+   - only append if legHistoryRef.current.length < expectedLegCount
+   - otherwise skip the append silently
+
+5. Replace bare setTimeout(() => resetLeg(...), 1500) with a timer ref:
+   - clear any existing legResetTimerRef.current before scheduling
+   - assign the new timeout ID to legResetTimerRef.current
+   - inside the timeout, set legResetTimerRef.current = null before/after resetLeg
+
+6. Reset isSubmittingLegRef.current = false:
+   - inside resetLeg after the new leg state is ready
+   - inside clearScorerState / match-completion cleanup
+   - also in any error path of confirmCheckout or updateScoreMutation failure
+
+7. On unmount, clear legResetTimerRef.current if it exists.
+
+Server fix in server/routes.ts:
+In PUT /api/scorer/matches/:matchId, after verifying match exists and is IN_PROGRESS, add:
+
+if (scoreA < match.scoreA || scoreB < match.scoreB) {
+  return res.json(match);
+}
+
+This makes stale or duplicate score submissions idempotent and prevents rollback.
+
+Acceptance tests:
+- BO3: A wins leg 1, B wins leg 2. Score must remain 1-1 until a real third leg is submitted.
+- Rapid double-tap Confirm: only one leg is saved.
+- resetLeg timer fires only once per leg.
+- legHistoryRef has exactly one entry per played leg.
+- Continue Scoring restores 1-1 without adding a leg.
+- Server ignores stale PUTs where scoreA or scoreB is lower than current stored values.

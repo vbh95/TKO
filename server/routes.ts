@@ -2547,6 +2547,10 @@ export async function registerRoutes(
         return res.status(400).json({ message: "scoreA and scoreB are required" });
       }
 
+      if (scoreA < (match.scoreA ?? 0) || scoreB < (match.scoreB ?? 0)) {
+        return res.json(match);
+      }
+
       if (match.status !== 'IN_PROGRESS') {
         if (match.status === 'COMPLETED' && match.scoreA === scoreA && match.scoreB === scoreB) {
           if (req.body.notes) {
