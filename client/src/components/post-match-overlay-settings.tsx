@@ -195,7 +195,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
         data-testid="sheet-post-match-settings"
       >
         {/* ── Left: settings controls ─────────────────────────── */}
-        <div className="w-[400px] shrink-0 flex flex-col h-full border-r bg-background">
+        <div className="w-[380px] max-w-[45vw] min-w-[300px] shrink-0 flex flex-col h-full border-r bg-background">
           <SheetHeader className="px-5 py-4 border-b shrink-0">
             <SheetTitle className="text-sm">Post Match Card — Board {boardNumber}</SheetTitle>
           </SheetHeader>
@@ -417,11 +417,14 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 </div>
               </Row>
 
-              <Separator className="my-4" />
-
+            </div>
+          )}
+          {/* Pinned save footer — always visible at column bottom */}
+          {!isLoading && (
+            <div className="shrink-0 border-t bg-background px-5 py-3">
               <Button
                 size="sm"
-                className="w-full text-xs mb-2"
+                className="w-full text-xs"
                 onClick={() => saveMutation.mutate(settings)}
                 disabled={saveMutation.isPending}
                 data-testid="btn-save-overlay-settings"
@@ -436,7 +439,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
         {/* ── Right: live preview ──────────────────────────────── */}
         <div
           ref={previewContainerRef}
-          className="flex-1 bg-neutral-950 flex items-center justify-center overflow-hidden relative"
+          className="flex-1 min-w-0 bg-neutral-950 flex items-center justify-center overflow-hidden relative"
           data-testid="preview-container"
         >
           <div className="absolute top-2 left-3 text-white/30 text-[10px] font-mono tracking-widest uppercase select-none">
