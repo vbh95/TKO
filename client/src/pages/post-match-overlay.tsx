@@ -222,10 +222,16 @@ export default function PostMatchOverlay() {
 
   const rawS = data?.settings ? { ...DEFAULT_SETTINGS, ...data.settings } : DEFAULT_SETTINGS;
   // Backwards compat: migrate single sponsorLogoUrl → sponsorLogoUrls
+  // Also: old "staggered" card entrance had no separate stats animation field — preserve
+  // its row-by-row reveal by locking statsEntranceAnimation to "none" so the legacy path fires.
   const s: typeof DEFAULT_SETTINGS = (() => {
     const merged = { ...rawS };
     if ((!merged.sponsorLogoUrls || (merged.sponsorLogoUrls as string[]).length === 0) && merged.sponsorLogoUrl) {
       merged.sponsorLogoUrls = [merged.sponsorLogoUrl] as string[];
+    }
+    const saved = (data?.settings ?? {}) as Record<string, unknown>;
+    if (merged.entranceAnimation === "staggered" && !("statsEntranceAnimation" in saved)) {
+      merged.statsEntranceAnimation = "none";
     }
     return merged as typeof DEFAULT_SETTINGS;
   })();

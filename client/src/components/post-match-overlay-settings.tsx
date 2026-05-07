@@ -248,7 +248,12 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
       const sponsorLogoUrls = existingUrls.length > 0
         ? existingUrls
         : base.sponsorLogoUrl ? [base.sponsorLogoUrl] : [];
-      setSettings({ ...base, sponsorLogoUrls });
+      // Backwards compat: old "staggered" entrance had no statsEntranceAnimation field —
+      // lock it to "none" so the legacy per-row reveal path fires instead of the new default.
+      const statsEntranceAnimation = (base.entranceAnimation === "staggered" && !("statsEntranceAnimation" in savedSettings))
+        ? "none"
+        : base.statsEntranceAnimation;
+      setSettings({ ...base, sponsorLogoUrls, statsEntranceAnimation });
     }
   }, [savedSettings]);
 
