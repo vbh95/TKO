@@ -62,6 +62,7 @@ const DEFAULT_SETTINGS = {
   statRowPadding: 7,
   borderRadius: 14,
   cardWidth: 1400,
+  sideCardWidth: 900,
   showStats: {
     average: true,
     ton80s: true,
@@ -103,6 +104,13 @@ function cardBackground(s: typeof DEFAULT_SETTINGS): string {
     const endRgb = hexToRgb(s.bgGradientEndColor || "#1e3a5f");
     return `linear-gradient(${s.bgGradientAngle}deg, rgba(${bgRgb}, ${s.bgOpacity}), rgba(${endRgb}, ${s.bgOpacity}))`;
   }
+  return `rgba(${bgRgb}, ${s.bgOpacity})`;
+}
+
+/** Solid RGBA for use inside linear-gradient() color stops.
+ *  cardBackground() may return a gradient string, which is invalid as a color stop. */
+function cardFadeColor(s: typeof DEFAULT_SETTINGS): string {
+  const bgRgb = hexToRgb(s.bgColor || "#0f172a");
   return `rgba(${bgRgb}, ${s.bgOpacity})`;
 }
 
@@ -444,13 +452,13 @@ export default function PostMatchOverlay() {
           {hasMediaA
             ? renderMedia(s.playerAMediaUrl, playerA?.name)
             : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.2)` }} />}
-          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 180, background: `linear-gradient(to right, transparent, ${cardBg})` }} />
+          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 180, background: `linear-gradient(to right, transparent, ${cardFadeColor(s)})` }} />
         </div>
 
         {/* Centre: card */}
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", height: 1080 }}>
           <div style={{
-            width: Math.min(s.cardWidth, 1920 - sideW * 2),
+            width: Math.min(s.sideCardWidth, 1920 - sideW * 2),
             background: cardBg,
             borderRadius: s.borderRadius,
             overflow: "hidden",
@@ -467,7 +475,7 @@ export default function PostMatchOverlay() {
           {hasMediaB
             ? renderMedia(s.playerBMediaUrl, playerB?.name)
             : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.2)` }} />}
-          <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 180, background: `linear-gradient(to left, transparent, ${cardBg})` }} />
+          <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 180, background: `linear-gradient(to left, transparent, ${cardFadeColor(s)})` }} />
         </div>
       </div>
     );
@@ -497,13 +505,13 @@ export default function PostMatchOverlay() {
               {hasMediaA
                 ? renderMedia(s.playerAMediaUrl, playerA?.name)
                 : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.15)` }} />}
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardBg})` }} />
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardFadeColor(s)})` }} />
             </div>
             <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
               {hasMediaB
                 ? renderMedia(s.playerBMediaUrl, playerB?.name)
                 : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.15)` }} />}
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardBg})` }} />
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardFadeColor(s)})` }} />
             </div>
           </div>
         )}

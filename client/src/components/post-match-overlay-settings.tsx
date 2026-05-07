@@ -81,6 +81,7 @@ export const DEFAULT_OVERLAY_SETTINGS = {
   statRowPadding: 7,
   borderRadius: 14,
   cardWidth: 1400,
+  sideCardWidth: 900,
   showStats: {
     average: true,
     ton80s: true,
@@ -151,6 +152,14 @@ function cardBackground(s: Settings): string {
   return `rgba(${bgRgb}, ${s.bgOpacity})`;
 }
 
+/** Always returns a solid RGBA colour for use inside linear-gradient() color stops.
+ *  Using cardBackground() directly inside a gradient would produce invalid CSS when
+ *  bgType === "gradient" (CSS cannot nest gradient() as a color stop). */
+function cardFadeColor(s: Settings): string {
+  const bgRgb = hexToRgb(s.bgColor || "#0f172a");
+  return `rgba(${bgRgb}, ${s.bgOpacity})`;
+}
+
 export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boardNumber }: Props) {
   const { toast } = useToast();
   const [settings, setSettings] = useState<Settings>(DEFAULT_OVERLAY_SETTINGS);
@@ -166,16 +175,20 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
 
   useEffect(() => {
     if (savedSettings) {
-      const merged: any = {
+      const base: Settings = {
         ...DEFAULT_OVERLAY_SETTINGS,
-        ...savedSettings,
-        showStats: { ...DEFAULT_OVERLAY_SETTINGS.showStats, ...(savedSettings.showStats ?? {}) },
+        ...(savedSettings as Partial<Settings>),
+        showStats: {
+          ...DEFAULT_OVERLAY_SETTINGS.showStats,
+          ...((savedSettings.showStats as typeof DEFAULT_OVERLAY_SETTINGS.showStats | undefined) ?? {}),
+        },
       };
       // Backwards compat: migrate single sponsorLogoUrl into sponsorLogoUrls array
-      if ((!merged.sponsorLogoUrls || (merged.sponsorLogoUrls as string[]).length === 0) && merged.sponsorLogoUrl) {
-        merged.sponsorLogoUrls = [merged.sponsorLogoUrl];
-      }
-      setSettings(merged as Settings);
+      const existingUrls = base.sponsorLogoUrls ?? [];
+      const sponsorLogoUrls = existingUrls.length > 0
+        ? existingUrls
+        : base.sponsorLogoUrl ? [base.sponsorLogoUrl] : [];
+      setSettings({ ...base, sponsorLogoUrls });
     }
   }, [savedSettings]);
 
@@ -373,12 +386,20 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
 
               {/* LAYOUT */}
               <SectionLabel>Layout</SectionLabel>
-              <Row label="Card Width">
+              <Row label="Card Width (top)">
                 <div className="flex items-center gap-2">
                   <input type="range" min={700} max={1800} step={20} value={settings.cardWidth}
                     onChange={e => set("cardWidth", parseInt(e.target.value))}
                     className="w-20" data-testid="range-card-width" />
                   <span className="text-xs w-10 text-right">{settings.cardWidth}px</span>
+                </div>
+              </Row>
+              <Row label="Card Width (side)">
+                <div className="flex items-center gap-2">
+                  <input type="range" min={500} max={1200} step={20} value={settings.sideCardWidth}
+                    onChange={e => set("sideCardWidth", parseInt(e.target.value))}
+                    className="w-20" data-testid="range-side-card-width" />
+                  <span className="text-xs w-10 text-right">{settings.sideCardWidth}px</span>
                 </div>
               </Row>
               <Row label="Border Radius">
@@ -686,13 +707,13 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
           {hasMediaA
             ? <img src={s.playerAMediaUrl} alt="Player A" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
             : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.25)` }} />}
-          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 160, background: `linear-gradient(to right, transparent, ${cardBg})` }} />
+          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 160, background: `linear-gradient(to right, transparent, ${cardFadeColor(s)})` }} />
         </div>
 
         {/* Center: stats card */}
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", height: 1080 }}>
           <div style={{
-            width: Math.min(s.cardWidth, 1920 - sideW * 2),
+            width: Math.min(s.sideCardWidth, 1920 - sideW * 2),
             background: cardBg,
             borderRadius: s.borderRadius,
             overflow: "hidden",
@@ -708,7 +729,7 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
           {hasMediaB
             ? <img src={s.playerBMediaUrl} alt="Player B" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
             : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.25)` }} />}
-          <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 160, background: `linear-gradient(to left, transparent, ${cardBg})` }} />
+          <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 160, background: `linear-gradient(to left, transparent, ${cardFadeColor(s)})` }} />
         </div>
       </div>
     );
@@ -731,13 +752,13 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
               {hasMediaA
                 ? <img src={s.playerAMediaUrl} alt="A" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
                 : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.15)` }} />}
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardBg})` }} />
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardFadeColor(s)})` }} />
             </div>
             <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
               {hasMediaB
                 ? <img src={s.playerBMediaUrl} alt="B" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
                 : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.15)` }} />}
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardBg})` }} />
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardFadeColor(s)})` }} />
             </div>
           </div>
         )}
