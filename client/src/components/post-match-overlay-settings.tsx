@@ -178,6 +178,12 @@ function cardFadeColor(s: Settings): string {
   return `rgba(${bgRgb}, ${s.bgOpacity})`;
 }
 
+/**
+ * Injects the complete set of pmc-* CSS keyframes into the document head.
+ * Must stay in sync with injectKeyframes() in post-match-overlay.tsx so that
+ * whichever page runs first wins the #pmc-keyframes ID without leaving any
+ * keyframe missing for the other (SPA navigation can cause one to be skipped).
+ */
 function injectOverlayKeyframes() {
   const id = "pmc-keyframes";
   if (document.getElementById(id)) return;
@@ -185,16 +191,27 @@ function injectOverlayKeyframes() {
   style.id = id;
   style.textContent = `
     @keyframes pmc-fade-in { from { opacity: 0 } to { opacity: 1 } }
+    @keyframes pmc-fade-out { from { opacity: 1 } to { opacity: 0 } }
     @keyframes pmc-slide-up { from { opacity: 0; transform: translateY(60px) } to { opacity: 1; transform: translateY(0) } }
+    @keyframes pmc-slide-down { from { opacity: 1; transform: translateY(0) } to { opacity: 0; transform: translateY(60px) } }
     @keyframes pmc-slide-left { from { opacity: 0; transform: translateX(-80px) } to { opacity: 1; transform: translateX(0) } }
     @keyframes pmc-slide-right { from { opacity: 0; transform: translateX(80px) } to { opacity: 1; transform: translateX(0) } }
     @keyframes pmc-zoom-in { from { opacity: 0; transform: scale(0.85) } to { opacity: 1; transform: scale(1) } }
+    @keyframes pmc-zoom-out { from { opacity: 1; transform: scale(1) } to { opacity: 0; transform: scale(0.85) } }
     @keyframes pmc-wipe { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0% 0 0) } }
+    @keyframes pmc-stat-reveal { from { opacity: 0; transform: translateX(-16px) } to { opacity: 1; transform: translateX(0) } }
+    @keyframes pmc-winner-pulse { 0%,100% { text-shadow: 0 0 0px currentColor } 50% { text-shadow: 0 0 18px currentColor } }
     @keyframes pmc-flip-in { from { opacity: 0; transform: perspective(800px) rotateX(90deg) } to { opacity: 1; transform: perspective(800px) rotateX(0deg) } }
+    @keyframes pmc-flip-out { from { opacity: 1; transform: perspective(800px) rotateX(0deg) } to { opacity: 0; transform: perspective(800px) rotateX(-90deg) } }
     @keyframes pmc-drop-in { from { opacity: 0; transform: translateY(-80px) } to { opacity: 1; transform: translateY(0) } }
     @keyframes pmc-blur-in { from { opacity: 0; filter: blur(18px) } to { opacity: 1; filter: blur(0px) } }
-    @keyframes pmc-bounce-in { 0% { opacity: 0; transform: scale(0.7) } 60% { opacity: 1; transform: scale(1.06) } 80% { transform: scale(0.97) } 100% { transform: scale(1) } }
-    @keyframes pmc-stat-reveal { from { opacity: 0; transform: translateX(-16px) } to { opacity: 1; transform: translateX(0) } }
+    @keyframes pmc-blur-out { from { opacity: 1; filter: blur(0px) } to { opacity: 0; filter: blur(18px) } }
+    @keyframes pmc-bounce-in {
+      0%   { opacity: 0; transform: scale(0.7) }
+      60%  { opacity: 1; transform: scale(1.06) }
+      80%  { transform: scale(0.97) }
+      100% { transform: scale(1) }
+    }
   `;
   document.head.appendChild(style);
 }
