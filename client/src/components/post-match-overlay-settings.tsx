@@ -753,6 +753,11 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
   const hasMedia = hasMediaA || hasMediaB;
   const logoUrls = (s.sponsorLogoUrls ?? []).filter(Boolean);
 
+  // Stage 1: card entrance (delay = 0). "staggered" means no card anim, only rows reveal.
+  const previewCardAnim = s.entranceAnimation !== "staggered"
+    ? getEntranceAnimWithDelay(s.entranceAnimation, s.animationDuration, 0)
+    : undefined;
+
   const previewNameAnim = s.nameEntranceAnimation !== "none"
     ? getEntranceAnimWithDelay(s.nameEntranceAnimation, s.nameAnimationDuration, s.animationDuration)
     : undefined;
@@ -837,6 +842,7 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
           boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
           border: "1px solid rgba(255,255,255,0.08)",
           display: "flex", flexDirection: "row",
+          animation: previewCardAnim,
         }}>
           {/* Left: Player A media column */}
           <div style={{ width: sideColW, flexShrink: 0, position: "relative", overflow: "hidden" }}>
@@ -872,6 +878,7 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
         overflow: "hidden",
         boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
         border: "1px solid rgba(255,255,255,0.08)",
+        animation: previewCardAnim,
       }}>
         {/* Top media strip */}
         {hasMedia && (
