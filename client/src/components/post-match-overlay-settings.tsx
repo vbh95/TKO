@@ -20,7 +20,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { ChevronUp, ChevronDown, Save, Loader2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Save, Loader2, Plus, Trash2 } from "lucide-react";
 
 const STAT_LABELS: Record<string, string> = {
   average: "3-Dart Avg",
@@ -49,25 +49,38 @@ const ANIMATION_OPTIONS = [
   { value: "zoom-in", label: "Zoom In" },
   { value: "wipe-reveal", label: "Wipe Reveal" },
   { value: "staggered", label: "Staggered Stat Reveal" },
+  { value: "flip-in", label: "Flip In" },
+  { value: "drop-in", label: "Drop In" },
+  { value: "blur-in", label: "Blur In" },
+  { value: "bounce-in", label: "Bounce In" },
 ];
 
 const EXIT_ANIMATION_OPTIONS = [
   { value: "fade-out", label: "Fade Out" },
   { value: "zoom-out", label: "Zoom Out" },
+  { value: "slide-down", label: "Slide Down" },
+  { value: "flip-out", label: "Flip Out" },
+  { value: "blur-out", label: "Blur Out" },
 ];
 
 export const DEFAULT_OVERLAY_SETTINGS = {
   bgColor: "#0f172a",
   bgOpacity: 0.93,
+  bgType: "solid" as "solid" | "gradient",
+  bgGradientEndColor: "#1e3a5f",
+  bgGradientAngle: 135,
   primaryColor: "#7B1818",
   secondaryColor: "#4B9B3E",
   textColor: "#ffffff",
   winnerHighlightColor: "#f59e0b",
+  showWinnerStar: true,
   fontFamily: "Outfit, sans-serif",
   titleFontSize: 18,
   playerNameFontSize: 30,
   statsFontSize: 14,
+  statRowPadding: 7,
   borderRadius: 14,
+  cardWidth: 1400,
   showStats: {
     average: true,
     ton80s: true,
@@ -80,9 +93,12 @@ export const DEFAULT_OVERLAY_SETTINGS = {
   statOrder: ["average", "ton80s", "ton40s", "tons", "checkoutPct", "highestCheckout", "bestLeg"],
   showSponsorArea: false,
   sponsorLogoUrl: "",
+  sponsorLogoUrls: [] as string[],
+  sponsorLogoMaxHeight: 48,
   playerAMediaUrl: "",
   playerBMediaUrl: "",
   mediaFit: "cover",
+  mediaPosition: "top" as "top" | "side",
   entranceAnimation: "fade-in",
   exitAnimation: "fade-out",
   animationDuration: 800,
@@ -118,6 +134,23 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+function hexToRgb(hex: string) {
+  const h = (hex || "#000000").replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16) || 0;
+  const g = parseInt(h.slice(2, 4), 16) || 0;
+  const b = parseInt(h.slice(4, 6), 16) || 0;
+  return `${r}, ${g}, ${b}`;
+}
+
+function cardBackground(s: Settings): string {
+  const bgRgb = hexToRgb(s.bgColor || "#0f172a");
+  if (s.bgType === "gradient") {
+    const endRgb = hexToRgb(s.bgGradientEndColor || "#1e3a5f");
+    return `linear-gradient(${s.bgGradientAngle}deg, rgba(${bgRgb}, ${s.bgOpacity}), rgba(${endRgb}, ${s.bgOpacity}))`;
+  }
+  return `rgba(${bgRgb}, ${s.bgOpacity})`;
+}
+
 export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boardNumber }: Props) {
   const { toast } = useToast();
   const [settings, setSettings] = useState<Settings>(DEFAULT_OVERLAY_SETTINGS);
@@ -133,11 +166,16 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
 
   useEffect(() => {
     if (savedSettings) {
-      setSettings(prev => ({
+      const merged: any = {
         ...DEFAULT_OVERLAY_SETTINGS,
         ...savedSettings,
         showStats: { ...DEFAULT_OVERLAY_SETTINGS.showStats, ...(savedSettings.showStats ?? {}) },
-      }));
+      };
+      // Backwards compat: migrate single sponsorLogoUrl into sponsorLogoUrls array
+      if ((!merged.sponsorLogoUrls || (merged.sponsorLogoUrls as string[]).length === 0) && merged.sponsorLogoUrl) {
+        merged.sponsorLogoUrls = [merged.sponsorLogoUrl];
+      }
+      setSettings(merged as Settings);
     }
   }, [savedSettings]);
 
@@ -187,6 +225,19 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
     });
   };
 
+  const addSponsorLogo = () =>
+    setSettings(prev => ({ ...prev, sponsorLogoUrls: [...(prev.sponsorLogoUrls ?? []), ""] }));
+
+  const updateSponsorLogo = (idx: number, val: string) =>
+    setSettings(prev => {
+      const urls = [...(prev.sponsorLogoUrls ?? [])];
+      urls[idx] = val;
+      return { ...prev, sponsorLogoUrls: urls };
+    });
+
+  const removeSponsorLogo = (idx: number) =>
+    setSettings(prev => ({ ...prev, sponsorLogoUrls: (prev.sponsorLogoUrls ?? []).filter((_, i) => i !== idx) }));
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -209,10 +260,41 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
 
               {/* COLOURS */}
               <SectionLabel>Colours</SectionLabel>
-              <Row label="Background">
+              <Row label="Winner Star">
+                <Switch checked={settings.showWinnerStar} onCheckedChange={v => set("showWinnerStar", v)}
+                  data-testid="switch-winner-star" />
+              </Row>
+              <Row label="BG Type">
+                <Select value={settings.bgType} onValueChange={v => set("bgType", v as "solid" | "gradient")}>
+                  <SelectTrigger className="h-8 w-28 text-xs" data-testid="select-bg-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="solid">Solid</SelectItem>
+                    <SelectItem value="gradient">Gradient</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Row>
+              <Row label="BG Colour">
                 <input type="color" value={settings.bgColor} onChange={e => set("bgColor", e.target.value)}
                   className="h-8 w-16 rounded border cursor-pointer" data-testid="color-bg" />
               </Row>
+              {settings.bgType === "gradient" && (
+                <>
+                  <Row label="Gradient End">
+                    <input type="color" value={settings.bgGradientEndColor} onChange={e => set("bgGradientEndColor", e.target.value)}
+                      className="h-8 w-16 rounded border cursor-pointer" data-testid="color-bg-gradient-end" />
+                  </Row>
+                  <Row label="Gradient Angle">
+                    <div className="flex items-center gap-2">
+                      <input type="range" min={0} max={360} step={5} value={settings.bgGradientAngle}
+                        onChange={e => set("bgGradientAngle", parseInt(e.target.value))}
+                        className="w-20" data-testid="range-gradient-angle" />
+                      <span className="text-xs w-8 text-right">{settings.bgGradientAngle}°</span>
+                    </div>
+                  </Row>
+                </>
+              )}
               <Row label="BG Opacity">
                 <div className="flex items-center gap-2 flex-1 justify-end">
                   <input type="range" min={0} max={1} step={0.01} value={settings.bgOpacity}
@@ -278,11 +360,27 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                   <span className="text-xs w-8 text-right">{settings.statsFontSize}px</span>
                 </div>
               </Row>
+              <Row label="Stat Spacing">
+                <div className="flex items-center gap-2">
+                  <input type="range" min={2} max={24} step={1} value={settings.statRowPadding}
+                    onChange={e => set("statRowPadding", parseInt(e.target.value))}
+                    className="w-20" data-testid="range-stat-spacing" />
+                  <span className="text-xs w-8 text-right">{settings.statRowPadding}px</span>
+                </div>
+              </Row>
 
               <Separator className="my-3" />
 
               {/* LAYOUT */}
               <SectionLabel>Layout</SectionLabel>
+              <Row label="Card Width">
+                <div className="flex items-center gap-2">
+                  <input type="range" min={700} max={1800} step={20} value={settings.cardWidth}
+                    onChange={e => set("cardWidth", parseInt(e.target.value))}
+                    className="w-20" data-testid="range-card-width" />
+                  <span className="text-xs w-10 text-right">{settings.cardWidth}px</span>
+                </div>
+              </Row>
               <Row label="Border Radius">
                 <div className="flex items-center gap-2">
                   <input type="range" min={0} max={32} step={1} value={settings.borderRadius}
@@ -296,10 +394,38 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                   data-testid="switch-sponsor" />
               </Row>
               {settings.showSponsorArea && (
-                <Row label="Sponsor Logo URL">
-                  <Input className="h-8 text-xs w-48" placeholder="https://…" value={settings.sponsorLogoUrl}
-                    onChange={e => set("sponsorLogoUrl", e.target.value)} data-testid="input-sponsor-url" />
-                </Row>
+                <>
+                  <Row label="Logo Max Height">
+                    <div className="flex items-center gap-2">
+                      <input type="range" min={24} max={120} step={4} value={settings.sponsorLogoMaxHeight}
+                        onChange={e => set("sponsorLogoMaxHeight", parseInt(e.target.value))}
+                        className="w-20" data-testid="range-sponsor-height" />
+                      <span className="text-xs w-8 text-right">{settings.sponsorLogoMaxHeight}px</span>
+                    </div>
+                  </Row>
+                  <div className="mt-2 mb-1">
+                    <p className="text-xs text-muted-foreground mb-2">Sponsor Logos</p>
+                    {(settings.sponsorLogoUrls ?? []).map((url, idx) => (
+                      <div key={idx} className="flex items-center gap-1 mb-1">
+                        <Input
+                          className="h-7 text-xs flex-1"
+                          placeholder="https://…"
+                          value={url}
+                          onChange={e => updateSponsorLogo(idx, e.target.value)}
+                          data-testid={`input-sponsor-url-${idx}`}
+                        />
+                        <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeSponsorLogo(idx)} data-testid={`btn-remove-sponsor-${idx}`}>
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button size="sm" variant="outline" className="w-full h-7 text-xs mt-1"
+                      onClick={addSponsorLogo} data-testid="btn-add-sponsor">
+                      <Plus className="w-3 h-3 mr-1" />Add Logo
+                    </Button>
+                  </div>
+                </>
               )}
 
               <div className="mt-3">
@@ -339,6 +465,17 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <Input className="h-8 text-xs w-48" placeholder="Image or video URL"
                   value={settings.playerBMediaUrl} onChange={e => set("playerBMediaUrl", e.target.value)}
                   data-testid="input-media-b" />
+              </Row>
+              <Row label="Media Position">
+                <Select value={settings.mediaPosition} onValueChange={v => set("mediaPosition", v as "top" | "side")}>
+                  <SelectTrigger className="h-8 w-28 text-xs" data-testid="select-media-position">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="top">Top Strip</SelectItem>
+                    <SelectItem value="side">Side Panels</SelectItem>
+                  </SelectContent>
+                </Select>
               </Row>
               <Row label="Media Fit">
                 <Select value={settings.mediaFit} onValueChange={v => set("mediaFit", v as "cover" | "contain")}>
@@ -419,7 +556,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
 
             </div>
           )}
-          {/* Pinned save footer — always visible at column bottom */}
+          {/* Pinned save footer */}
           {!isLoading && (
             <div className="shrink-0 border-t bg-background px-5 py-3">
               <Button
@@ -462,14 +599,6 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
   );
 }
 
-function hexToRgb(hex: string) {
-  const h = (hex || "#000000").replace("#", "");
-  const r = parseInt(h.slice(0, 2), 16) || 0;
-  const g = parseInt(h.slice(2, 4), 16) || 0;
-  const b = parseInt(h.slice(4, 6), 16) || 0;
-  return `${r}, ${g}, ${b}`;
-}
-
 function PreviewCard({ settings: s }: { settings: Settings }) {
   const STAT_LBL: Record<string, string> = {
     average: "3-Dart Avg", ton80s: "180s", ton40s: "140+",
@@ -486,71 +615,133 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
   };
   const showStats = s.showStats as Record<string, boolean>;
   const visibleStats = s.statOrder.filter(k => showStats[k]);
-  const bgRgb = hexToRgb(s.bgColor || "#0f172a");
-  const cardBg = `rgba(${bgRgb}, ${s.bgOpacity})`;
+  const cardBg = cardBackground(s);
+  const isSide = s.mediaPosition === "side";
+  const hasMediaA = !!s.playerAMediaUrl;
+  const hasMediaB = !!s.playerBMediaUrl;
+  const hasMedia = hasMediaA || hasMediaB;
+  const logoUrls = (s.sponsorLogoUrls ?? []).filter(Boolean);
+
+  const cardContent = (
+    <>
+      {/* Tournament name */}
+      <div style={{
+        textAlign: "center",
+        padding: (hasMedia && !isSide) ? "10px 40px 0" : "28px 40px 0",
+        color: `rgba(${hexToRgb(s.textColor)}, 0.6)`,
+        fontSize: s.titleFontSize, fontWeight: 600,
+        letterSpacing: "0.12em", textTransform: "uppercase",
+      }}>
+        Example Tournament
+      </div>
+
+      {/* Score row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 40px 0", gap: 20 }}>
+        <div style={{ flex: 1, textAlign: "right", color: s.winnerHighlightColor, fontSize: s.playerNameFontSize, fontWeight: 800, letterSpacing: "0.02em" }}>
+          Player A {s.showWinnerStar && <span style={{ marginLeft: 10, fontSize: s.playerNameFontSize * 0.6, opacity: 0.85 }}>★</span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", background: "rgba(255,255,255,0.07)", borderRadius: 10, overflow: "hidden", minWidth: 160, flexShrink: 0 }}>
+          <div style={{ flex: 1, textAlign: "center", padding: "10px 20px", fontSize: s.playerNameFontSize * 1.1, fontWeight: 900, color: s.winnerHighlightColor, background: `rgba(${hexToRgb(s.winnerHighlightColor)}, 0.1)` }}>2</div>
+          <div style={{ width: 2, background: "rgba(255,255,255,0.12)", alignSelf: "stretch" }} />
+          <div style={{ flex: 1, textAlign: "center", padding: "10px 20px", fontSize: s.playerNameFontSize * 1.1, fontWeight: 900, color: s.textColor }}>1</div>
+        </div>
+        <div style={{ flex: 1, textAlign: "left", color: s.textColor, fontSize: s.playerNameFontSize, fontWeight: 800, letterSpacing: "0.02em" }}>
+          Player B
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={{ margin: "14px 40px", height: 1, background: `linear-gradient(to right, transparent, rgba(${hexToRgb(s.primaryColor)}, 0.6), rgba(${hexToRgb(s.secondaryColor)}, 0.6), transparent)` }} />
+
+      {/* Stats */}
+      <div style={{ padding: "0 40px", paddingBottom: s.showSponsorArea ? 16 : 28 }}>
+        {visibleStats.map((k, idx) => (
+          <div key={k} style={{ display: "flex", alignItems: "center", padding: `${s.statRowPadding}px 0`, borderBottom: idx < visibleStats.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+            <div style={{ flex: 1, textAlign: "right", fontSize: s.statsFontSize + 2, fontWeight: 700, color: s.textColor, paddingRight: 20 }}>{DEMO[k]?.a ?? "—"}</div>
+            <div style={{ width: 200, textAlign: "center", fontSize: s.statsFontSize, fontWeight: 500, color: `rgba(${hexToRgb(s.textColor)}, 0.5)`, textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>{STAT_LBL[k] ?? k}</div>
+            <div style={{ flex: 1, textAlign: "left", fontSize: s.statsFontSize + 2, fontWeight: 700, color: s.textColor, paddingLeft: 20 }}>{DEMO[k]?.b ?? "—"}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Sponsor */}
+      {s.showSponsorArea && (
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "12px 40px 20px", display: "flex", justifyContent: "center", alignItems: "center", gap: 24, minHeight: 60 }}>
+          {logoUrls.length > 0
+            ? logoUrls.map((url, i) => (
+                <img key={i} src={url} alt={`Sponsor ${i + 1}`} style={{ maxHeight: s.sponsorLogoMaxHeight, maxWidth: 280, objectFit: "contain" }} />
+              ))
+            : <div style={{ color: `rgba(${hexToRgb(s.textColor)}, 0.25)`, fontSize: 13, fontStyle: "italic" }}>Sponsor area</div>}
+        </div>
+      )}
+    </>
+  );
+
+  if (isSide) {
+    const sideW = 360;
+    return (
+      <div style={{ width: 1920, height: 1080, background: "transparent", display: "flex", alignItems: "center", fontFamily: s.fontFamily }}>
+        {/* Left: Player A panel */}
+        <div style={{ width: sideW, height: 1080, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+          {hasMediaA
+            ? <img src={s.playerAMediaUrl} alt="Player A" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
+            : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.25)` }} />}
+          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 160, background: `linear-gradient(to right, transparent, ${cardBg})` }} />
+        </div>
+
+        {/* Center: stats card */}
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", height: 1080 }}>
+          <div style={{
+            width: Math.min(s.cardWidth, 1920 - sideW * 2),
+            background: cardBg,
+            borderRadius: s.borderRadius,
+            overflow: "hidden",
+            boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}>
+            {cardContent}
+          </div>
+        </div>
+
+        {/* Right: Player B panel */}
+        <div style={{ width: sideW, height: 1080, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+          {hasMediaB
+            ? <img src={s.playerBMediaUrl} alt="Player B" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
+            : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.25)` }} />}
+          <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 160, background: `linear-gradient(to left, transparent, ${cardBg})` }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{
-      width: 1920, height: 1080,
-      background: "transparent",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontFamily: s.fontFamily,
-    }}>
+    <div style={{ width: 1920, height: 1080, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: s.fontFamily }}>
       <div style={{
-        width: 1400,
+        width: s.cardWidth,
         background: cardBg,
         borderRadius: s.borderRadius,
         overflow: "hidden",
         boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
         border: "1px solid rgba(255,255,255,0.08)",
       }}>
-        {/* Tournament name */}
-        <div style={{
-          textAlign: "center", padding: "28px 40px 0",
-          color: `rgba(${hexToRgb(s.textColor)}, 0.6)`,
-          fontSize: s.titleFontSize, fontWeight: 600,
-          letterSpacing: "0.12em", textTransform: "uppercase",
-        }}>
-          Example Tournament
-        </div>
-
-        {/* Score row */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 40px 0", gap: 20 }}>
-          <div style={{ flex: 1, textAlign: "right", color: s.winnerHighlightColor, fontSize: s.playerNameFontSize, fontWeight: 800, letterSpacing: "0.02em" }}>
-            Player A ★
-          </div>
-          <div style={{ display: "flex", alignItems: "center", background: "rgba(255,255,255,0.07)", borderRadius: 10, overflow: "hidden", minWidth: 160, flexShrink: 0 }}>
-            <div style={{ flex: 1, textAlign: "center", padding: "10px 20px", fontSize: s.playerNameFontSize * 1.1, fontWeight: 900, color: s.winnerHighlightColor, background: `rgba(${hexToRgb(s.winnerHighlightColor)}, 0.1)` }}>2</div>
-            <div style={{ width: 2, background: "rgba(255,255,255,0.12)", alignSelf: "stretch" }} />
-            <div style={{ flex: 1, textAlign: "center", padding: "10px 20px", fontSize: s.playerNameFontSize * 1.1, fontWeight: 900, color: s.textColor }}>1</div>
-          </div>
-          <div style={{ flex: 1, textAlign: "left", color: s.textColor, fontSize: s.playerNameFontSize, fontWeight: 800, letterSpacing: "0.02em" }}>
-            Player B
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div style={{ margin: "14px 40px", height: 1, background: `linear-gradient(to right, transparent, rgba(${hexToRgb(s.primaryColor)}, 0.6), rgba(${hexToRgb(s.secondaryColor)}, 0.6), transparent)` }} />
-
-        {/* Stats */}
-        <div style={{ padding: "0 40px", paddingBottom: s.showSponsorArea ? 16 : 28 }}>
-          {visibleStats.map((k, idx) => (
-            <div key={k} style={{ display: "flex", alignItems: "center", padding: "7px 0", borderBottom: idx < visibleStats.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-              <div style={{ flex: 1, textAlign: "right", fontSize: s.statsFontSize + 2, fontWeight: 700, color: s.textColor, paddingRight: 20 }}>{DEMO[k]?.a ?? "—"}</div>
-              <div style={{ width: 200, textAlign: "center", fontSize: s.statsFontSize, fontWeight: 500, color: `rgba(${hexToRgb(s.textColor)}, 0.5)`, textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>{STAT_LBL[k] ?? k}</div>
-              <div style={{ flex: 1, textAlign: "left", fontSize: s.statsFontSize + 2, fontWeight: 700, color: s.textColor, paddingLeft: 20 }}>{DEMO[k]?.b ?? "—"}</div>
+        {/* Top media strip */}
+        {hasMedia && (
+          <div style={{ display: "flex", height: 280, width: "100%" }}>
+            <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
+              {hasMediaA
+                ? <img src={s.playerAMediaUrl} alt="A" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
+                : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.15)` }} />}
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardBg})` }} />
             </div>
-          ))}
-        </div>
-
-        {/* Sponsor */}
-        {s.showSponsorArea && (
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "12px 40px 20px", display: "flex", justifyContent: "center", alignItems: "center", minHeight: 60 }}>
-            {s.sponsorLogoUrl
-              ? <img src={s.sponsorLogoUrl} alt="Sponsor" style={{ maxHeight: 48, maxWidth: 320, objectFit: "contain" }} />
-              : <div style={{ color: `rgba(${hexToRgb(s.textColor)}, 0.25)`, fontSize: 13, fontStyle: "italic" }}>Sponsor area</div>}
+            <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
+              {hasMediaB
+                ? <img src={s.playerBMediaUrl} alt="B" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
+                : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.15)` }} />}
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardBg})` }} />
+            </div>
           </div>
         )}
+        {cardContent}
       </div>
     </div>
   );
