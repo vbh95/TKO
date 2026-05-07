@@ -85,6 +85,10 @@ const DEFAULT_SETTINGS = {
   exitAnimation: "fade-out",
   animationDuration: 800,
   statRevealDelay: 120,
+  nameEntranceAnimation: "fade-in",
+  nameAnimationDuration: 600,
+  statsEntranceAnimation: "slide-up",
+  statsAnimationDuration: 500,
   holdDuration: 15000,
   autoHide: true,
   refreshInterval: 10000,
@@ -174,6 +178,25 @@ function getEntranceAnim(name: string, duration: number): string {
     case "blur-in":          return `pmc-blur-in ${ms} ease both`;
     case "bounce-in":        return `pmc-bounce-in ${ms} ease both`;
     default:                 return `pmc-fade-in ${ms} ease both`;
+  }
+}
+
+function getEntranceAnimWithDelay(name: string, duration: number, delayMs: number): string | undefined {
+  if (name === "none") return undefined;
+  const ms = `${duration}ms`;
+  const delay = `${delayMs}ms`;
+  const ease = "cubic-bezier(0.22, 1, 0.36, 1)";
+  switch (name) {
+    case "slide-up":         return `pmc-slide-up ${ms} ${ease} ${delay} both`;
+    case "slide-from-left":  return `pmc-slide-left ${ms} ${ease} ${delay} both`;
+    case "slide-from-right": return `pmc-slide-right ${ms} ${ease} ${delay} both`;
+    case "zoom-in":          return `pmc-zoom-in ${ms} ${ease} ${delay} both`;
+    case "wipe-reveal":      return `pmc-wipe ${ms} ${ease} ${delay} both`;
+    case "flip-in":          return `pmc-flip-in ${ms} ${ease} ${delay} both`;
+    case "drop-in":          return `pmc-drop-in ${ms} ${ease} ${delay} both`;
+    case "blur-in":          return `pmc-blur-in ${ms} ease ${delay} both`;
+    case "bounce-in":        return `pmc-bounce-in ${ms} ease ${delay} both`;
+    default:                 return `pmc-fade-in ${ms} ease ${delay} both`;
   }
 }
 
@@ -298,8 +321,20 @@ export default function PostMatchOverlay() {
   /* ─── Stats + sponsor content (shared by both layouts) ─────────── */
   const headerPad = (hasMedia && !isSide) ? "10px 40px 0" : "28px 40px 0";
 
+  const nameEntranceAnim = (!exiting && s.nameEntranceAnimation !== "none")
+    ? getEntranceAnimWithDelay(s.nameEntranceAnimation, s.nameAnimationDuration, s.animationDuration)
+    : undefined;
+
+  const getStatRowAnim = (idx: number) => {
+    if (exiting || s.statsEntranceAnimation === "none") return undefined;
+    const delay = s.animationDuration + s.nameAnimationDuration + s.statRevealDelay * idx;
+    return getEntranceAnimWithDelay(s.statsEntranceAnimation, s.statsAnimationDuration, delay);
+  };
+
   const statsContent = (
     <>
+      {/* Header block: tournament name + score + divider — animate together */}
+      <div style={{ animation: nameEntranceAnim }}>
       {/* Tournament name */}
       <div style={{
         textAlign: "center",
@@ -379,14 +414,13 @@ export default function PostMatchOverlay() {
         margin: "14px 40px", height: 1,
         background: `linear-gradient(to right, transparent, rgba(${hexToRgb(s.primaryColor)}, 0.6), rgba(${hexToRgb(s.secondaryColor)}, 0.6), transparent)`,
       }} />
+      </div>
 
       {/* Stats rows */}
       <div style={{ padding: "0 40px", paddingBottom: s.showSponsorArea ? 16 : 28 }}>
         {visibleStats.map((statKey, idx) => {
           const vals = getStatValues(statKey, stats);
-          const anim = s.entranceAnimation === "staggered"
-            ? `pmc-stat-reveal ${s.animationDuration}ms cubic-bezier(0.22,1,0.36,1) ${s.statRevealDelay * (idx + 1)}ms both`
-            : undefined;
+          const anim = getStatRowAnim(idx);
           return (
             <div
               key={statKey}
@@ -439,43 +473,45 @@ export default function PostMatchOverlay() {
 
   /* ─── Side layout ─────────────────────────────────────────────── */
   if (isSide) {
-    const sideW = 360;
+    const sideColW = 280;
     return (
       <div style={{
         width: "1920px", height: "1080px",
         background: "transparent",
-        display: "flex", alignItems: "center",
+        display: "flex", alignItems: "center", justifyContent: "center",
         fontFamily: s.fontFamily, position: "relative", overflow: "hidden",
       }}>
-        {/* Left: Player A */}
-        <div style={{ width: sideW, height: 1080, flexShrink: 0, position: "relative", overflow: "hidden" }}>
-          {hasMediaA
-            ? renderMedia(s.playerAMediaUrl, playerA?.name)
-            : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.2)` }} />}
-          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 180, background: `linear-gradient(to right, transparent, ${cardFadeColor(s)})` }} />
-        </div>
+        {/* Single card containing media + stats */}
+        <div style={{
+          width: Math.min(s.sideCardWidth, 1920 - 80),
+          background: cardBg,
+          borderRadius: s.borderRadius,
+          overflow: "hidden",
+          animation: cardAnim,
+          boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
+          border: `1px solid rgba(255,255,255,0.08)`,
+          display: "flex", flexDirection: "row",
+        }}>
+          {/* Left: Player A media column */}
+          <div style={{ width: sideColW, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+            {hasMediaA
+              ? renderMedia(s.playerAMediaUrl, playerA?.name)
+              : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.25)` }} />}
+            <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 120, background: `linear-gradient(to right, transparent, ${cardFadeColor(s)})` }} />
+          </div>
 
-        {/* Centre: card */}
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", height: 1080 }}>
-          <div style={{
-            width: Math.min(s.sideCardWidth, 1920 - sideW * 2),
-            background: cardBg,
-            borderRadius: s.borderRadius,
-            overflow: "hidden",
-            animation: cardAnim,
-            boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
-            border: `1px solid rgba(255,255,255,0.08)`,
-          }}>
+          {/* Centre: stats */}
+          <div style={{ flex: 1, minWidth: 0 }}>
             {statsContent}
           </div>
-        </div>
 
-        {/* Right: Player B */}
-        <div style={{ width: sideW, height: 1080, flexShrink: 0, position: "relative", overflow: "hidden" }}>
-          {hasMediaB
-            ? renderMedia(s.playerBMediaUrl, playerB?.name)
-            : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.2)` }} />}
-          <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 180, background: `linear-gradient(to left, transparent, ${cardFadeColor(s)})` }} />
+          {/* Right: Player B media column */}
+          <div style={{ width: sideColW, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+            {hasMediaB
+              ? renderMedia(s.playerBMediaUrl, playerB?.name)
+              : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.25)` }} />}
+            <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 120, background: `linear-gradient(to left, transparent, ${cardFadeColor(s)})` }} />
+          </div>
         </div>
       </div>
     );

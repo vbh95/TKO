@@ -63,6 +63,19 @@ const EXIT_ANIMATION_OPTIONS = [
   { value: "blur-out", label: "Blur Out" },
 ];
 
+const STAGGER_ANIMATION_OPTIONS = [
+  { value: "none", label: "None" },
+  { value: "fade-in", label: "Fade In" },
+  { value: "slide-up", label: "Slide Up" },
+  { value: "slide-from-left", label: "Slide From Left" },
+  { value: "slide-from-right", label: "Slide From Right" },
+  { value: "zoom-in", label: "Zoom In" },
+  { value: "flip-in", label: "Flip In" },
+  { value: "drop-in", label: "Drop In" },
+  { value: "blur-in", label: "Blur In" },
+  { value: "bounce-in", label: "Bounce In" },
+];
+
 export const DEFAULT_OVERLAY_SETTINGS = {
   bgColor: "#0f172a",
   bgOpacity: 0.93,
@@ -104,6 +117,10 @@ export const DEFAULT_OVERLAY_SETTINGS = {
   exitAnimation: "fade-out",
   animationDuration: 800,
   statRevealDelay: 120,
+  nameEntranceAnimation: "fade-in",
+  nameAnimationDuration: 600,
+  statsEntranceAnimation: "slide-up",
+  statsAnimationDuration: 500,
   holdDuration: 15000,
   autoHide: true,
   refreshInterval: 10000,
@@ -554,6 +571,51 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                   <span className="text-xs w-12 text-right">{settings.statRevealDelay}ms</span>
                 </div>
               </Row>
+
+              <p className="text-xs text-muted-foreground mt-3 mb-1 font-medium">Names &amp; Score</p>
+              <Row label="Name Entrance">
+                <Select value={settings.nameEntranceAnimation} onValueChange={v => set("nameEntranceAnimation", v)}>
+                  <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-name-entrance">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAGGER_ANIMATION_OPTIONS.map(a => (
+                      <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Row>
+              <Row label="Name Duration">
+                <div className="flex items-center gap-2">
+                  <input type="range" min={100} max={1500} step={50} value={settings.nameAnimationDuration}
+                    onChange={e => set("nameAnimationDuration", parseInt(e.target.value))}
+                    className="w-20" data-testid="range-name-anim-duration" />
+                  <span className="text-xs w-12 text-right">{settings.nameAnimationDuration}ms</span>
+                </div>
+              </Row>
+
+              <p className="text-xs text-muted-foreground mt-3 mb-1 font-medium">Stats</p>
+              <Row label="Stats Entrance">
+                <Select value={settings.statsEntranceAnimation} onValueChange={v => set("statsEntranceAnimation", v)}>
+                  <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-stats-entrance">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAGGER_ANIMATION_OPTIONS.map(a => (
+                      <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Row>
+              <Row label="Stats Duration">
+                <div className="flex items-center gap-2">
+                  <input type="range" min={100} max={1500} step={50} value={settings.statsAnimationDuration}
+                    onChange={e => set("statsAnimationDuration", parseInt(e.target.value))}
+                    className="w-20" data-testid="range-stats-anim-duration" />
+                  <span className="text-xs w-12 text-right">{settings.statsAnimationDuration}ms</span>
+                </div>
+              </Row>
+
               <Row label="Hold Duration (s)">
                 <div className="flex items-center gap-2">
                   <input type="range" min={3000} max={60000} step={1000} value={settings.holdDuration}
@@ -699,37 +761,39 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
   );
 
   if (isSide) {
-    const sideW = 360;
+    const sideColW = 280;
     return (
-      <div style={{ width: 1920, height: 1080, background: "transparent", display: "flex", alignItems: "center", fontFamily: s.fontFamily }}>
-        {/* Left: Player A panel */}
-        <div style={{ width: sideW, height: 1080, flexShrink: 0, position: "relative", overflow: "hidden" }}>
-          {hasMediaA
-            ? <img src={s.playerAMediaUrl} alt="Player A" style={{ width: "100%", height: "100%", objectFit: s.mediaFit, display: "block" }} />
-            : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.25)` }} />}
-          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 160, background: `linear-gradient(to right, transparent, ${cardFadeColor(s)})` }} />
-        </div>
+      <div style={{ width: 1920, height: 1080, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: s.fontFamily }}>
+        {/* Single card containing media + stats */}
+        <div style={{
+          width: Math.min(s.sideCardWidth, 1920 - 80),
+          background: cardBg,
+          borderRadius: s.borderRadius,
+          overflow: "hidden",
+          boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          display: "flex", flexDirection: "row",
+        }}>
+          {/* Left: Player A media column */}
+          <div style={{ width: sideColW, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+            {hasMediaA
+              ? <img src={s.playerAMediaUrl} alt="Player A" style={{ width: "100%", height: "100%", objectFit: s.mediaFit, display: "block" }} />
+              : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.25)` }} />}
+            <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 120, background: `linear-gradient(to right, transparent, ${cardFadeColor(s)})` }} />
+          </div>
 
-        {/* Center: stats card */}
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", height: 1080 }}>
-          <div style={{
-            width: Math.min(s.sideCardWidth, 1920 - sideW * 2),
-            background: cardBg,
-            borderRadius: s.borderRadius,
-            overflow: "hidden",
-            boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
-            border: "1px solid rgba(255,255,255,0.08)",
-          }}>
+          {/* Centre: stats */}
+          <div style={{ flex: 1, minWidth: 0 }}>
             {cardContent}
           </div>
-        </div>
 
-        {/* Right: Player B panel */}
-        <div style={{ width: sideW, height: 1080, flexShrink: 0, position: "relative", overflow: "hidden" }}>
-          {hasMediaB
-            ? <img src={s.playerBMediaUrl} alt="Player B" style={{ width: "100%", height: "100%", objectFit: s.mediaFit, display: "block" }} />
-            : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.25)` }} />}
-          <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 160, background: `linear-gradient(to left, transparent, ${cardFadeColor(s)})` }} />
+          {/* Right: Player B media column */}
+          <div style={{ width: sideColW, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+            {hasMediaB
+              ? <img src={s.playerBMediaUrl} alt="Player B" style={{ width: "100%", height: "100%", objectFit: s.mediaFit, display: "block" }} />
+              : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.25)` }} />}
+            <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 120, background: `linear-gradient(to left, transparent, ${cardFadeColor(s)})` }} />
+          </div>
         </div>
       </div>
     );
