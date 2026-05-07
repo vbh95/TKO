@@ -70,6 +70,7 @@ const STAGGER_ANIMATION_OPTIONS = [
   { value: "slide-from-left", label: "Slide From Left" },
   { value: "slide-from-right", label: "Slide From Right" },
   { value: "zoom-in", label: "Zoom In" },
+  { value: "wipe-reveal", label: "Wipe Reveal" },
   { value: "flip-in", label: "Flip In" },
   { value: "drop-in", label: "Drop In" },
   { value: "blur-in", label: "Blur In" },
@@ -175,6 +176,25 @@ function cardBackground(s: Settings): string {
 function cardFadeColor(s: Settings): string {
   const bgRgb = hexToRgb(s.bgColor || "#0f172a");
   return `rgba(${bgRgb}, ${s.bgOpacity})`;
+}
+
+function getEntranceAnimWithDelay(name: string, duration: number, delayMs: number): string | undefined {
+  if (name === "none") return undefined;
+  const ms = `${duration}ms`;
+  const delay = `${delayMs}ms`;
+  const ease = "cubic-bezier(0.22, 1, 0.36, 1)";
+  switch (name) {
+    case "slide-up":         return `pmc-slide-up ${ms} ${ease} ${delay} both`;
+    case "slide-from-left":  return `pmc-slide-left ${ms} ${ease} ${delay} both`;
+    case "slide-from-right": return `pmc-slide-right ${ms} ${ease} ${delay} both`;
+    case "zoom-in":          return `pmc-zoom-in ${ms} ${ease} ${delay} both`;
+    case "wipe-reveal":      return `pmc-wipe ${ms} ${ease} ${delay} both`;
+    case "flip-in":          return `pmc-flip-in ${ms} ${ease} ${delay} both`;
+    case "drop-in":          return `pmc-drop-in ${ms} ${ease} ${delay} both`;
+    case "blur-in":          return `pmc-blur-in ${ms} ease ${delay} both`;
+    case "bounce-in":        return `pmc-bounce-in ${ms} ease ${delay} both`;
+    default:                 return `pmc-fade-in ${ms} ease ${delay} both`;
+  }
 }
 
 export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boardNumber }: Props) {
@@ -705,41 +725,52 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
   const hasMedia = hasMediaA || hasMediaB;
   const logoUrls = (s.sponsorLogoUrls ?? []).filter(Boolean);
 
+  const previewNameAnim = s.nameEntranceAnimation !== "none"
+    ? getEntranceAnimWithDelay(s.nameEntranceAnimation, s.nameAnimationDuration, s.animationDuration)
+    : undefined;
+
+  const getPreviewStatAnim = (idx: number) => s.statsEntranceAnimation !== "none"
+    ? getEntranceAnimWithDelay(s.statsEntranceAnimation, s.statsAnimationDuration, s.animationDuration + s.nameAnimationDuration + s.statRevealDelay * idx)
+    : undefined;
+
   const cardContent = (
     <>
-      {/* Tournament name */}
-      <div style={{
-        textAlign: "center",
-        padding: (hasMedia && !isSide) ? "10px 40px 0" : "28px 40px 0",
-        color: `rgba(${hexToRgb(s.textColor)}, 0.6)`,
-        fontSize: s.titleFontSize, fontWeight: 600,
-        letterSpacing: "0.12em", textTransform: "uppercase",
-      }}>
-        Example Tournament
-      </div>
+      {/* Header block: tournament name + score + divider — animate together */}
+      <div style={{ animation: previewNameAnim }}>
+        {/* Tournament name */}
+        <div style={{
+          textAlign: "center",
+          padding: (hasMedia && !isSide) ? "10px 40px 0" : "28px 40px 0",
+          color: `rgba(${hexToRgb(s.textColor)}, 0.6)`,
+          fontSize: s.titleFontSize, fontWeight: 600,
+          letterSpacing: "0.12em", textTransform: "uppercase",
+        }}>
+          Example Tournament
+        </div>
 
-      {/* Score row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 40px 0", gap: 20 }}>
-        <div style={{ flex: 1, textAlign: "right", color: s.winnerHighlightColor, fontSize: s.playerNameFontSize, fontWeight: 800, letterSpacing: "0.02em" }}>
-          Player A {s.showWinnerStar && <span style={{ marginLeft: 10, fontSize: s.playerNameFontSize * 0.6, opacity: 0.85 }}>★</span>}
+        {/* Score row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 40px 0", gap: 20 }}>
+          <div style={{ flex: 1, textAlign: "right", color: s.winnerHighlightColor, fontSize: s.playerNameFontSize, fontWeight: 800, letterSpacing: "0.02em" }}>
+            Player A {s.showWinnerStar && <span style={{ marginLeft: 10, fontSize: s.playerNameFontSize * 0.6, opacity: 0.85 }}>★</span>}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", background: "rgba(255,255,255,0.07)", borderRadius: 10, overflow: "hidden", minWidth: 160, flexShrink: 0 }}>
+            <div style={{ flex: 1, textAlign: "center", padding: "10px 20px", fontSize: s.playerNameFontSize * 1.1, fontWeight: 900, color: s.winnerHighlightColor, background: `rgba(${hexToRgb(s.winnerHighlightColor)}, 0.1)` }}>2</div>
+            <div style={{ width: 2, background: "rgba(255,255,255,0.12)", alignSelf: "stretch" }} />
+            <div style={{ flex: 1, textAlign: "center", padding: "10px 20px", fontSize: s.playerNameFontSize * 1.1, fontWeight: 900, color: s.textColor }}>1</div>
+          </div>
+          <div style={{ flex: 1, textAlign: "left", color: s.textColor, fontSize: s.playerNameFontSize, fontWeight: 800, letterSpacing: "0.02em" }}>
+            Player B
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", background: "rgba(255,255,255,0.07)", borderRadius: 10, overflow: "hidden", minWidth: 160, flexShrink: 0 }}>
-          <div style={{ flex: 1, textAlign: "center", padding: "10px 20px", fontSize: s.playerNameFontSize * 1.1, fontWeight: 900, color: s.winnerHighlightColor, background: `rgba(${hexToRgb(s.winnerHighlightColor)}, 0.1)` }}>2</div>
-          <div style={{ width: 2, background: "rgba(255,255,255,0.12)", alignSelf: "stretch" }} />
-          <div style={{ flex: 1, textAlign: "center", padding: "10px 20px", fontSize: s.playerNameFontSize * 1.1, fontWeight: 900, color: s.textColor }}>1</div>
-        </div>
-        <div style={{ flex: 1, textAlign: "left", color: s.textColor, fontSize: s.playerNameFontSize, fontWeight: 800, letterSpacing: "0.02em" }}>
-          Player B
-        </div>
-      </div>
 
-      {/* Divider */}
-      <div style={{ margin: "14px 40px", height: 1, background: `linear-gradient(to right, transparent, rgba(${hexToRgb(s.primaryColor)}, 0.6), rgba(${hexToRgb(s.secondaryColor)}, 0.6), transparent)` }} />
+        {/* Divider */}
+        <div style={{ margin: "14px 40px", height: 1, background: `linear-gradient(to right, transparent, rgba(${hexToRgb(s.primaryColor)}, 0.6), rgba(${hexToRgb(s.secondaryColor)}, 0.6), transparent)` }} />
+      </div>
 
       {/* Stats */}
       <div style={{ padding: "0 40px", paddingBottom: s.showSponsorArea ? 16 : 28 }}>
         {visibleStats.map((k, idx) => (
-          <div key={k} style={{ display: "flex", alignItems: "center", padding: `${s.statRowPadding}px 0`, borderBottom: idx < visibleStats.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+          <div key={k} style={{ display: "flex", alignItems: "center", padding: `${s.statRowPadding}px 0`, borderBottom: idx < visibleStats.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none", animation: getPreviewStatAnim(idx) }}>
             <div style={{ flex: 1, textAlign: "right", fontSize: s.statsFontSize + 2, fontWeight: 700, color: s.textColor, paddingRight: 20 }}>{DEMO[k]?.a ?? "—"}</div>
             <div style={{ width: 200, textAlign: "center", fontSize: s.statsFontSize, fontWeight: 500, color: `rgba(${hexToRgb(s.textColor)}, 0.5)`, textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>{STAT_LBL[k] ?? k}</div>
             <div style={{ flex: 1, textAlign: "left", fontSize: s.statsFontSize + 2, fontWeight: 700, color: s.textColor, paddingLeft: 20 }}>{DEMO[k]?.b ?? "—"}</div>
