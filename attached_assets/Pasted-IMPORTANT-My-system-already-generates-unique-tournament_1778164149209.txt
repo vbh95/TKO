@@ -1,0 +1,142 @@
+IMPORTANT:
+My system already generates unique tournament-specific and board-specific URLs for:
+- Tablet scorer sessions
+- Existing OBS overlays
+
+This system currently works perfectly and must NOT be changed, replaced, refactored, or broken.
+
+The new Post Match Card Overlay must integrate into the existing URL generation structure and use the same tournament + board context already used by the current OBS overlay system.
+
+Generate the new Post Match Card Overlay URLs using the same existing logic/pattern as the current OBS Overlay URLs.
+
+The new Post Match Card Overlay URL should automatically use the existing tournament session ID and board identifier already associated with that board card.
+
+Do not create a separate tournament routing system.
+Do not modify the existing overlay routing.
+Extend the current implementation only.
+
+--------------------------------------------------
+
+Update the existing Tablet Scoring modal UI.
+
+For each board card, underneath the existing “OBS Overlay” URL section, add a new section called:
+
+Post Match Card Overlay
+
+This should display a separate copyable URL for that board’s post-match overlay.
+
+The section must visually match the existing OBS Overlay section styling:
+- Small label
+- URL input field
+- Copy button on the right
+- Same spacing and theme styling already used in the modal
+
+The Post Match Card Overlay URL must use the existing tournament-specific and board-specific routing/session logic already used by the current OBS overlay system.
+
+Example pattern only:
+- Existing OBS Overlay URL
+- New Post Match Card Overlay URL generated beside it using the same board/tournament context
+
+Do NOT change the existing QR pairing system, scorer tablet URL generation, OBS overlay URLs, board IDs, session tokens, or overlay routing logic.
+
+--------------------------------------------------
+
+Next to the Post Match Card Overlay URL field, add a settings button with a cog icon.
+
+When clicked, open a Post Match Card customisation modal or slide-out panel.
+
+This customisation panel should allow me to visually configure the overlay for that board.
+
+Customisation settings must include:
+
+COLOURS:
+- Background colour
+- Background transparency
+- Primary colour
+- Secondary colour
+- Text colour
+- Winner highlight colour
+
+TYPOGRAPHY:
+- Font family
+- Title font size
+- Player name font size
+- Stats font size
+
+LAYOUT:
+- Show/hide individual stats
+- Change stat display order
+- Border radius
+- Optional sponsor/logo area
+
+PLAYER MEDIA:
+- Left player image/video upload or URL
+- Right player image/video upload or URL
+- Media fit mode:
+  - cover
+  - contain
+
+ANIMATIONS:
+- Entrance animation
+- Exit animation
+- Animation duration
+- Stat row reveal delay
+- Hold duration
+- Auto-hide toggle
+- Refresh interval
+
+Animation options:
+- Fade in
+- Fade out
+- Slide up
+- Slide from left
+- Slide from right
+- Zoom in
+- Zoom out
+- Wipe reveal
+- Staggered stat reveal
+
+--------------------------------------------------
+
+Add a LIVE PREVIEW button inside the customisation panel.
+
+The preview should render the Post Match Card Overlay in real-time using the selected settings before using it in OBS.
+
+--------------------------------------------------
+
+The Post Match Card Overlay itself should:
+
+- Be a separate OBS browser source from the current live scoring overlay
+- Reuse the existing completed match stats already available in the tablet scorer/match stats system
+- NOT create a new stats engine
+- Automatically show the latest completed match for the selected board
+- Auto-refresh without requiring OBS reload
+- Support transparent backgrounds
+- Be designed for 1920x1080 OBS browser source use
+- Use broadcast-style layout and animations
+- Not interfere with the existing live scoring overlay
+
+--------------------------------------------------
+
+The Post Match Card Overlay should display:
+- Match winner
+- Final score
+- Player names
+- Player averages
+- 180s
+- 140+
+- 100+
+- Checkout percentage
+- Highest checkout
+- Best leg
+- Optional sponsor/logo area
+- Left player media
+- Right player media
+
+--------------------------------------------------
+
+Save all Post Match Card settings persistently using the existing app structure/database/config system.
+
+Each board should be able to have its own saved Post Match Card customisation settings.
+
+Keep all existing Tablet Scoring functionality exactly as it currently works.

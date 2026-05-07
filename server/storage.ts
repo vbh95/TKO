@@ -1,4 +1,4 @@
-import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, boardSessions, leagues, leagueManualResults, betaFeedback, feedbackNotifications } from "@shared/schema";
+import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, boardSessions, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications } from "@shared/schema";
 import { desc } from "drizzle-orm";
 import type { 
   User, InsertUser, 
@@ -10,6 +10,7 @@ import type {
   Match, InsertMatch,
   MatchNote, InsertMatchNote,
   BoardSession, InsertBoardSession,
+  BoardOverlaySettings,
   League, InsertLeague,
   LeagueManualResult, InsertLeagueManualResult,
   BetaFeedback, InsertBetaFeedback,
@@ -119,6 +120,10 @@ export interface IStorage {
 
   // Reset
   resetTournamentData(tournamentId: number): Promise<void>;
+
+  // Board Overlay Settings
+  getBoardOverlaySettings(tournamentId: number, boardNumber: number): Promise<BoardOverlaySettings | undefined>;
+  upsertBoardOverlaySettings(tournamentId: number, boardNumber: number, settings: object): Promise<BoardOverlaySettings>;
   
   // Session Store
   sessionStore: session.Store;
@@ -632,6 +637,32 @@ export class DatabaseStorage implements IStorage {
       .where(eq(tournamentCollaborators.userId, userId))
       .orderBy(desc(tournaments.updatedAt));
     return rows.map(r => r.tournament);
+  }
+
+  async getBoardOverlaySettings(tournamentId: number, boardNumber: number): Promise<BoardOverlaySettings | undefined> {
+    const [row] = await db
+      .select()
+      .from(boardOverlaySettings)
+      .where(and(eq(boardOverlaySettings.tournamentId, tournamentId), eq(boardOverlaySettings.boardNumber, boardNumber)));
+    return row;
+  }
+
+  async upsertBoardOverlaySettings(tournamentId: number, boardNumber: number, settings: object): Promise<BoardOverlaySettings> {
+    const existing = await this.getBoardOverlaySettings(tournamentId, boardNumber);
+    if (existing) {
+      const [updated] = await db
+        .update(boardOverlaySettings)
+        .set({ settings, updatedAt: new Date() })
+        .where(and(eq(boardOverlaySettings.tournamentId, tournamentId), eq(boardOverlaySettings.boardNumber, boardNumber)))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(boardOverlaySettings)
+        .values({ tournamentId, boardNumber, settings })
+        .returning();
+      return created;
+    }
   }
 }
 

@@ -3406,6 +3406,160 @@ export async function registerRoutes(
     }
   });
 
+  // === BOARD OVERLAY SETTINGS ===
+
+  app.get('/api/tournaments/:id/board-overlay-settings/:boardNumber', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const tournamentId = parseInt(req.params.id, 10);
+      const boardNumber = parseInt(req.params.boardNumber, 10);
+      if (isNaN(tournamentId) || isNaN(boardNumber)) return res.status(400).json({ message: "Invalid parameters" });
+      const tournament = await storage.getTournament(tournamentId);
+      if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
+      const row = await storage.getBoardOverlaySettings(tournamentId, boardNumber);
+      res.json(row?.settings ?? {});
+    } catch (err) {
+      console.error("GET board overlay settings error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put('/api/tournaments/:id/board-overlay-settings/:boardNumber', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const tournamentId = parseInt(req.params.id, 10);
+      const boardNumber = parseInt(req.params.boardNumber, 10);
+      if (isNaN(tournamentId) || isNaN(boardNumber)) return res.status(400).json({ message: "Invalid parameters" });
+      const tournament = await storage.getTournament(tournamentId);
+      if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+      if (!(await isAuthorizedForTournament(tournament, (req.user as any).id, !!(req.user as any).isSuperUser))) return res.status(401).json({ message: "Unauthorized" });
+      const settings = req.body;
+      if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
+        return res.status(400).json({ message: "Settings must be an object" });
+      }
+      const row = await storage.upsertBoardOverlaySettings(tournamentId, boardNumber, settings);
+      res.json(row.settings);
+    } catch (err) {
+      console.error("PUT board overlay settings error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Public endpoint — no auth required (used by OBS browser source)
+  app.get('/api/tournaments/:id/boards/:boardNumber/last-completed-match', async (req, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id, 10);
+      const boardNumber = parseInt(req.params.boardNumber, 10);
+      if (isNaN(tournamentId) || isNaN(boardNumber)) return res.status(400).json({ message: "Invalid parameters" });
+
+      const tournament = await storage.getTournament(tournamentId);
+      if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+      const allMatches = await storage.getMatchesByTournamentId(tournamentId);
+      const completedMatches = allMatches.filter(m => m.status === 'COMPLETED');
+
+      // Try direct boardNumber field first (covers board_rotation group matches + knockout)
+      let candidates = completedMatches.filter(m => (m as any).boardNumber === boardNumber);
+
+      // Fallback: group-based assignment (non-board-rotation: group at index boardNumber-1)
+      if (candidates.length === 0) {
+        const groups = await storage.getGroupsByTournamentId(tournamentId);
+        const sortedGroups = [...groups].sort((a, b) => a.name.localeCompare(b.name));
+        const group = sortedGroups[boardNumber - 1];
+        if (group) {
+          candidates = completedMatches.filter(m => m.groupId === group.id);
+        }
+      }
+
+      // Most recently completed = highest id
+      candidates.sort((a, b) => b.id - a.id);
+      const match = candidates[0] ?? null;
+
+      if (!match) {
+        const settingsRow = await storage.getBoardOverlaySettings(tournamentId, boardNumber);
+        return res.json({ match: null, playerA: null, playerB: null, stats: null, settings: settingsRow?.settings ?? {} });
+      }
+
+      const players = await storage.getPlayersByTournamentId(tournamentId);
+      const playerA = (match as any).playerA ?? players.find(p => p.id === match.playerAId) ?? null;
+      const playerB = (match as any).playerB ?? players.find(p => p.id === match.playerBId) ?? null;
+
+      const note = await storage.getMatchNote(match.id);
+
+      let avgA: number | null = null;
+      let avgB: number | null = null;
+      if (note?.totalVisitsA && note.totalVisitsA > 0 && note.totalScoredA != null) {
+        avgA = Math.round((note.totalScoredA / note.totalVisitsA) * 10) / 10;
+      }
+      if (note?.totalVisitsB && note.totalVisitsB > 0 && note.totalScoredB != null) {
+        avgB = Math.round((note.totalScoredB / note.totalVisitsB) * 10) / 10;
+      }
+
+      const checkoutPctA = note?.checkoutAttemptsA && note.checkoutAttemptsA > 0 && note.checkoutSuccessA != null
+        ? Math.round((note.checkoutSuccessA / note.checkoutAttemptsA) * 1000) / 10
+        : null;
+      const checkoutPctB = note?.checkoutAttemptsB && note.checkoutAttemptsB > 0 && note.checkoutSuccessB != null
+        ? Math.round((note.checkoutSuccessB / note.checkoutAttemptsB) * 1000) / 10
+        : null;
+
+      // Best leg: fewest darts to win a leg, computed from legHistory
+      let bestLegA: number | null = null;
+      let bestLegB: number | null = null;
+      if (Array.isArray(note?.legHistory)) {
+        for (const leg of note.legHistory as any[]) {
+          if (!leg || !Array.isArray(leg.visits) || !leg.winner || !leg.checkoutDartsUsed) continue;
+          const winnerVisits = leg.visits.filter((v: any) => v.player === leg.winner);
+          if (winnerVisits.length === 0) continue;
+          const darts = (winnerVisits.length - 1) * 3 + leg.checkoutDartsUsed;
+          if (leg.winner === 'A') {
+            if (bestLegA === null || darts < bestLegA) bestLegA = darts;
+          } else {
+            if (bestLegB === null || darts < bestLegB) bestLegB = darts;
+          }
+        }
+      }
+
+      const settingsRow = await storage.getBoardOverlaySettings(tournamentId, boardNumber);
+
+      res.json({
+        match: {
+          id: match.id,
+          playerAId: match.playerAId,
+          playerBId: match.playerBId,
+          scoreA: match.scoreA ?? 0,
+          scoreB: match.scoreB ?? 0,
+          winnerId: match.winnerId ?? null,
+          bestOf: match.bestOf,
+          roundKey: match.roundKey,
+        },
+        playerA: playerA ? { id: playerA.id, name: playerA.name } : null,
+        playerB: playerB ? { id: playerB.id, name: playerB.name } : null,
+        tournamentName: tournament.name,
+        stats: {
+          avgA,
+          avgB,
+          ton80sA: note?.ton80sA ?? null,
+          ton80sB: note?.ton80sB ?? null,
+          ton40sA: note?.ton40sA ?? null,
+          ton40sB: note?.ton40sB ?? null,
+          tonsA: note?.tonsA ?? null,
+          tonsB: note?.tonsB ?? null,
+          checkoutPctA,
+          checkoutPctB,
+          highestFinishA: note?.highestFinishA ?? null,
+          highestFinishB: note?.highestFinishB ?? null,
+          bestLegA,
+          bestLegB,
+        },
+        settings: settingsRow?.settings ?? {},
+      });
+    } catch (err) {
+      console.error("Last completed match error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   backfillKnockoutScorers();
 
   return httpServer;

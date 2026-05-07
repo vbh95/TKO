@@ -177,6 +177,16 @@ export const matchNotes = pgTable("match_notes", {
 
 export const insertMatchNoteSchema = createInsertSchema(matchNotes).omit({ id: true });
 
+// === BOARD OVERLAY SETTINGS ===
+export const boardOverlaySettings = pgTable("board_overlay_settings", {
+  id: serial("id").primaryKey(),
+  tournamentId: integer("tournament_id").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+  boardNumber: integer("board_number").notNull(),
+  settings: jsonb("settings").notNull().default({}),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type BoardOverlaySettings = typeof boardOverlaySettings.$inferSelect;
+
 // === BOARD SESSIONS ===
 export const boardSessions = pgTable("board_sessions", {
   id: serial("id").primaryKey(),

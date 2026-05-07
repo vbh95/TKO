@@ -1,0 +1,84 @@
+Create a site-admin-only post-match OBS overlay system for my darts software.
+
+Do not change or break the existing live scoring OBS overlay.
+
+Add a new protected admin customisation page available only to site admins:
+
+/admin/post-match-overlay
+
+Only users with site admin permissions should be able to access, view, edit, or save this feature. Non-admins must be blocked or redirected.
+
+Add a new OBS browser source overlay page:
+
+/overlay/post-match?board=1&mode=latestCompleted
+
+The OBS overlay should be public/read-only for OBS use, but the customisation screen must be admin-only.
+
+The overlay should display the latest completed match stats that already exist in the tablet scorer/match stats system. Reuse existing match stats data rather than creating a new stats engine.
+
+The overlay should show:
+- Match winner
+- Final score
+- Player names
+- Player averages
+- 180s
+- 140+
+- 100+
+- Checkout percentage
+- Highest checkout
+- Best leg
+- Optional sponsor/logo area
+- Left player media placeholder
+- Right player media placeholder
+
+Create a customisation screen where site admins can visually control:
+- Background colour/transparency
+- Primary colour
+- Secondary colour
+- Text colour
+- Winner highlight colour
+- Font family
+- Title font size
+- Player name font size
+- Stats font size
+- Show/hide individual stats
+- Stat display order
+- Left player image/video URL or upload
+- Right player image/video URL or upload
+- Media fit: cover or contain
+- Border radius
+- Animation style
+- Animation duration
+- Entrance animation
+- Exit animation
+- Stat row reveal delay
+- Hold duration
+- Auto-hide on/off
+- Refresh interval
+
+Animation options should include:
+- Fade in
+- Fade out
+- Slide up
+- Slide from left
+- Slide from right
+- Zoom in
+- Zoom out
+- Wipe reveal
+- Staggered stat reveal
+
+Add a live preview button inside the admin screen so I can test the overlay animation and layout before using it in OBS.
+
+Save all overlay settings to the database or a persistent JSON config, whichever fits the existing app structure best.
+
+The OBS overlay page must load:
+1. The latest completed match data for the selected board
+2. The saved post-match overlay settings
+
+The overlay should auto-refresh the match data and settings without needing to reload OBS.
+
+Make the overlay 1920x1080, transparent-background friendly, and suitable for OBS Browser Source.
+
+Add any required backend routes/API endpoints, frontend components, CSS, and database/config changes.
+
+Keep this feature separate from the current live match overlay.

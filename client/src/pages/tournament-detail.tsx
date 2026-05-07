@@ -97,6 +97,7 @@ import { useSocket } from "@/hooks/use-socket";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Match, Player, GroupMembership, BoardSession } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { PostMatchOverlaySettings } from "@/components/post-match-overlay-settings";
 
 function InlineScorerEdit({ matchId, tournamentId, currentName, isLegacy }: { matchId: number; tournamentId: number; currentName: string | null; isLegacy?: boolean }) {
   const [editing, setEditing] = useState(false);
@@ -2784,9 +2785,11 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, 
   });
 
   const sortedGroups = [...groups].sort((a: any, b: any) => a.name.localeCompare(b.name));
+  const [overlaySettingsBoard, setOverlaySettingsBoard] = useState<number | null>(null);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto" data-testid="dialog-connected-devices">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -2912,6 +2915,26 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, 
                         </div>
                       </div>
                     )}
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                        <Monitor className="w-3 h-3" /> Post Match Card
+                      </p>
+                      <div className="flex gap-2">
+                        <Input readOnly value={`${window.location.origin}/post-match-overlay/${tournament.id}/${boardNumber}`} className="text-xs h-8" data-testid={`input-post-match-url-${boardNumber}`} />
+                        <Button size="icon" variant="outline" className="h-8 w-8 shrink-0"
+                          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/post-match-overlay/${tournament.id}/${boardNumber}`); toast({ title: "Post Match URL copied!", description: "Paste into OBS as a Browser Source." }); }}
+                          data-testid={`button-copy-post-match-${boardNumber}`}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                        <Button size="icon" variant="outline" className="h-8 w-8 shrink-0"
+                          onClick={() => setOverlaySettingsBoard(boardNumber)}
+                          data-testid={`button-post-match-settings-${boardNumber}`}
+                        >
+                          <Settings className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -3082,6 +3105,26 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, 
                       <p className="text-xs text-muted-foreground/60 italic">No active match on this board yet</p>
                     )}
                   </div>
+                  <div className="pt-2 border-t">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                      <Monitor className="w-3 h-3" /> Post Match Card
+                    </p>
+                    <div className="flex gap-2">
+                      <Input readOnly value={`${window.location.origin}/post-match-overlay/${tournament.id}/${boardNumber}`} className="text-xs h-8" data-testid={`input-post-match-url-${boardNumber}`} />
+                      <Button size="icon" variant="outline" className="h-8 w-8 shrink-0"
+                        onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/post-match-overlay/${tournament.id}/${boardNumber}`); toast({ title: "Post Match URL copied!", description: "Paste into OBS as a Browser Source." }); }}
+                        data-testid={`button-copy-post-match-${boardNumber}`}
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                      <Button size="icon" variant="outline" className="h-8 w-8 shrink-0"
+                        onClick={() => setOverlaySettingsBoard(boardNumber)}
+                        data-testid={`button-post-match-settings-${boardNumber}`}
+                      >
+                        <Settings className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -3091,5 +3134,12 @@ function BoardSessionsDialog({ open, onOpenChange, tournament, groups, matches, 
         }
       </DialogContent>
     </Dialog>
+    <PostMatchOverlaySettings
+      open={overlaySettingsBoard !== null}
+      onOpenChange={(o) => { if (!o) setOverlaySettingsBoard(null); }}
+      tournamentId={tournament.id}
+      boardNumber={overlaySettingsBoard ?? 1}
+    />
+    </>
   );
 }
