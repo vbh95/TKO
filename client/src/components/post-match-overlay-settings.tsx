@@ -98,7 +98,7 @@ export const DEFAULT_OVERLAY_SETTINGS = {
   sponsorLogoMaxHeight: 48,
   playerAMediaUrl: "",
   playerBMediaUrl: "",
-  mediaFit: "cover",
+  mediaFit: "cover" as "cover" | "contain",
   mediaPosition: "top" as "top" | "side",
   entranceAnimation: "fade-in",
   exitAnimation: "fade-out",
@@ -705,7 +705,7 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
         {/* Left: Player A panel */}
         <div style={{ width: sideW, height: 1080, flexShrink: 0, position: "relative", overflow: "hidden" }}>
           {hasMediaA
-            ? <img src={s.playerAMediaUrl} alt="Player A" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
+            ? <img src={s.playerAMediaUrl} alt="Player A" style={{ width: "100%", height: "100%", objectFit: s.mediaFit, display: "block" }} />
             : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.25)` }} />}
           <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 160, background: `linear-gradient(to right, transparent, ${cardFadeColor(s)})` }} />
         </div>
@@ -727,7 +727,7 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
         {/* Right: Player B panel */}
         <div style={{ width: sideW, height: 1080, flexShrink: 0, position: "relative", overflow: "hidden" }}>
           {hasMediaB
-            ? <img src={s.playerBMediaUrl} alt="Player B" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
+            ? <img src={s.playerBMediaUrl} alt="Player B" style={{ width: "100%", height: "100%", objectFit: s.mediaFit, display: "block" }} />
             : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.25)` }} />}
           <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 160, background: `linear-gradient(to left, transparent, ${cardFadeColor(s)})` }} />
         </div>
@@ -750,13 +750,13 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
           <div style={{ display: "flex", height: 280, width: "100%" }}>
             <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
               {hasMediaA
-                ? <img src={s.playerAMediaUrl} alt="A" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
+                ? <img src={s.playerAMediaUrl} alt="A" style={{ width: "100%", height: "100%", objectFit: s.mediaFit, display: "block" }} />
                 : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.primaryColor)}, 0.15)` }} />}
               <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardFadeColor(s)})` }} />
             </div>
             <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
               {hasMediaB
-                ? <img src={s.playerBMediaUrl} alt="B" style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
+                ? <img src={s.playerBMediaUrl} alt="B" style={{ width: "100%", height: "100%", objectFit: s.mediaFit, display: "block" }} />
                 : <div style={{ width: "100%", height: "100%", background: `rgba(${hexToRgb(s.secondaryColor)}, 0.15)` }} />}
               <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(transparent, ${cardFadeColor(s)})` }} />
             </div>

@@ -79,7 +79,7 @@ const DEFAULT_SETTINGS = {
   sponsorLogoMaxHeight: 48,
   playerAMediaUrl: "",
   playerBMediaUrl: "",
-  mediaFit: "cover",
+  mediaFit: "cover" as "cover" | "contain",
   mediaPosition: "top" as "top" | "side",
   entranceAnimation: "fade-in",
   exitAnimation: "fade-out",
@@ -291,8 +291,8 @@ export default function PostMatchOverlay() {
   const renderMedia = (url: string, name: string | undefined) => {
     if (!url) return null;
     return isVideo(url)
-      ? <video src={url} autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />
-      : <img src={url} alt={name} style={{ width: "100%", height: "100%", objectFit: s.mediaFit as any, display: "block" }} />;
+      ? <video src={url} autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: s.mediaFit, display: "block" }} />
+      : <img src={url} alt={name} style={{ width: "100%", height: "100%", objectFit: s.mediaFit, display: "block" }} />;
   };
 
   /* ─── Stats + sponsor content (shared by both layouts) ─────────── */
