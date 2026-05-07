@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -20,9 +20,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { ChevronUp, ChevronDown, Eye, Save, Loader2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Save, Loader2 } from "lucide-react";
 
-const STAT_KEYS = ["average", "ton80s", "ton40s", "tons", "checkoutPct", "highestCheckout", "bestLeg"] as const;
 const STAT_LABELS: Record<string, string> = {
   average: "3-Dart Avg",
   ton80s: "180s",
@@ -113,7 +112,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
-      <Label className="text-xs text-muted-foreground shrink-0 w-40">{label}</Label>
+      <Label className="text-xs text-muted-foreground shrink-0 w-36">{label}</Label>
       <div className="flex-1 flex justify-end">{children}</div>
     </div>
   );
@@ -122,7 +121,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boardNumber }: Props) {
   const { toast } = useToast();
   const [settings, setSettings] = useState<Settings>(DEFAULT_OVERLAY_SETTINGS);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(0.3);
 
   const qk = [`/api/tournaments/${tournamentId}/board-overlay-settings/${boardNumber}`];
 
@@ -133,9 +133,28 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
 
   useEffect(() => {
     if (savedSettings) {
-      setSettings(prev => ({ ...DEFAULT_OVERLAY_SETTINGS, ...savedSettings, showStats: { ...DEFAULT_OVERLAY_SETTINGS.showStats, ...(savedSettings.showStats ?? {}) } }));
+      setSettings(prev => ({
+        ...DEFAULT_OVERLAY_SETTINGS,
+        ...savedSettings,
+        showStats: { ...DEFAULT_OVERLAY_SETTINGS.showStats, ...(savedSettings.showStats ?? {}) },
+      }));
     }
   }, [savedSettings]);
+
+  useEffect(() => {
+    const el = previewContainerRef.current;
+    if (!el) return;
+    const update = () => {
+      const { width, height } = el.getBoundingClientRect();
+      if (width > 0 && height > 0) {
+        setPreviewScale(Math.min(width / 1920, height / 1080));
+      }
+    };
+    update();
+    const obs = new ResizeObserver(update);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [open]);
 
   const saveMutation = useMutation({
     mutationFn: async (data: Settings) => {
@@ -169,19 +188,24 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
   };
 
   return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-[420px] overflow-y-auto" data-testid="sheet-post-match-settings">
-          <SheetHeader>
-            <SheetTitle className="text-sm">Post Match Card Settings — Board {boardNumber}</SheetTitle>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-[95vw] sm:max-w-none p-0 flex flex-row gap-0 overflow-hidden"
+        data-testid="sheet-post-match-settings"
+      >
+        {/* ── Left: settings controls ─────────────────────────── */}
+        <div className="w-[400px] shrink-0 flex flex-col h-full border-r bg-background">
+          <SheetHeader className="px-5 py-4 border-b shrink-0">
+            <SheetTitle className="text-sm">Post Match Card — Board {boardNumber}</SheetTitle>
           </SheetHeader>
 
           {isLoading ? (
-            <div className="flex items-center justify-center h-40">
+            <div className="flex items-center justify-center flex-1">
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="mt-4 space-y-1">
+            <div className="flex-1 overflow-y-auto px-5 pb-4">
 
               {/* COLOURS */}
               <SectionLabel>Colours</SectionLabel>
@@ -193,7 +217,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <div className="flex items-center gap-2 flex-1 justify-end">
                   <input type="range" min={0} max={1} step={0.01} value={settings.bgOpacity}
                     onChange={e => set("bgOpacity", parseFloat(e.target.value))}
-                    className="w-28" data-testid="range-bg-opacity" />
+                    className="w-24" data-testid="range-bg-opacity" />
                   <span className="text-xs w-8 text-right">{Math.round(settings.bgOpacity * 100)}%</span>
                 </div>
               </Row>
@@ -220,7 +244,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
               <SectionLabel>Typography</SectionLabel>
               <Row label="Font Family">
                 <Select value={settings.fontFamily} onValueChange={v => set("fontFamily", v)}>
-                  <SelectTrigger className="h-8 w-48 text-xs" data-testid="select-font">
+                  <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-font">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -234,7 +258,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <div className="flex items-center gap-2">
                   <input type="range" min={10} max={36} step={1} value={settings.titleFontSize}
                     onChange={e => set("titleFontSize", parseInt(e.target.value))}
-                    className="w-24" data-testid="range-title-size" />
+                    className="w-20" data-testid="range-title-size" />
                   <span className="text-xs w-8 text-right">{settings.titleFontSize}px</span>
                 </div>
               </Row>
@@ -242,7 +266,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <div className="flex items-center gap-2">
                   <input type="range" min={14} max={56} step={1} value={settings.playerNameFontSize}
                     onChange={e => set("playerNameFontSize", parseInt(e.target.value))}
-                    className="w-24" data-testid="range-name-size" />
+                    className="w-20" data-testid="range-name-size" />
                   <span className="text-xs w-8 text-right">{settings.playerNameFontSize}px</span>
                 </div>
               </Row>
@@ -250,7 +274,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <div className="flex items-center gap-2">
                   <input type="range" min={10} max={28} step={1} value={settings.statsFontSize}
                     onChange={e => set("statsFontSize", parseInt(e.target.value))}
-                    className="w-24" data-testid="range-stats-size" />
+                    className="w-20" data-testid="range-stats-size" />
                   <span className="text-xs w-8 text-right">{settings.statsFontSize}px</span>
                 </div>
               </Row>
@@ -263,7 +287,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <div className="flex items-center gap-2">
                   <input type="range" min={0} max={32} step={1} value={settings.borderRadius}
                     onChange={e => set("borderRadius", parseInt(e.target.value))}
-                    className="w-24" data-testid="range-border-radius" />
+                    className="w-20" data-testid="range-border-radius" />
                   <span className="text-xs w-8 text-right">{settings.borderRadius}px</span>
                 </div>
               </Row>
@@ -273,7 +297,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
               </Row>
               {settings.showSponsorArea && (
                 <Row label="Sponsor Logo URL">
-                  <Input className="h-8 text-xs w-52" placeholder="https://…" value={settings.sponsorLogoUrl}
+                  <Input className="h-8 text-xs w-48" placeholder="https://…" value={settings.sponsorLogoUrl}
                     onChange={e => set("sponsorLogoUrl", e.target.value)} data-testid="input-sponsor-url" />
                 </Row>
               )}
@@ -307,18 +331,18 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
               {/* PLAYER MEDIA */}
               <SectionLabel>Player Media</SectionLabel>
               <Row label="Left Player (A) URL">
-                <Input className="h-8 text-xs w-52" placeholder="Image or video URL"
+                <Input className="h-8 text-xs w-48" placeholder="Image or video URL"
                   value={settings.playerAMediaUrl} onChange={e => set("playerAMediaUrl", e.target.value)}
                   data-testid="input-media-a" />
               </Row>
               <Row label="Right Player (B) URL">
-                <Input className="h-8 text-xs w-52" placeholder="Image or video URL"
+                <Input className="h-8 text-xs w-48" placeholder="Image or video URL"
                   value={settings.playerBMediaUrl} onChange={e => set("playerBMediaUrl", e.target.value)}
                   data-testid="input-media-b" />
               </Row>
               <Row label="Media Fit">
                 <Select value={settings.mediaFit} onValueChange={v => set("mediaFit", v as "cover" | "contain")}>
-                  <SelectTrigger className="h-8 w-32 text-xs" data-testid="select-media-fit">
+                  <SelectTrigger className="h-8 w-28 text-xs" data-testid="select-media-fit">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -334,7 +358,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
               <SectionLabel>Animations</SectionLabel>
               <Row label="Entrance">
                 <Select value={settings.entranceAnimation} onValueChange={v => set("entranceAnimation", v)}>
-                  <SelectTrigger className="h-8 w-48 text-xs" data-testid="select-entrance">
+                  <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-entrance">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -346,7 +370,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
               </Row>
               <Row label="Exit">
                 <Select value={settings.exitAnimation} onValueChange={v => set("exitAnimation", v)}>
-                  <SelectTrigger className="h-8 w-48 text-xs" data-testid="select-exit">
+                  <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-exit">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -360,7 +384,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <div className="flex items-center gap-2">
                   <input type="range" min={200} max={2000} step={50} value={settings.animationDuration}
                     onChange={e => set("animationDuration", parseInt(e.target.value))}
-                    className="w-24" data-testid="range-anim-duration" />
+                    className="w-20" data-testid="range-anim-duration" />
                   <span className="text-xs w-12 text-right">{settings.animationDuration}ms</span>
                 </div>
               </Row>
@@ -368,7 +392,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <div className="flex items-center gap-2">
                   <input type="range" min={50} max={500} step={10} value={settings.statRevealDelay}
                     onChange={e => set("statRevealDelay", parseInt(e.target.value))}
-                    className="w-24" data-testid="range-stat-delay" />
+                    className="w-20" data-testid="range-stat-delay" />
                   <span className="text-xs w-12 text-right">{settings.statRevealDelay}ms</span>
                 </div>
               </Row>
@@ -376,7 +400,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <div className="flex items-center gap-2">
                   <input type="range" min={3000} max={60000} step={1000} value={settings.holdDuration}
                     onChange={e => set("holdDuration", parseInt(e.target.value))}
-                    className="w-24" data-testid="range-hold" />
+                    className="w-20" data-testid="range-hold" />
                   <span className="text-xs w-12 text-right">{settings.holdDuration / 1000}s</span>
                 </div>
               </Row>
@@ -388,82 +412,58 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <div className="flex items-center gap-2">
                   <input type="range" min={3000} max={60000} step={1000} value={settings.refreshInterval}
                     onChange={e => set("refreshInterval", parseInt(e.target.value))}
-                    className="w-24" data-testid="range-refresh" />
+                    className="w-20" data-testid="range-refresh" />
                   <span className="text-xs w-12 text-right">{settings.refreshInterval / 1000}s</span>
                 </div>
               </Row>
 
               <Separator className="my-4" />
 
-              {/* Actions */}
-              <div className="flex gap-2 pb-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 text-xs"
-                  onClick={() => setPreviewOpen(true)}
-                  data-testid="btn-preview-overlay"
-                >
-                  <Eye className="w-3 h-3 mr-1" /> Live Preview
-                </Button>
-                <Button
-                  size="sm"
-                  className="flex-1 text-xs"
-                  onClick={() => saveMutation.mutate(settings)}
-                  disabled={saveMutation.isPending}
-                  data-testid="btn-save-overlay-settings"
-                >
-                  {saveMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
-                  Save Settings
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                className="w-full text-xs mb-2"
+                onClick={() => saveMutation.mutate(settings)}
+                disabled={saveMutation.isPending}
+                data-testid="btn-save-overlay-settings"
+              >
+                {saveMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+                Save Settings
+              </Button>
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </div>
 
-      {/* Live preview modal */}
-      {previewOpen && (
+        {/* ── Right: live preview ──────────────────────────────── */}
         <div
-          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center"
-          onClick={() => setPreviewOpen(false)}
-          data-testid="overlay-preview-backdrop"
+          ref={previewContainerRef}
+          className="flex-1 bg-neutral-950 flex items-center justify-center overflow-hidden relative"
+          data-testid="preview-container"
         >
+          <div className="absolute top-2 left-3 text-white/30 text-[10px] font-mono tracking-widest uppercase select-none">
+            Live Preview · 1920 × 1080
+          </div>
           <div
-            className="relative bg-black rounded-xl overflow-hidden shadow-2xl"
-            style={{ width: "min(1200px, 95vw)", aspectRatio: "16/9" }}
-            onClick={e => e.stopPropagation()}
+            style={{
+              width: 1920,
+              height: 1080,
+              transform: `scale(${previewScale})`,
+              transformOrigin: "center center",
+              flexShrink: 0,
+            }}
           >
-            <div style={{ transform: "scale(var(--preview-scale, 1))", transformOrigin: "top left", width: 1920, height: 1080 }}>
-              <PreviewCard settings={settings} />
-            </div>
-            <style>{`
-              [data-preview-wrapper] { --preview-scale: ${Math.min(window.innerWidth * 0.95, 1200) / 1920}; }
-            `}</style>
-            <button
-              className="absolute top-2 right-2 bg-white/10 hover:bg-white/20 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm"
-              onClick={() => setPreviewOpen(false)}
-              data-testid="btn-close-preview"
-            >
-              ✕
-            </button>
-            <div
-              className="absolute top-2 left-2 bg-black/60 text-white/60 text-xs px-2 py-1 rounded"
-            >
-              Click outside to close
-            </div>
+            <PreviewCard settings={settings} />
           </div>
         </div>
-      )}
-    </>
+      </SheetContent>
+    </Sheet>
   );
 }
 
 function hexToRgb(hex: string) {
-  const h = hex.replace("#", "");
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
+  const h = (hex || "#000000").replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16) || 0;
+  const g = parseInt(h.slice(2, 4), 16) || 0;
+  const b = parseInt(h.slice(4, 6), 16) || 0;
   return `${r}, ${g}, ${b}`;
 }
 
@@ -487,11 +487,31 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
   const cardBg = `rgba(${bgRgb}, ${s.bgOpacity})`;
 
   return (
-    <div style={{ width: 1920, height: 1080, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: s.fontFamily }}>
-      <div style={{ width: 1400, background: cardBg, borderRadius: s.borderRadius, overflow: "hidden", boxShadow: "0 8px 48px rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ textAlign: "center", padding: "28px 40px 0", color: `rgba(${hexToRgb(s.textColor)}, 0.6)`, fontSize: s.titleFontSize, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+    <div style={{
+      width: 1920, height: 1080,
+      background: "transparent",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontFamily: s.fontFamily,
+    }}>
+      <div style={{
+        width: 1400,
+        background: cardBg,
+        borderRadius: s.borderRadius,
+        overflow: "hidden",
+        boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
+        border: "1px solid rgba(255,255,255,0.08)",
+      }}>
+        {/* Tournament name */}
+        <div style={{
+          textAlign: "center", padding: "28px 40px 0",
+          color: `rgba(${hexToRgb(s.textColor)}, 0.6)`,
+          fontSize: s.titleFontSize, fontWeight: 600,
+          letterSpacing: "0.12em", textTransform: "uppercase",
+        }}>
           Example Tournament
         </div>
+
+        {/* Score row */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 40px 0", gap: 20 }}>
           <div style={{ flex: 1, textAlign: "right", color: s.winnerHighlightColor, fontSize: s.playerNameFontSize, fontWeight: 800, letterSpacing: "0.02em" }}>
             Player A ★
@@ -505,8 +525,12 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
             Player B
           </div>
         </div>
+
+        {/* Divider */}
         <div style={{ margin: "14px 40px", height: 1, background: `linear-gradient(to right, transparent, rgba(${hexToRgb(s.primaryColor)}, 0.6), rgba(${hexToRgb(s.secondaryColor)}, 0.6), transparent)` }} />
-        <div style={{ padding: "0 40px 28px" }}>
+
+        {/* Stats */}
+        <div style={{ padding: "0 40px", paddingBottom: s.showSponsorArea ? 16 : 28 }}>
           {visibleStats.map((k, idx) => (
             <div key={k} style={{ display: "flex", alignItems: "center", padding: "7px 0", borderBottom: idx < visibleStats.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
               <div style={{ flex: 1, textAlign: "right", fontSize: s.statsFontSize + 2, fontWeight: 700, color: s.textColor, paddingRight: 20 }}>{DEMO[k]?.a ?? "—"}</div>
@@ -515,6 +539,8 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
             </div>
           ))}
         </div>
+
+        {/* Sponsor */}
         {s.showSponsorArea && (
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "12px 40px 20px", display: "flex", justifyContent: "center", alignItems: "center", minHeight: 60 }}>
             {s.sponsorLogoUrl
