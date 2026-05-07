@@ -20,7 +20,38 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { ChevronUp, ChevronDown, Save, Loader2, Plus, Trash2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Save, Loader2, Plus, Trash2, Play } from "lucide-react";
+
+type AnimPhase = "idle" | "entrance" | "hold" | "exit";
+
+function getEntranceAnimStr(name: string, duration: number): string {
+  const ms = `${duration}ms`;
+  const ease = "cubic-bezier(0.22, 1, 0.36, 1)";
+  switch (name) {
+    case "slide-up":         return `pmc-slide-up ${ms} ${ease} both`;
+    case "slide-from-left":  return `pmc-slide-left ${ms} ${ease} both`;
+    case "slide-from-right": return `pmc-slide-right ${ms} ${ease} both`;
+    case "zoom-in":          return `pmc-zoom-in ${ms} ${ease} both`;
+    case "wipe-reveal":      return `pmc-wipe ${ms} ${ease} both`;
+    case "flip-in":          return `pmc-flip-in ${ms} ${ease} both`;
+    case "drop-in":          return `pmc-drop-in ${ms} ${ease} both`;
+    case "blur-in":          return `pmc-blur-in ${ms} ease both`;
+    case "bounce-in":        return `pmc-bounce-in ${ms} ease both`;
+    case "staggered":        return `pmc-fade-in ${ms} ease both`;
+    default:                 return `pmc-fade-in ${ms} ease both`;
+  }
+}
+
+function getExitAnimStr(name: string, duration: number): string {
+  const ms = `${duration}ms`;
+  switch (name) {
+    case "zoom-out":   return `pmc-zoom-out ${ms} ease both`;
+    case "slide-down": return `pmc-slide-down ${ms} cubic-bezier(0.22, 1, 0.36, 1) both`;
+    case "flip-out":   return `pmc-flip-out ${ms} ease both`;
+    case "blur-out":   return `pmc-blur-out ${ms} ease both`;
+    default:           return `pmc-fade-out ${ms} ease both`;
+  }
+}
 
 const STAT_LABELS: Record<string, string> = {
   average: "3-Dart Avg",
@@ -240,8 +271,39 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
   const [settings, setSettings] = useState<Settings>(DEFAULT_OVERLAY_SETTINGS);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [previewScale, setPreviewScale] = useState(0.3);
+  const [animPhase, setAnimPhase] = useState<AnimPhase>("idle");
+  const animTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => { injectOverlayKeyframes(); }, []);
+
+  const isPlayingAnim = animPhase !== "idle";
+
+  function playAnimation() {
+    animTimersRef.current.forEach(clearTimeout);
+    animTimersRef.current = [];
+    const dur = settings.animationDuration;
+    const visibleCount = settings.statOrder.filter(
+      k => (settings.showStats as Record<string, boolean>)[k]
+    ).length;
+    // Entrance phase must last long enough for all animated layers to complete:
+    // card entrance + optional name entrance + optional staggered stats
+    const nameDur = settings.nameEntranceAnimation !== "none" ? settings.nameAnimationDuration : 0;
+    const statsDur = settings.entranceAnimation === "staggered"
+      ? settings.statRevealDelay * visibleCount
+      : (settings.statsEntranceAnimation !== "none"
+          ? settings.statsAnimationDuration + settings.statRevealDelay * Math.max(0, visibleCount - 1)
+          : 0);
+    const entranceDur = dur + nameDur + statsDur;
+    setAnimPhase("entrance");
+    const t1 = setTimeout(() => setAnimPhase("hold"), entranceDur);
+    const t2 = setTimeout(() => setAnimPhase("exit"), entranceDur + 1000);
+    const t3 = setTimeout(() => setAnimPhase("idle"), entranceDur + 1000 + dur);
+    animTimersRef.current = [t1, t2, t3];
+  }
+
+  useEffect(() => {
+    return () => { animTimersRef.current.forEach(clearTimeout); };
+  }, []);
 
   const qk = [`/api/tournaments/${tournamentId}/board-overlay-settings/${boardNumber}`];
 
@@ -727,8 +789,27 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
           className="flex-1 min-w-0 bg-neutral-950 flex items-center justify-center overflow-hidden relative"
           data-testid="preview-container"
         >
-          <div className="absolute top-2 left-3 text-white/30 text-[10px] font-mono tracking-widest uppercase select-none">
-            Live Preview · 1920 × 1080
+          <div className="absolute top-2 left-3 flex flex-col items-start gap-1.5">
+            <span className="text-white/30 text-[10px] font-mono tracking-widest uppercase select-none">
+              Live Preview · 1920 × 1080
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-[10px] px-2 gap-1 bg-white/5 border-white/15 text-white/60 hover:bg-white/10 hover:text-white/90"
+              onClick={playAnimation}
+              disabled={isPlayingAnim}
+              data-testid="btn-play-animation"
+            >
+              {isPlayingAnim ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Play className="w-3 h-3" />
+              )}
+              {isPlayingAnim
+                ? animPhase === "entrance" ? "Entering…" : animPhase === "hold" ? "Holding…" : "Exiting…"
+                : "Play Animation"}
+            </Button>
           </div>
           <div
             style={{
@@ -739,7 +820,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
               flexShrink: 0,
             }}
           >
-            <PreviewCard settings={settings} />
+            <PreviewCard settings={settings} animPhase={animPhase} />
           </div>
         </div>
       </SheetContent>
@@ -747,7 +828,7 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
   );
 }
 
-function PreviewCard({ settings: s }: { settings: Settings }) {
+function PreviewCard({ settings: s, animPhase = "idle" }: { settings: Settings; animPhase?: AnimPhase }) {
   const STAT_LBL: Record<string, string> = {
     average: "3-Dart Avg", ton80s: "180s", ton40s: "140+",
     tons: "100+", checkoutPct: "Checkout %", highestCheckout: "Highest Finish", bestLeg: "Best Leg",
@@ -770,7 +851,7 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
   const hasMedia = hasMediaA || hasMediaB;
   const logoUrls = (s.sponsorLogoUrls ?? []).filter(Boolean);
 
-  // Stage 1: card entrance (delay = 0). "staggered" means no card anim, only rows reveal.
+  // Static preview animations — always-on when idle so the preview is informative
   const previewCardAnim = s.entranceAnimation !== "staggered"
     ? getEntranceAnimWithDelay(s.entranceAnimation, s.animationDuration, 0)
     : undefined;
@@ -779,7 +860,7 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
     ? getEntranceAnimWithDelay(s.nameEntranceAnimation, s.nameAnimationDuration, s.animationDuration)
     : undefined;
 
-  const getPreviewStatAnim = (idx: number) => {
+  const getPreviewStatAnim = (idx: number): string | undefined => {
     if (s.entranceAnimation === "staggered" && s.statsEntranceAnimation === "none") {
       return `pmc-stat-reveal ${s.statsAnimationDuration}ms cubic-bezier(0.22,1,0.36,1) ${s.animationDuration + s.statRevealDelay * idx}ms both`;
     }
@@ -788,10 +869,28 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
     return getEntranceAnimWithDelay(s.statsEntranceAnimation, s.statsAnimationDuration, s.animationDuration + nameDur + s.statRevealDelay * idx);
   };
 
+  // Play-button-triggered animations — override the static preview while the sequence runs
+  const activeCardAnim: string | undefined = (() => {
+    if (animPhase === "entrance") return getEntranceAnimStr(s.entranceAnimation, s.animationDuration);
+    if (animPhase === "exit") return getExitAnimStr(s.exitAnimation, s.animationDuration);
+    if (animPhase === "idle") return previewCardAnim;
+    return undefined; // hold — card fully visible, no animation running
+  })();
+
+  const activeNameAnim: string | undefined = animPhase === "idle" ? previewNameAnim : undefined;
+
+  const getActiveStatAnim = (idx: number): string | undefined => {
+    if (animPhase === "idle") return getPreviewStatAnim(idx);
+    if (animPhase === "entrance" && s.entranceAnimation === "staggered") {
+      return `pmc-stat-reveal ${s.animationDuration}ms cubic-bezier(0.22,1,0.36,1) ${s.statRevealDelay * (idx + 1)}ms both`;
+    }
+    return undefined;
+  };
+
   const cardContent = (
     <>
       {/* Header block: tournament name + score + divider — animate together */}
-      <div style={{ animation: previewNameAnim }}>
+      <div style={{ animation: activeNameAnim }}>
         {/* Tournament name */}
         <div style={{
           textAlign: "center",
@@ -825,7 +924,7 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
       {/* Stats */}
       <div style={{ padding: "0 40px", paddingBottom: s.showSponsorArea ? 16 : 28 }}>
         {visibleStats.map((k, idx) => (
-          <div key={k} style={{ display: "flex", alignItems: "center", padding: `${s.statRowPadding}px 0`, borderBottom: idx < visibleStats.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none", animation: getPreviewStatAnim(idx) }}>
+          <div key={k} style={{ display: "flex", alignItems: "center", padding: `${s.statRowPadding}px 0`, borderBottom: idx < visibleStats.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none", animation: getActiveStatAnim(idx) }}>
             <div style={{ flex: 1, textAlign: "right", fontSize: s.statsFontSize + 2, fontWeight: 700, color: s.textColor, paddingRight: 20 }}>{DEMO[k]?.a ?? "—"}</div>
             <div style={{ width: 200, textAlign: "center", fontSize: s.statsFontSize, fontWeight: 500, color: `rgba(${hexToRgb(s.textColor)}, 0.5)`, textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>{STAT_LBL[k] ?? k}</div>
             <div style={{ flex: 1, textAlign: "left", fontSize: s.statsFontSize + 2, fontWeight: 700, color: s.textColor, paddingLeft: 20 }}>{DEMO[k]?.b ?? "—"}</div>
@@ -859,7 +958,7 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
           boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
           border: "1px solid rgba(255,255,255,0.08)",
           display: "flex", flexDirection: "row",
-          animation: previewCardAnim,
+          animation: activeCardAnim,
         }}>
           {/* Left: Player A media column */}
           <div style={{ width: sideColW, flexShrink: 0, position: "relative", overflow: "hidden" }}>
@@ -895,7 +994,7 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
         overflow: "hidden",
         boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
         border: "1px solid rgba(255,255,255,0.08)",
-        animation: previewCardAnim,
+        animation: activeCardAnim,
       }}>
         {/* Top media strip */}
         {hasMedia && (
