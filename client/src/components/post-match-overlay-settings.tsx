@@ -209,7 +209,11 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
 
   const saveMutation = useMutation({
     mutationFn: async (data: Settings) => {
-      return apiRequest("PUT", `/api/tournaments/${tournamentId}/board-overlay-settings/${boardNumber}`, data);
+      const payload: Settings = {
+        ...data,
+        sponsorLogoUrls: (data.sponsorLogoUrls ?? []).map(u => u.trim()).filter(Boolean),
+      };
+      return apiRequest("PUT", `/api/tournaments/${tournamentId}/board-overlay-settings/${boardNumber}`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -277,16 +281,12 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
                 <Switch checked={settings.showWinnerStar} onCheckedChange={v => set("showWinnerStar", v)}
                   data-testid="switch-winner-star" />
               </Row>
-              <Row label="BG Type">
-                <Select value={settings.bgType} onValueChange={v => set("bgType", v as "solid" | "gradient")}>
-                  <SelectTrigger className="h-8 w-28 text-xs" data-testid="select-bg-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="solid">Solid</SelectItem>
-                    <SelectItem value="gradient">Gradient</SelectItem>
-                  </SelectContent>
-                </Select>
+              <Row label="Gradient BG">
+                <Switch
+                  checked={settings.bgType === "gradient"}
+                  onCheckedChange={v => set("bgType", v ? "gradient" : "solid")}
+                  data-testid="switch-bg-gradient"
+                />
               </Row>
               <Row label="BG Colour">
                 <input type="color" value={settings.bgColor} onChange={e => set("bgColor", e.target.value)}
