@@ -326,8 +326,14 @@ export default function PostMatchOverlay() {
     : undefined;
 
   const getStatRowAnim = (idx: number) => {
-    if (exiting || s.statsEntranceAnimation === "none") return undefined;
-    const delay = s.animationDuration + s.nameAnimationDuration + s.statRevealDelay * idx;
+    if (exiting) return undefined;
+    // Legacy backward compat: "staggered" card entrance with no dedicated stats animation
+    if (s.entranceAnimation === "staggered" && s.statsEntranceAnimation === "none") {
+      return `pmc-stat-reveal ${s.statsAnimationDuration}ms cubic-bezier(0.22,1,0.36,1) ${s.animationDuration + s.statRevealDelay * idx}ms both`;
+    }
+    if (s.statsEntranceAnimation === "none") return undefined;
+    const nameDur = s.nameEntranceAnimation !== "none" ? s.nameAnimationDuration : 0;
+    const delay = s.animationDuration + nameDur + s.statRevealDelay * idx;
     return getEntranceAnimWithDelay(s.statsEntranceAnimation, s.statsAnimationDuration, delay);
   };
 

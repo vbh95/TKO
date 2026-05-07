@@ -178,6 +178,27 @@ function cardFadeColor(s: Settings): string {
   return `rgba(${bgRgb}, ${s.bgOpacity})`;
 }
 
+function injectOverlayKeyframes() {
+  const id = "pmc-keyframes";
+  if (document.getElementById(id)) return;
+  const style = document.createElement("style");
+  style.id = id;
+  style.textContent = `
+    @keyframes pmc-fade-in { from { opacity: 0 } to { opacity: 1 } }
+    @keyframes pmc-slide-up { from { opacity: 0; transform: translateY(60px) } to { opacity: 1; transform: translateY(0) } }
+    @keyframes pmc-slide-left { from { opacity: 0; transform: translateX(-80px) } to { opacity: 1; transform: translateX(0) } }
+    @keyframes pmc-slide-right { from { opacity: 0; transform: translateX(80px) } to { opacity: 1; transform: translateX(0) } }
+    @keyframes pmc-zoom-in { from { opacity: 0; transform: scale(0.85) } to { opacity: 1; transform: scale(1) } }
+    @keyframes pmc-wipe { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0% 0 0) } }
+    @keyframes pmc-flip-in { from { opacity: 0; transform: perspective(800px) rotateX(90deg) } to { opacity: 1; transform: perspective(800px) rotateX(0deg) } }
+    @keyframes pmc-drop-in { from { opacity: 0; transform: translateY(-80px) } to { opacity: 1; transform: translateY(0) } }
+    @keyframes pmc-blur-in { from { opacity: 0; filter: blur(18px) } to { opacity: 1; filter: blur(0px) } }
+    @keyframes pmc-bounce-in { 0% { opacity: 0; transform: scale(0.7) } 60% { opacity: 1; transform: scale(1.06) } 80% { transform: scale(0.97) } 100% { transform: scale(1) } }
+    @keyframes pmc-stat-reveal { from { opacity: 0; transform: translateX(-16px) } to { opacity: 1; transform: translateX(0) } }
+  `;
+  document.head.appendChild(style);
+}
+
 function getEntranceAnimWithDelay(name: string, duration: number, delayMs: number): string | undefined {
   if (name === "none") return undefined;
   const ms = `${duration}ms`;
@@ -202,6 +223,8 @@ export function PostMatchOverlaySettings({ open, onOpenChange, tournamentId, boa
   const [settings, setSettings] = useState<Settings>(DEFAULT_OVERLAY_SETTINGS);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [previewScale, setPreviewScale] = useState(0.3);
+
+  useEffect(() => { injectOverlayKeyframes(); }, []);
 
   const qk = [`/api/tournaments/${tournamentId}/board-overlay-settings/${boardNumber}`];
 
@@ -729,9 +752,14 @@ function PreviewCard({ settings: s }: { settings: Settings }) {
     ? getEntranceAnimWithDelay(s.nameEntranceAnimation, s.nameAnimationDuration, s.animationDuration)
     : undefined;
 
-  const getPreviewStatAnim = (idx: number) => s.statsEntranceAnimation !== "none"
-    ? getEntranceAnimWithDelay(s.statsEntranceAnimation, s.statsAnimationDuration, s.animationDuration + s.nameAnimationDuration + s.statRevealDelay * idx)
-    : undefined;
+  const getPreviewStatAnim = (idx: number) => {
+    if (s.entranceAnimation === "staggered" && s.statsEntranceAnimation === "none") {
+      return `pmc-stat-reveal ${s.statsAnimationDuration}ms cubic-bezier(0.22,1,0.36,1) ${s.animationDuration + s.statRevealDelay * idx}ms both`;
+    }
+    if (s.statsEntranceAnimation === "none") return undefined;
+    const nameDur = s.nameEntranceAnimation !== "none" ? s.nameAnimationDuration : 0;
+    return getEntranceAnimWithDelay(s.statsEntranceAnimation, s.statsAnimationDuration, s.animationDuration + nameDur + s.statRevealDelay * idx);
+  };
 
   const cardContent = (
     <>
