@@ -1,0 +1,113 @@
+#82 - Scorer Landscape Mode Toggle
+
+Implement a local-only landscape mode toggle for the tablet scorer scoring view.
+
+Critical constraints:
+- Do NOT change scoring logic, checkout logic, undo logic, match completion logic, board session logic, QR pairing, OBS overlays, API routes, or database schema.
+- Do NOT persist the landscape preference in localStorage or the database.
+- Portrait mode must remain visually and functionally identical to the current scorer layout.
+- The toggle must only appear when view === "scoring".
+
+Tasks:
+
+1. Add local state
+In the main tablet scorer component, near the other view/layout state variables, add:
+
+const [isLandscapeView, setIsLandscapeView] = useState(false);
+
+This must be local UI state only.
+
+2. Add the toggle button to the scoring header
+Find the scoring view top header strip, the bg-primary header that contains the back button, TKO logo, refresh button, theme toggle, and connection badge.
+
+Add a small button between the refresh button and the theme toggle.
+
+Button behaviour:
+- onClick: setIsLandscapeView(v => !v)
+- Label:
+  - "Landscape" when isLandscapeView is false
+  - "Portrait" when isLandscapeView is true
+- Icon:
+  - Use LayoutPanelLeft or Columns2 from lucide-react.
+- Only render this button inside the scoring view header.
+- Do not show it on match list, bull throw, or match report screens.
+
+3. Split the scoring view into reusable layout sections
+Refactor only the JSX layout, not the logic.
+
+Identify the existing scoring screen content and separate it conceptually into:
+
+A) keypad/input controls:
+- numeric keypad
+- quick score buttons
+- OK button
+- Clear button
+- undo/correction controls
+- checkout confirm controls if currently tied to the keypad area
+
+B) match/player info:
+- player panels
+- names
+- remaining scores
+- legs/sets
+- averages
+- last score
+- round label
+- leg count
+- match score
+- checkout suggestion
+- impossible score warnings
+- status messages
+
+Do not duplicate any state, handlers, mutations, or scoring calculations.
+Reuse the exact existing buttons and handlers.
+
+4. Keep portrait layout unchanged
+When isLandscapeView is false, render the existing portrait JSX/classes exactly as they are now.
+
+The portrait branch should preserve the current layout as closely as possible. Do not restyle it.
+
+5. Add landscape layout
+When isLandscapeView is true, render the same existing UI sections in a two-column full-screen grid:
+
+- Outer wrapper:
+  min-h-[calc(100vh-var(--header-height,0px))] w-full grid grid-cols-[minmax(320px,40%)_1fr] gap-4 p-4 overflow-hidden
+
+- Left column:
+  keypad/input controls
+  className similar to:
+  h-full min-h-0 overflow-y-auto
+
+- Right column:
+  player panels, match info, checkout suggestions, warnings, status messages
+  className similar to:
+  h-full min-h-0 overflow-y-auto space-y-4
+
+6. Responsive fallback
+Only use the two-column landscape layout on suitable screen widths.
+For smaller screens, fall back to the existing portrait layout or use responsive Tailwind classes such as:
+
+landscape wrapper:
+hidden md:grid
+
+portrait fallback:
+block md:hidden
+
+Do not break phone/tablet portrait behaviour.
+
+7. Functional verification
+After changes, verify:
+- Tapping Landscape switches layout instantly with no reload.
+- Tapping Portrait switches back instantly.
+- Current score entry state is not lost.
+- Numeric keypad works.
+- Quick scores work.
+- OK and Clear work.
+- Undo works.
+- Checkout confirm works.
+- Impossible-score warnings still display.
+- Right column scrolls if content overflows.
+- Toggle is not visible on match list, bull throw, or match report.
+- No backend, database, API, board session, pairing, or overlay files were changed.
+
+Only modify the tablet scorer UI/layout files necessary for this feature.

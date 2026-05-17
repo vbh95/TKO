@@ -1,0 +1,64 @@
+Add a landscape mode toggle button to the tablet scorer only.
+
+Critical constraints:
+- Do NOT change any tournament logic, match logic, scoring logic, checkout logic, board assignment logic, OBS overlay URLs, QR/session pairing, or database schema.
+- Do NOT alter the existing portrait tablet scorer layout except adding a clear landscape toggle button.
+- This is UI/layout only.
+
+Goal:
+On the tablet scorer page, add a button that switches the scorer between the existing portrait layout and a new landscape layout for iPad/TV mirroring.
+
+Requirements:
+1. Add a visible button on the tablet scorer screen:
+   - Label: “Landscape View” when currently in portrait
+   - Label: “Portrait View” when currently in landscape
+   - It should toggle a local React state only.
+   - Do not save this to the database.
+
+2. Portrait mode:
+   - Must remain exactly as it currently is.
+   - Existing layout and behaviour should be unchanged.
+
+3. Landscape mode:
+   - Reorganise the existing scorer UI into a two-column full-screen layout.
+   - Left side: the scoring keypad/input controls.
+   - Right side: player scores, match info, stats, legs/sets, checkout info, and any existing match status panels.
+   - The layout should be optimised for iPad landscape and screen mirroring to a TV.
+   - Use responsive Tailwind classes where possible.
+   - Avoid fixed heights that could cause clipping.
+   - Make the landscape layout fill the available viewport cleanly.
+
+4. The keypad must remain fully functional:
+   - All score entry buttons must work exactly as before.
+   - Checkout/confirm buttons must work exactly as before.
+   - Undo/correction controls must work exactly as before.
+
+5. The right-hand panel must show the same information currently shown in portrait mode:
+   - Player names
+   - Scores
+   - Legs/sets
+   - Averages/stats
+   - Match status
+   - Checkout/pending checkout UI
+   - Any existing alerts/messages
+
+6. Keep the implementation minimal:
+   - Reuse the existing components/state/functions.
+   - Do not duplicate scoring logic.
+   - Only conditionally change the layout wrapper/classes.
+   - If the tablet scorer is one large component, add a clean `isLandscapeView` state and conditional layout sections.
+
+7. Add safe styling:
+   - Landscape container should use something like:
+     `min-h-screen w-full grid grid-cols-[minmax(320px,40%)_1fr] gap-4`
+   - Left keypad column should be easy to tap.
+   - Right info column should scroll if needed using `overflow-y-auto`.
+   - On smaller screens, fall back gracefully to the normal portrait layout.
+
+8. After implementation, verify:
+   - Portrait mode still looks and works as before.
+   - Landscape mode places keypad on the left and scores/stats on the right.
+   - No backend/database/API changes were made.
+   - No existing tablet scorer URL or board session logic was changed.
+
+Only modify the tablet scorer UI/layout files needed for this feature.

@@ -7,6 +7,7 @@ import {
   Crosshair,
   Delete,
   Grid2x2,
+  LayoutPanelLeft,
   Loader2,
   Moon,
   Sun,
@@ -564,6 +565,7 @@ export default function ScorerPage() {
   const isSubmittingLegRef = useRef(false);
   const legResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [swapPlayers, setSwapPlayers] = useState(false);
+  const [isLandscapeView, setIsLandscapeView] = useState(false);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -1530,6 +1532,366 @@ export default function ScorerPage() {
     const leftLastScore = swapPlayers ? lastScoreB : lastScoreA;
     const rightLastScore = swapPlayers ? lastScoreA : lastScoreB;
 
+    const matchInfoSection = (
+      <div className="text-center py-0.5 md:py-1 shrink-0">
+        <p className="text-primary text-[10px] md:text-sm uppercase tracking-wider font-bold">
+          {getMatchRoundLabel(activeMatch)}
+        </p>
+        <p className="text-gray-400 text-[9px] md:text-xs uppercase tracking-wider font-semibold">
+          Leg {currentLeg} — Best of {matchBestOf}
+        </p>
+        <div className="tabular-nums mt-0 flex items-center justify-center gap-2">
+          <span className={cn("text-xl md:text-4xl lg:text-5xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
+          <span className="text-gray-600 text-lg md:text-2xl">-</span>
+          <span className={cn("text-xl md:text-4xl lg:text-5xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
+        </div>
+      </div>
+    );
+
+    const playerPanelsSection = (
+      <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6 mt-1 md:mt-2 mb-1 md:mb-2 lg:mb-3 shrink-0">
+        <div
+          className={cn(
+            "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
+            currentThrower === leftThrower
+              ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
+              : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-80 grayscale-[30%]"
+          )}
+          data-testid="panel-player-a"
+        >
+          <div className="h-4 md:h-6 mb-1">
+            {currentThrower === leftThrower && (
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-white">Throwing</span>
+                <Crosshair className="w-3.5 h-3.5 md:w-5 md:h-5 text-white" />
+              </div>
+            )}
+          </div>
+          <p className="text-xs md:text-lg lg:text-xl font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5" data-testid="text-player-a-name">
+            {leftPlayer?.name || "Player 1"}
+            {legStartingThrower === leftThrower && (
+              <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
+            )}
+          </p>
+          <div
+            className="text-5xl md:text-8xl lg:text-[9rem] font-bold text-white tabular-nums leading-none tracking-tighter"
+            data-testid="text-remaining-a"
+          >
+            {leftRemaining}
+          </div>
+          <div className="mt-1 md:mt-3 lg:mt-4 grid grid-cols-2 gap-x-2 gap-y-0.5 md:gap-y-1 border-t border-white/10 pt-1 md:pt-2">
+            <div className="flex flex-col">
+              <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">3-dart avg</span>
+              <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{leftAvg}</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">Last score</span>
+              <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{leftLastScore !== null ? leftLastScore : '-'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
+            currentThrower === rightThrower
+              ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
+              : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-80 grayscale-[30%]"
+          )}
+          data-testid="panel-player-b"
+        >
+          <div className="h-4 md:h-6 mb-1">
+            {currentThrower === rightThrower && (
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-white">Throwing</span>
+                <Crosshair className="w-3.5 h-3.5 md:w-5 md:h-5 text-white" />
+              </div>
+            )}
+          </div>
+          <p className="text-xs md:text-lg lg:text-xl font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5" data-testid="text-player-b-name">
+            {rightPlayer?.name || "Player 2"}
+            {legStartingThrower === rightThrower && (
+              <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
+            )}
+          </p>
+          <div
+            className="text-5xl md:text-8xl lg:text-[9rem] font-bold text-white tabular-nums leading-none tracking-tighter"
+            data-testid="text-remaining-b"
+          >
+            {rightRemaining}
+          </div>
+          <div className="mt-1 md:mt-3 lg:mt-4 grid grid-cols-2 gap-x-2 gap-y-0.5 md:gap-y-1 border-t border-white/10 pt-1 md:pt-2">
+            <div className="flex flex-col">
+              <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">3-dart avg</span>
+              <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{rightAvg}</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">Last score</span>
+              <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{rightLastScore !== null ? rightLastScore : '-'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    const modalsSection = (
+      <>
+        {(impossibleWarning || pendingCheckout) && (
+          <div className="fixed inset-0 bg-black/60 z-[150]" />
+        )}
+
+        {impossibleWarning && (
+          <div className="bg-primary rounded-xl p-4 md:p-6 mb-1 shrink-0 relative z-[200]" data-testid="impossible-warning">
+            <p className="text-primary-foreground font-bold text-center text-2xl md:text-3xl mb-2">
+              {impossibleWarning.includes("not possible") ? "BUST!" : "Impossible Score"}
+            </p>
+            <p className="text-primary-foreground/80 text-center text-sm md:text-lg mb-4">{impossibleWarning}</p>
+            <div className="flex gap-2">
+              <button
+                className="flex-1 h-12 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-base md:text-lg touch-manipulation active:bg-primary-foreground/30 transition-colors"
+                onClick={() => {
+                  setImpossibleWarning(null);
+                  setInputValue("");
+                }}
+                data-testid="button-dismiss-impossible"
+              >
+                OK
+              </button>
+              {impossibleWarning.includes("not possible") && (
+                <button
+                  className="flex-1 h-12 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-base md:text-lg touch-manipulation active:bg-primary-foreground/30 transition-colors"
+                  onClick={() => {
+                    setImpossibleWarning(null);
+                    setInputValue("");
+                    handleScoreSubmit(0);
+                  }}
+                  data-testid="button-pass-turn"
+                >
+                  Pass Turn
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {pendingCheckout && !pendingDartsAtDouble && (
+          <div className="bg-primary rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="checkout-confirm">
+            <div className="text-center mb-2 md:mb-3">
+              <Trophy className="w-6 h-6 md:w-10 md:h-10 text-primary-foreground mx-auto mb-1" />
+              <p className="text-primary-foreground font-bold text-base md:text-xl">Checkout!</p>
+              <p className="text-primary-foreground/70 text-xs md:text-sm">
+                {pendingCheckout.player === 'A' ? (getPlayer(activeMatch.playerAId)?.name || 'Player 1') : (getPlayer(activeMatch.playerBId)?.name || 'Player 2')} checked out
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                className="flex-1 h-10 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-sm md:text-base touch-manipulation active:bg-primary-foreground/30 transition-colors"
+                onClick={cancelCheckout}
+                data-testid="button-cancel-checkout"
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 h-10 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-sm md:text-base touch-manipulation active:bg-primary-foreground/30 transition-colors"
+                onClick={handleConfirmCheckoutClick}
+                disabled={updateScoreMutation.isPending}
+                data-testid="button-confirm-checkout"
+              >
+                Confirm Checkout
+              </button>
+            </div>
+          </div>
+        )}
+
+        {pendingCheckout && pendingDartsAtDouble && (
+          <div className="bg-primary rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="darts-at-double">
+            <div className="text-center mb-3 md:mb-4">
+              <Target className="w-6 h-6 md:w-10 md:h-10 text-primary-foreground mx-auto mb-1" />
+              <p className="text-primary-foreground font-bold text-base md:text-xl">Checkout Stats</p>
+            </div>
+
+            <div className="mb-3 md:mb-4">
+              <p className="text-primary-foreground/70 text-xs font-semibold uppercase tracking-wider mb-2">
+                Darts Used On A Double
+              </p>
+              <div className="flex gap-2 md:gap-3">
+                {[1, 2, 3].map(n => (
+                  <button
+                    key={n}
+                    className={cn(
+                      "flex-1 h-12 md:h-16 rounded-xl font-bold text-lg md:text-2xl touch-manipulation transition-colors",
+                      selectedDartsAtDouble === n
+                        ? "bg-primary-foreground text-primary"
+                        : "bg-primary-foreground/20 text-primary-foreground active:bg-primary-foreground/30"
+                    )}
+                    onClick={() => {
+                      setSelectedDartsAtDouble(n);
+                      if (selectedCheckoutDartsUsed !== null && selectedCheckoutDartsUsed < n) {
+                        setSelectedCheckoutDartsUsed(null);
+                      }
+                    }}
+                    disabled={updateScoreMutation.isPending}
+                    data-testid={`button-darts-at-double-${n}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-3 md:mb-4">
+              <p className="text-primary-foreground/70 text-xs font-semibold uppercase tracking-wider mb-2">
+                Darts Used For Checkout
+              </p>
+              <div className="flex gap-2 md:gap-3">
+                {[1, 2, 3].map(n => {
+                  const tooFew = selectedDartsAtDouble !== null && n < selectedDartsAtDouble;
+                  return (
+                    <button
+                      key={n}
+                      className={cn(
+                        "flex-1 h-12 md:h-16 rounded-xl font-bold text-lg md:text-2xl touch-manipulation transition-colors",
+                        tooFew ? "opacity-30 pointer-events-none" : "",
+                        selectedCheckoutDartsUsed === n
+                          ? "bg-primary-foreground text-primary"
+                          : "bg-primary-foreground/20 text-primary-foreground active:bg-primary-foreground/30"
+                      )}
+                      onClick={() => setSelectedCheckoutDartsUsed(n)}
+                      disabled={updateScoreMutation.isPending || !!tooFew}
+                      data-testid={`button-checkout-darts-used-${n}`}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <button
+              className={cn(
+                "w-full h-10 md:h-14 rounded-xl font-semibold text-sm md:text-base touch-manipulation transition-colors",
+                selectedDartsAtDouble !== null && selectedCheckoutDartsUsed !== null
+                  ? "bg-primary-foreground text-primary"
+                  : "bg-primary-foreground/10 text-primary-foreground/40 pointer-events-none"
+              )}
+              onClick={() => {
+                if (selectedDartsAtDouble !== null && selectedCheckoutDartsUsed !== null) {
+                  confirmCheckout(selectedDartsAtDouble, selectedCheckoutDartsUsed);
+                }
+              }}
+              disabled={updateScoreMutation.isPending || selectedDartsAtDouble === null || selectedCheckoutDartsUsed === null}
+              data-testid="button-confirm-darts-selection"
+            >
+              Confirm
+            </button>
+          </div>
+        )}
+      </>
+    );
+
+    const keypadSection = (
+      <div className={cn("flex-1 flex flex-col justify-end pb-1 md:pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
+        <div className="flex-1 flex flex-col justify-end gap-1 md:gap-1.5">
+          <div className="flex gap-1 md:gap-1.5 items-center shrink-0">
+            <button
+              className="w-9 h-9 md:w-12 md:h-12 rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation"
+              onClick={() => setShowQuickScores(!showQuickScores)}
+              data-testid="button-toggle-quick"
+            >
+              <Grid2x2 className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
+            </button>
+            <div
+              className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-lg px-4 h-14 md:h-18 text-2xl md:text-4xl font-medium tabular-nums flex items-center justify-between"
+              data-testid="text-input-value"
+            >
+              <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
+              <button
+                className={cn(
+                  "ml-1 p-2 md:p-3 rounded-lg touch-manipulation active:scale-90 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center",
+                  inputValue ? "opacity-100" : "opacity-30 pointer-events-none"
+                )}
+                onClick={() => setInputValue(prev => prev.slice(0, -1))}
+                disabled={!inputValue}
+                data-testid="button-backspace"
+              >
+                <Delete className="w-5 h-5 md:w-7 md:h-7 text-red-400" />
+              </button>
+            </div>
+          </div>
+
+          {showQuickScores && !pendingCheckout && (
+            <div className="grid grid-cols-4 gap-1 md:gap-1.5 shrink-0">
+              {QUICK_SCORES.map(qs => (
+                <button
+                  key={qs}
+                  className={cn(
+                    "h-9 md:h-11 rounded-lg text-xs md:text-sm font-bold touch-manipulation transition-colors",
+                    qs === 180
+                      ? "bg-yellow-700/40 text-yellow-300 border-2 border-yellow-600/50"
+                      : "bg-[#2a2a2a] text-gray-300 border-2 border-[#3a3a3a]"
+                  )}
+                  onClick={() => handleScoreSubmit(qs)}
+                  disabled={updateScoreMutation.isPending}
+                  data-testid={`button-quick-${qs}`}
+                >
+                  {qs}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
+            <div key={ri} className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
+              {row.map(key => (
+                <button
+                  key={key}
+                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                  onClick={() => handleNumpad(key)}
+                  disabled={updateScoreMutation.isPending}
+                  data-testid={`button-numpad-${key}`}
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
+          ))}
+          <div className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
+            <button
+              className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
+              onClick={handleUndo}
+              disabled={legVisits.length === 0 || updateScoreMutation.isPending}
+              data-testid="button-undo"
+            >
+              <Undo2 className={cn("w-5 h-5 md:w-7 md:h-7", legVisits.length === 0 ? "text-gray-700" : "text-red-400")} />
+            </button>
+            <button
+              className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+              onClick={() => handleNumpad('0')}
+              disabled={updateScoreMutation.isPending}
+              data-testid="button-numpad-0"
+            >
+              0
+            </button>
+            <button
+              className="h-full min-h-[36px] rounded-lg flex items-center justify-center touch-manipulation transition-all bg-primary border-2 border-primary/50 active:bg-primary/80 active:scale-[0.98]"
+              onClick={() => handleNumpad('OK')}
+              disabled={updateScoreMutation.isPending}
+              data-testid="button-numpad-OK"
+            >
+              <Check className="w-6 h-6 md:w-8 md:h-8 text-white stroke-[3px]" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+
+    const spinnerSection = updateScoreMutation.isPending && (
+      <div className="flex items-center justify-center py-0.5 shrink-0">
+        <Loader2 className="w-3 h-3 animate-spin text-green-400 mr-1" />
+        <span className="text-[10px] text-gray-500">Updating...</span>
+      </div>
+    );
+
     return (
       <div className="fixed inset-0 bg-[hsl(222.2,84%,4.9%)] flex flex-col overflow-hidden z-[100]" data-testid="scorer-match-view">
         <div className="bg-primary text-primary-foreground py-1 md:py-2 px-3 shadow-lg shrink-0">
@@ -1566,6 +1928,17 @@ export default function ScorerPage() {
                 <RefreshCw className="w-3 h-3 text-primary-foreground" />
               </button>
               <button
+                onClick={() => setIsLandscapeView(v => !v)}
+                className="p-1 rounded hover:bg-white/10 transition-colors flex items-center gap-0.5"
+                data-testid="button-toggle-landscape"
+                title={isLandscapeView ? "Switch to portrait" : "Switch to landscape"}
+              >
+                <LayoutPanelLeft className="w-3 h-3 text-primary-foreground" />
+                <span className="text-[9px] md:text-[10px] text-primary-foreground font-medium hidden sm:inline">
+                  {isLandscapeView ? "Portrait" : "Landscape"}
+                </span>
+              </button>
+              <button
                 onClick={toggleTheme}
                 className="p-1 rounded hover:bg-white/10 transition-colors"
                 data-testid="button-toggle-theme-scorer"
@@ -1585,357 +1958,27 @@ export default function ScorerPage() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col w-full max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto px-2 md:px-4 py-0.5 md:py-1 overflow-hidden">
-          <div className="text-center py-0.5 md:py-1 shrink-0">
-            <p className="text-primary text-[10px] md:text-sm uppercase tracking-wider font-bold">
-              {getMatchRoundLabel(activeMatch)}
-            </p>
-            <p className="text-gray-400 text-[9px] md:text-xs uppercase tracking-wider font-semibold">
-              Leg {currentLeg} — Best of {matchBestOf}
-            </p>
-            <div className="tabular-nums mt-0 flex items-center justify-center gap-2">
-              <span className={cn("text-xl md:text-4xl lg:text-5xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
-              <span className="text-gray-600 text-lg md:text-2xl">-</span>
-              <span className={cn("text-xl md:text-4xl lg:text-5xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
+        {isLandscapeView ? (
+          <div className="flex-1 overflow-hidden grid grid-cols-[minmax(320px,40%)_1fr]">
+            <div className="h-full overflow-y-auto flex flex-col px-2 py-1 border-r border-white/10">
+              {keypadSection}
+              {spinnerSection}
+            </div>
+            <div className="h-full overflow-y-auto px-3 py-2 space-y-2">
+              {matchInfoSection}
+              {playerPanelsSection}
+              {modalsSection}
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6 mt-1 md:mt-2 mb-1 md:mb-2 lg:mb-3 shrink-0">
-            <div
-              className={cn(
-                "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
-                currentThrower === leftThrower
-                  ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
-                  : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-80 grayscale-[30%]"
-              )}
-              data-testid="panel-player-a"
-            >
-              <div className="h-4 md:h-6 mb-1">
-                {currentThrower === leftThrower && (
-                  <div className="flex items-center justify-end gap-1.5">
-                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-white">Throwing</span>
-                    <Crosshair className="w-3.5 h-3.5 md:w-5 md:h-5 text-white" />
-                  </div>
-                )}
-              </div>
-              <p className="text-xs md:text-lg lg:text-xl font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5" data-testid="text-player-a-name">
-                {leftPlayer?.name || "Player 1"}
-                {legStartingThrower === leftThrower && (
-                  <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
-                )}
-              </p>
-              <div
-                className="text-5xl md:text-8xl lg:text-[9rem] font-bold text-white tabular-nums leading-none tracking-tighter"
-                data-testid="text-remaining-a"
-              >
-                {leftRemaining}
-              </div>
-              <div className="mt-1 md:mt-3 lg:mt-4 grid grid-cols-2 gap-x-2 gap-y-0.5 md:gap-y-1 border-t border-white/10 pt-1 md:pt-2">
-                <div className="flex flex-col">
-                  <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">3-dart avg</span>
-                  <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{leftAvg}</span>
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">Last score</span>
-                  <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{leftLastScore !== null ? leftLastScore : '-'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div
-              className={cn(
-                "rounded-xl p-2 md:p-4 lg:p-6 transition-all duration-300 flex flex-col justify-center min-h-[140px] md:min-h-[200px] lg:min-h-[280px]",
-                currentThrower === rightThrower
-                  ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-105 z-10 shadow-2xl"
-                  : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] scale-95 opacity-80 grayscale-[30%]"
-              )}
-              data-testid="panel-player-b"
-            >
-              <div className="h-4 md:h-6 mb-1">
-                {currentThrower === rightThrower && (
-                  <div className="flex items-center justify-end gap-1.5">
-                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-white">Throwing</span>
-                    <Crosshair className="w-3.5 h-3.5 md:w-5 md:h-5 text-white" />
-                  </div>
-                )}
-              </div>
-              <p className="text-xs md:text-lg lg:text-xl font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5" data-testid="text-player-b-name">
-                {rightPlayer?.name || "Player 2"}
-                {legStartingThrower === rightThrower && (
-                  <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
-                )}
-              </p>
-              <div
-                className="text-5xl md:text-8xl lg:text-[9rem] font-bold text-white tabular-nums leading-none tracking-tighter"
-                data-testid="text-remaining-b"
-              >
-                {rightRemaining}
-              </div>
-              <div className="mt-1 md:mt-3 lg:mt-4 grid grid-cols-2 gap-x-2 gap-y-0.5 md:gap-y-1 border-t border-white/10 pt-1 md:pt-2">
-                <div className="flex flex-col">
-                  <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">3-dart avg</span>
-                  <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{rightAvg}</span>
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-white/40 uppercase text-[7px] md:text-[9px] font-bold">Last score</span>
-                  <span className="text-white font-bold tabular-nums text-sm md:text-lg lg:text-xl">{rightLastScore !== null ? rightLastScore : '-'}</span>
-                </div>
-              </div>
-            </div>
+        ) : (
+          <div className="flex-1 flex flex-col w-full max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto px-2 md:px-4 py-0.5 md:py-1 overflow-hidden">
+            {matchInfoSection}
+            {playerPanelsSection}
+            {modalsSection}
+            {keypadSection}
+            {spinnerSection}
           </div>
-
-          {(impossibleWarning || pendingCheckout) && (
-            <div className="fixed inset-0 bg-black/60 z-[150]" />
-          )}
-
-          {impossibleWarning && (
-            <div className="bg-primary rounded-xl p-4 md:p-6 mb-1 shrink-0 relative z-[200]" data-testid="impossible-warning">
-              <p className="text-primary-foreground font-bold text-center text-2xl md:text-3xl mb-2">
-                {impossibleWarning.includes("not possible") ? "BUST!" : "Impossible Score"}
-              </p>
-              <p className="text-primary-foreground/80 text-center text-sm md:text-lg mb-4">{impossibleWarning}</p>
-              <div className="flex gap-2">
-                <button
-                  className="flex-1 h-12 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-base md:text-lg touch-manipulation active:bg-primary-foreground/30 transition-colors"
-                  onClick={() => {
-                    setImpossibleWarning(null);
-                    setInputValue("");
-                  }}
-                  data-testid="button-dismiss-impossible"
-                >
-                  OK
-                </button>
-                {impossibleWarning.includes("not possible") && (
-                  <button
-                    className="flex-1 h-12 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-base md:text-lg touch-manipulation active:bg-primary-foreground/30 transition-colors"
-                    onClick={() => {
-                      setImpossibleWarning(null);
-                      setInputValue("");
-                      handleScoreSubmit(0);
-                    }}
-                    data-testid="button-pass-turn"
-                  >
-                    Pass Turn
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {pendingCheckout && !pendingDartsAtDouble && (
-            <div className="bg-primary rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="checkout-confirm">
-              <div className="text-center mb-2 md:mb-3">
-                <Trophy className="w-6 h-6 md:w-10 md:h-10 text-primary-foreground mx-auto mb-1" />
-                <p className="text-primary-foreground font-bold text-base md:text-xl">Checkout!</p>
-                <p className="text-primary-foreground/70 text-xs md:text-sm">
-                  {pendingCheckout.player === 'A' ? (getPlayer(activeMatch.playerAId)?.name || 'Player 1') : (getPlayer(activeMatch.playerBId)?.name || 'Player 2')} checked out
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  className="flex-1 h-10 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-sm md:text-base touch-manipulation active:bg-primary-foreground/30 transition-colors"
-                  onClick={cancelCheckout}
-                  data-testid="button-cancel-checkout"
-                >
-                  Cancel
-                </button>
-                <button
-                  className="flex-1 h-10 md:h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-sm md:text-base touch-manipulation active:bg-primary-foreground/30 transition-colors"
-                  onClick={handleConfirmCheckoutClick}
-                  disabled={updateScoreMutation.isPending}
-                  data-testid="button-confirm-checkout"
-                >
-                  Confirm Checkout
-                </button>
-              </div>
-            </div>
-          )}
-
-          {pendingCheckout && pendingDartsAtDouble && (
-            <div className="bg-primary rounded-xl p-3 md:p-5 mb-1 shrink-0 relative z-[200]" data-testid="darts-at-double">
-              <div className="text-center mb-3 md:mb-4">
-                <Target className="w-6 h-6 md:w-10 md:h-10 text-primary-foreground mx-auto mb-1" />
-                <p className="text-primary-foreground font-bold text-base md:text-xl">Checkout Stats</p>
-              </div>
-
-              <div className="mb-3 md:mb-4">
-                <p className="text-primary-foreground/70 text-xs font-semibold uppercase tracking-wider mb-2">
-                  Darts Used On A Double
-                </p>
-                <div className="flex gap-2 md:gap-3">
-                  {[1, 2, 3].map(n => (
-                    <button
-                      key={n}
-                      className={cn(
-                        "flex-1 h-12 md:h-16 rounded-xl font-bold text-lg md:text-2xl touch-manipulation transition-colors",
-                        selectedDartsAtDouble === n
-                          ? "bg-primary-foreground text-primary"
-                          : "bg-primary-foreground/20 text-primary-foreground active:bg-primary-foreground/30"
-                      )}
-                      onClick={() => {
-                        setSelectedDartsAtDouble(n);
-                        if (selectedCheckoutDartsUsed !== null && selectedCheckoutDartsUsed < n) {
-                          setSelectedCheckoutDartsUsed(null);
-                        }
-                      }}
-                      disabled={updateScoreMutation.isPending}
-                      data-testid={`button-darts-at-double-${n}`}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-3 md:mb-4">
-                <p className="text-primary-foreground/70 text-xs font-semibold uppercase tracking-wider mb-2">
-                  Darts Used For Checkout
-                </p>
-                <div className="flex gap-2 md:gap-3">
-                  {[1, 2, 3].map(n => {
-                    const tooFew = selectedDartsAtDouble !== null && n < selectedDartsAtDouble;
-                    return (
-                      <button
-                        key={n}
-                        className={cn(
-                          "flex-1 h-12 md:h-16 rounded-xl font-bold text-lg md:text-2xl touch-manipulation transition-colors",
-                          tooFew ? "opacity-30 pointer-events-none" : "",
-                          selectedCheckoutDartsUsed === n
-                            ? "bg-primary-foreground text-primary"
-                            : "bg-primary-foreground/20 text-primary-foreground active:bg-primary-foreground/30"
-                        )}
-                        onClick={() => setSelectedCheckoutDartsUsed(n)}
-                        disabled={updateScoreMutation.isPending || !!tooFew}
-                        data-testid={`button-checkout-darts-used-${n}`}
-                      >
-                        {n}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button
-                className={cn(
-                  "w-full h-10 md:h-14 rounded-xl font-semibold text-sm md:text-base touch-manipulation transition-colors",
-                  selectedDartsAtDouble !== null && selectedCheckoutDartsUsed !== null
-                    ? "bg-primary-foreground text-primary"
-                    : "bg-primary-foreground/10 text-primary-foreground/40 pointer-events-none"
-                )}
-                onClick={() => {
-                  if (selectedDartsAtDouble !== null && selectedCheckoutDartsUsed !== null) {
-                    confirmCheckout(selectedDartsAtDouble, selectedCheckoutDartsUsed);
-                  }
-                }}
-                disabled={updateScoreMutation.isPending || selectedDartsAtDouble === null || selectedCheckoutDartsUsed === null}
-                data-testid="button-confirm-darts-selection"
-              >
-                Confirm
-              </button>
-            </div>
-          )}
-
-          <div className={cn("flex-1 flex flex-col justify-end pb-1 md:pb-2", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
-            <div className="flex-1 flex flex-col justify-end gap-1 md:gap-1.5">
-              <div className="flex gap-1 md:gap-1.5 items-center shrink-0">
-                <button
-                  className="w-9 h-9 md:w-12 md:h-12 rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation"
-                  onClick={() => setShowQuickScores(!showQuickScores)}
-                  data-testid="button-toggle-quick"
-                >
-                  <Grid2x2 className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
-                </button>
-                <div
-                  className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-lg px-4 h-14 md:h-18 text-2xl md:text-4xl font-medium tabular-nums flex items-center justify-between"
-                  data-testid="text-input-value"
-                >
-                  <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
-                  <button
-                    className={cn(
-                      "ml-1 p-2 md:p-3 rounded-lg touch-manipulation active:scale-90 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center",
-                      inputValue ? "opacity-100" : "opacity-30 pointer-events-none"
-                    )}
-                    onClick={() => setInputValue(prev => prev.slice(0, -1))}
-                    disabled={!inputValue}
-                    data-testid="button-backspace"
-                  >
-                    <Delete className="w-5 h-5 md:w-7 md:h-7 text-red-400" />
-                  </button>
-                </div>
-              </div>
-
-              {showQuickScores && !pendingCheckout && (
-                <div className="grid grid-cols-4 gap-1 md:gap-1.5 shrink-0">
-                  {QUICK_SCORES.map(qs => (
-                    <button
-                      key={qs}
-                      className={cn(
-                        "h-9 md:h-11 rounded-lg text-xs md:text-sm font-bold touch-manipulation transition-colors",
-                        qs === 180
-                          ? "bg-yellow-700/40 text-yellow-300 border-2 border-yellow-600/50"
-                          : "bg-[#2a2a2a] text-gray-300 border-2 border-[#3a3a3a]"
-                      )}
-                      onClick={() => handleScoreSubmit(qs)}
-                      disabled={updateScoreMutation.isPending}
-                      data-testid={`button-quick-${qs}`}
-                    >
-                      {qs}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
-                <div key={ri} className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
-                  {row.map(key => (
-                    <button
-                      key={key}
-                      className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
-                      onClick={() => handleNumpad(key)}
-                      disabled={updateScoreMutation.isPending}
-                      data-testid={`button-numpad-${key}`}
-                    >
-                      {key}
-                    </button>
-                  ))}
-                </div>
-              ))}
-              <div className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
-                <button
-                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
-                  onClick={handleUndo}
-                  disabled={legVisits.length === 0 || updateScoreMutation.isPending}
-                  data-testid="button-undo"
-                >
-                  <Undo2 className={cn("w-5 h-5 md:w-7 md:h-7", legVisits.length === 0 ? "text-gray-700" : "text-red-400")} />
-                </button>
-                <button
-                  className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
-                  onClick={() => handleNumpad('0')}
-                  disabled={updateScoreMutation.isPending}
-                  data-testid="button-numpad-0"
-                >
-                  0
-                </button>
-                <button
-                  className="h-full min-h-[36px] rounded-lg flex items-center justify-center touch-manipulation transition-all bg-primary border-2 border-primary/50 active:bg-primary/80 active:scale-[0.98]"
-                  onClick={() => handleNumpad('OK')}
-                  disabled={updateScoreMutation.isPending}
-                  data-testid="button-numpad-OK"
-                >
-                  <Check className="w-6 h-6 md:w-8 md:h-8 text-white stroke-[3px]" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {updateScoreMutation.isPending && (
-            <div className="flex items-center justify-center py-0.5 shrink-0">
-              <Loader2 className="w-3 h-3 animate-spin text-green-400 mr-1" />
-              <span className="text-[10px] text-gray-500">Updating...</span>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     );
   }
