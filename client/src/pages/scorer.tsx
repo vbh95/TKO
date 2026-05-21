@@ -1976,8 +1976,8 @@ export default function ScorerPage() {
             </div>
           </div>
         ) : shouldUseLandscapeLayout ? (
-          <div className="flex-1 w-full overflow-y-auto px-2 sm:px-3 md:px-5 lg:px-8 py-2 md:py-5 lg:py-8">
-            <div className="mx-auto grid w-full max-w-[1280px] grid-cols-[minmax(340px,58%)_minmax(280px,42%)] gap-3 md:gap-6 lg:gap-10 items-start">
+          <div className="flex-1 w-full overflow-y-auto px-2 sm:px-3 md:px-5 lg:px-8 py-2 md:py-3 lg:py-4 xl:py-8">
+            <div className="mx-auto grid w-full max-w-[1280px] grid-cols-[minmax(340px,58%)_minmax(280px,42%)] gap-3 md:gap-4 lg:gap-6 xl:gap-10 items-start">
 
               {/* LEFT: match info + keypad */}
               <div className="flex flex-col items-center justify-start min-w-0">
@@ -2124,11 +2124,11 @@ export default function ScorerPage() {
               </div>
 
               {/* RIGHT: stacked player cards */}
-              <div className="min-h-0 overflow-y-auto flex flex-col gap-3 md:gap-4 lg:gap-5 xl:gap-8 pt-1 md:pt-2 lg:pt-4 xl:pt-6 pr-1 md:pr-2">
+              <div className="min-h-0 overflow-y-auto flex flex-col gap-3 md:gap-4 lg:gap-5 xl:gap-8 pt-1 md:pt-2 lg:pt-2 xl:pt-6 pr-1 md:pr-2">
 
                 <div
                   className={cn(
-                    "w-full max-w-[460px] min-h-[160px] md:min-h-[190px] lg:min-h-[230px] xl:min-h-[290px] mx-auto rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6 flex flex-col justify-center transition-all duration-300",
+                    "w-full max-w-[460px] min-h-[140px] md:min-h-[170px] lg:min-h-[190px] xl:min-h-[260px] mx-auto rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6 flex flex-col justify-center transition-all duration-300",
                     currentThrower === leftThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
                       : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] opacity-80 grayscale-[30%]"
@@ -2169,7 +2169,7 @@ export default function ScorerPage() {
 
                 <div
                   className={cn(
-                    "w-full max-w-[460px] min-h-[160px] md:min-h-[190px] lg:min-h-[230px] xl:min-h-[290px] mx-auto rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6 flex flex-col justify-center transition-all duration-300",
+                    "w-full max-w-[460px] min-h-[140px] md:min-h-[170px] lg:min-h-[190px] xl:min-h-[260px] mx-auto rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6 flex flex-col justify-center transition-all duration-300",
                     currentThrower === rightThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
                       : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] opacity-80 grayscale-[30%]"
