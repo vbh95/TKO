@@ -2081,7 +2081,7 @@ export default function ScorerPage() {
                     {['1','2','3','4','5','6','7','8','9'].map(key => (
                       <button
                         key={key}
-                        className="h-14 md:h-24 lg:h-[112px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl lg:text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                        className="h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl lg:text-2xl xl:text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
                         onClick={() => handleNumpad(key)}
                         disabled={updateScoreMutation.isPending}
                         data-testid={`button-numpad-${key}`}
@@ -2094,7 +2094,7 @@ export default function ScorerPage() {
                   {/* Bottom row: undo / 0 / OK */}
                   <div className="grid grid-cols-3 gap-3">
                     <button
-                      className="h-14 md:h-24 lg:h-[112px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
+                      className="h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
                       onClick={() => setShowUndoConfirm(true)}
                       disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                       data-testid="button-undo"
@@ -2102,7 +2102,7 @@ export default function ScorerPage() {
                       <Undo2 className={cn("w-8 h-8", legVisits.length === 0 ? "text-gray-700" : "text-red-400")} />
                     </button>
                     <button
-                      className="h-14 md:h-24 lg:h-[112px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl lg:text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                      className="h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl lg:text-2xl xl:text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
                       onClick={() => handleNumpad('0')}
                       disabled={updateScoreMutation.isPending}
                       data-testid="button-numpad-0"
@@ -2110,7 +2110,7 @@ export default function ScorerPage() {
                       0
                     </button>
                     <button
-                      className="h-14 md:h-24 lg:h-[112px] rounded-xl flex items-center justify-center touch-manipulation transition-all bg-primary border-2 border-primary/50 active:bg-primary/80 active:scale-[0.98]"
+                      className="h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl flex items-center justify-center touch-manipulation transition-all bg-primary border-2 border-primary/50 active:bg-primary/80 active:scale-[0.98]"
                       onClick={() => handleNumpad('OK')}
                       disabled={updateScoreMutation.isPending}
                       data-testid="button-numpad-OK"
@@ -2124,11 +2124,11 @@ export default function ScorerPage() {
               </div>
 
               {/* RIGHT: stacked player cards */}
-              <div className="min-h-0 overflow-y-auto flex flex-col gap-3 md:gap-5 lg:gap-8 pt-1 md:pt-3 lg:pt-6 pr-1 md:pr-2">
+              <div className="min-h-0 overflow-y-auto flex flex-col gap-3 md:gap-4 lg:gap-5 xl:gap-8 pt-1 md:pt-2 lg:pt-4 xl:pt-6 pr-1 md:pr-2">
 
                 <div
                   className={cn(
-                    "w-full max-w-[460px] min-h-[200px] md:min-h-[260px] lg:min-h-[330px] mx-auto rounded-2xl p-3 md:p-5 lg:p-6 flex flex-col justify-center transition-all duration-300",
+                    "w-full max-w-[460px] min-h-[160px] md:min-h-[190px] lg:min-h-[230px] xl:min-h-[290px] mx-auto rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6 flex flex-col justify-center transition-all duration-300",
                     currentThrower === leftThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
                       : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] opacity-80 grayscale-[30%]"
@@ -2150,7 +2150,7 @@ export default function ScorerPage() {
                     )}
                   </p>
                   <div
-                    className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", currentThrower === leftThrower ? "text-[4.5rem] md:text-[6.5rem] lg:text-[8rem]" : "text-[4rem] md:text-[6rem] lg:text-[7rem]")}
+                    className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", currentThrower === leftThrower ? "text-[3.5rem] md:text-[4rem] lg:text-[5rem] xl:text-[6.5rem]" : "text-[3rem] md:text-[3.5rem] lg:text-[4.5rem] xl:text-[6rem]")}
                     data-testid="text-remaining-a"
                   >
                     {leftRemaining}
@@ -2169,7 +2169,7 @@ export default function ScorerPage() {
 
                 <div
                   className={cn(
-                    "w-full max-w-[460px] min-h-[200px] md:min-h-[260px] lg:min-h-[330px] mx-auto rounded-2xl p-3 md:p-5 lg:p-6 flex flex-col justify-center transition-all duration-300",
+                    "w-full max-w-[460px] min-h-[160px] md:min-h-[190px] lg:min-h-[230px] xl:min-h-[290px] mx-auto rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6 flex flex-col justify-center transition-all duration-300",
                     currentThrower === rightThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
                       : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] opacity-80 grayscale-[30%]"
@@ -2191,7 +2191,7 @@ export default function ScorerPage() {
                     )}
                   </p>
                   <div
-                    className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", currentThrower === rightThrower ? "text-[4.5rem] md:text-[6.5rem] lg:text-[8rem]" : "text-[4rem] md:text-[6rem] lg:text-[7rem]")}
+                    className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", currentThrower === rightThrower ? "text-[3.5rem] md:text-[4rem] lg:text-[5rem] xl:text-[6.5rem]" : "text-[3rem] md:text-[3.5rem] lg:text-[4.5rem] xl:text-[6rem]")}
                     data-testid="text-remaining-b"
                   >
                     {rightRemaining}
