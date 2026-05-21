@@ -1,0 +1,50 @@
+Add a confirmation popup before the tablet scorer “undo player score” action runs.
+
+Context:
+Users are accidentally tapping the undo player-score button when they meant to backspace the keypad input. Because this can remove the last submitted score and the scorer may not know what the previous score was, the undo action must require confirmation.
+
+Critical constraints:
+- Only modify the tablet scorer UI file(s), likely `client/src/pages/scorer.tsx`.
+- Do NOT change scoring calculations, match logic, checkout logic, API routes, database schema, board sessions, pairing, overlays, or tournament logic.
+- Do NOT change the keypad backspace/delete button behaviour.
+- This only affects the submitted-score undo button/action.
+
+Requirements:
+1. Find the existing undo player-score button in the scorer keypad area.
+   - It is the button that currently calls the score undo handler directly.
+   - Do not confuse it with the keypad backspace/delete button.
+
+2. Add local state only:
+   - `showUndoConfirm`, default `false`.
+
+3. Change the undo player-score button:
+   - Instead of immediately running the undo handler, it should set `showUndoConfirm` to `true`.
+   - Keep the existing disabled logic, styling, icon, and placement unchanged.
+
+4. Add a confirmation dialog/modal:
+   - Title: `Undo last score?`
+   - Message: `This will remove the last submitted player score. Only continue if this was intentional.`
+   - Buttons:
+     - `Cancel` closes the popup and does nothing.
+     - `Undo Score` closes the popup and then runs the existing undo handler.
+   - Make the confirm button visually dangerous/destructive if the project already has a destructive button style.
+
+5. Preserve all existing undo functionality:
+   - The existing undo handler must still be used.
+   - Do not rewrite undo logic.
+   - Do not change what undo does.
+   - Do not change any backend mutation.
+
+6. Make sure the popup works in both portrait and landscape scorer layouts:
+   - Render it in the shared scorer view/modal area if possible.
+   - It must appear above the screen with a high z-index.
+   - It must not interfere with impossible-score or checkout confirmation modals.
+
+7. Verify:
+   - Keypad backspace still deletes digits immediately with no confirmation.
+   - Submitted-score undo now opens the confirmation popup.
+   - Pressing Cancel does not undo anything.
+   - Pressing Undo Score performs the exact same undo action as before.
+   - Portrait scorer layout is unchanged.
+   - Landscape scorer layout is unchanged except the undo confirmation behaviour.
+   - No database/API/backend files changed.
