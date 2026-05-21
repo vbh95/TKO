@@ -546,6 +546,7 @@ export default function ScorerPage() {
   const [inputValue, setInputValue] = useState("");
   const [legStartingThrower, setLegStartingThrower] = useState<'A' | 'B'>('A');
   const [showQuickScores, setShowQuickScores] = useState(false);
+  const [showUndoConfirm, setShowUndoConfirm] = useState(false);
   const [allMatchVisits, setAllMatchVisits] = useState<Visit[]>([]);
   const [matchReport, setMatchReport] = useState<MatchStats | null>(null);
   const [matchScoresOpen, setMatchScoresOpen] = useState(false);
@@ -1858,7 +1859,7 @@ export default function ScorerPage() {
           <div className="grid grid-cols-3 gap-1 md:gap-1.5 flex-1 max-h-[10vh]">
             <button
               className="h-full min-h-[36px] rounded-lg bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
-              onClick={handleUndo}
+              onClick={() => setShowUndoConfirm(true)}
               disabled={legVisits.length === 0 || updateScoreMutation.isPending}
               data-testid="button-undo"
             >
@@ -2078,7 +2079,7 @@ export default function ScorerPage() {
                   <div className="grid grid-cols-3 gap-3">
                     <button
                       className="h-[112px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
-                      onClick={handleUndo}
+                      onClick={() => setShowUndoConfirm(true)}
                       disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                       data-testid="button-undo"
                     >
@@ -2354,6 +2355,40 @@ export default function ScorerPage() {
             {keypadSection}
             {spinnerSection}
           </div>
+        )}
+
+        {/* Undo confirmation modal — floats above both portrait and landscape layouts */}
+        {showUndoConfirm && (
+          <>
+            <div className="fixed inset-0 bg-black/60 z-[210]" />
+            <div className="fixed inset-0 z-[220] flex items-center justify-center p-6">
+              <div className="w-full max-w-sm bg-[#1e1e1e] border border-white/10 rounded-2xl p-6 shadow-2xl">
+                <div className="flex items-center gap-3 mb-3">
+                  <Undo2 className="w-6 h-6 text-red-400 shrink-0" />
+                  <p className="text-white font-bold text-xl">Undo last score?</p>
+                </div>
+                <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+                  This will remove the last submitted player score. Only continue if this was intentional.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    className="flex-1 h-12 rounded-xl bg-white/10 text-white font-semibold text-base touch-manipulation active:bg-white/20 transition-colors"
+                    onClick={() => setShowUndoConfirm(false)}
+                    data-testid="button-undo-cancel"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="flex-1 h-12 rounded-xl bg-red-600 text-white font-semibold text-base touch-manipulation active:bg-red-700 transition-colors"
+                    onClick={() => { setShowUndoConfirm(false); handleUndo(); }}
+                    data-testid="button-undo-confirm"
+                  >
+                    Undo Score
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </div>
     );
