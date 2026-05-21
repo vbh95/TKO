@@ -1,0 +1,101 @@
+```text
+Make the tablet scorer fully automatic and responsive for iPad/tablet landscape mode.
+
+Only modify `client/src/pages/scorer.tsx`. Do not change scoring logic, checkout logic, undo logic, handlers, API routes, database schema, overlays, board sessions, pairing, tournament logic, or scorer URLs.
+
+Implement this as a UI-only change.
+
+Add viewport detection using local state for `viewportWidth` and `viewportHeight`. Update them from `window.innerWidth` and `window.innerHeight` on load, resize, and orientationchange, with cleanup on unmount.
+
+Use these rules:
+- Landscape scorer is allowed only when the device is landscape AND `viewportWidth >= 768` AND `viewportHeight >= 500`.
+- Portrait scorer is allowed only when the device is portrait AND `viewportHeight >= 650`.
+- If neither layout can safely fit, show a full-screen message: “Please rotate your device”.
+- Do not save anything to DB or localStorage.
+
+Remove any manual landscape toggle button if it exists. Replace any `isLandscapeView` layout condition with an automatic `shouldUseLandscapeLayout`.
+
+Add these derived booleans:
+
+const isDeviceLandscape = viewportWidth > viewportHeight;
+
+const canUseLandscapeScorer =
+  isDeviceLandscape && viewportWidth >= 768 && viewportHeight >= 500;
+
+const canUsePortraitScorer =
+  !isDeviceLandscape && viewportHeight >= 650;
+
+const shouldShowRotateDeviceMessage =
+  view === "scoring" &&
+  activeMatch &&
+  !canUseLandscapeScorer &&
+  !canUsePortraitScorer;
+
+const shouldUseLandscapeLayout =
+  view === "scoring" &&
+  activeMatch &&
+  canUseLandscapeScorer;
+
+In the scoring view, render:
+1. rotate-device message if `shouldShowRotateDeviceMessage`
+2. responsive landscape layout if `shouldUseLandscapeLayout`
+3. existing portrait layout unchanged otherwise
+
+Rotate-device message JSX:
+
+<div className="flex-1 min-h-[calc(100vh-56px)] flex items-center justify-center p-6 bg-background text-center">
+  <div className="max-w-sm rounded-2xl border border-white/10 bg-card p-6 shadow-xl">
+    <div className="text-5xl mb-4">↻</div>
+    <h2 className="text-2xl font-black text-white mb-2">Please rotate your device</h2>
+    <p className="text-white/70 font-semibold">This scorer needs more screen space to display correctly.</p>
+  </div>
+</div>
+
+Landscape layout must be responsive and tablet-friendly:
+- left column = match info, player names/score row, score input, quick scores, keypad, undo/0/OK
+- right column = two player score cards stacked vertically
+- player cards must never be side-by-side
+- keypad must stay centred
+- layout must not touch screen edges
+- both columns must scroll if needed
+- preserve checkout/impossible/undo modals
+
+Use these landscape classes:
+- outer wrapper: `flex-1 w-full overflow-y-auto px-2 sm:px-3 md:px-5 lg:px-8 py-2 md:py-5 lg:py-8`
+- inner grid: `mx-auto grid w-full max-w-[1280px] grid-cols-[minmax(340px,58%)_minmax(280px,42%)] gap-3 md:gap-6 lg:gap-10 items-start`
+- left column: `flex flex-col items-center justify-start min-w-0`
+- keypad wrapper: `w-full max-w-[680px]`
+- right column: `min-h-0 overflow-y-auto flex flex-col gap-3 md:gap-5 lg:gap-8 pt-1 md:pt-3 lg:pt-6 pr-1 md:pr-2`
+- player cards: `w-full max-w-[460px] min-h-[200px] md:min-h-[260px] lg:min-h-[330px] mx-auto rounded-2xl p-3 md:p-5 lg:p-6 flex flex-col justify-center`
+
+Use responsive sizing:
+- input: `h-12 md:h-16 lg:h-[72px] text-2xl md:text-3xl lg:text-4xl`
+- keypad buttons: `h-14 md:h-24 lg:h-[112px] text-xl md:text-2xl lg:text-3xl rounded-xl`
+- active remaining score: `text-[4.5rem] md:text-[6.5rem] lg:text-[8rem] leading-none`
+- inactive remaining score: `text-[4rem] md:text-[6rem] lg:text-[7rem] leading-none`
+- player name: `text-lg md:text-xl lg:text-2xl`
+
+Preserve all existing functionality exactly:
+- score entry
+- quick scores
+- OK
+- clear/backspace
+- undo confirmation
+- checkout confirmation
+- impossible-score warning
+- darts-at-double modal
+- averages
+- last scores
+- throwing indicators
+
+Final checks:
+- iPad landscape fits without clipping
+- iPad Pro landscape scales up cleanly
+- Android tablet landscape scales correctly
+- smaller tablets scale down but remain usable
+- invalid/small screen shows “Please rotate your device”
+- rotating updates without reload
+- current scoring state is not lost
+- portrait mode remains unchanged
+- no backend/API/database files changed
+```
