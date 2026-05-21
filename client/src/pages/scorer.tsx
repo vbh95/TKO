@@ -1959,13 +1959,14 @@ export default function ScorerPage() {
         </div>
 
         {isLandscapeView ? (
-          <div className="flex-1 w-full overflow-y-auto px-8 py-10">
-            <div className="mx-auto grid max-w-[1280px] grid-cols-[minmax(520px,58%)_minmax(360px,42%)] gap-10 items-start">
+          <div className="flex-1 w-full overflow-hidden px-8 py-6">
+            <div className="mx-auto grid h-full max-w-[1280px] grid-cols-[minmax(520px,58%)_minmax(360px,42%)] gap-10 items-start">
 
-              {/* LEFT: match info + keypad */}
-              <div className="flex flex-col items-center justify-start min-w-0">
+              {/* LEFT: match info + keypad — fills full column height */}
+              <div className="h-[calc(100vh-140px)] flex flex-col items-center min-w-0">
 
-                <div className="mb-6 text-center w-full">
+                {/* Match info */}
+                <div className="shrink-0 mb-4 text-center w-full">
                   <p className="text-primary text-sm uppercase tracking-wider font-bold">
                     {getMatchRoundLabel(activeMatch)}
                   </p>
@@ -1973,31 +1974,52 @@ export default function ScorerPage() {
                     Leg {currentLeg} — Best of {matchBestOf}
                   </p>
                   <div className="flex items-center justify-center gap-5">
-                    <span className="text-right text-xl font-black text-white uppercase truncate max-w-[160px]">
-                      {leftPlayer?.name || "Player 1"}
-                    </span>
-                    <div className="flex items-center gap-3 tabular-nums">
+                    {(() => {
+                      const name = leftPlayer?.name || "Player 1";
+                      const spaceIdx = name.indexOf(' ');
+                      const first = spaceIdx !== -1 ? name.slice(0, spaceIdx) : name;
+                      const last = spaceIdx !== -1 ? name.slice(spaceIdx + 1) : '';
+                      return (
+                        <div className="text-right min-w-[120px]" data-testid="text-left-player-name-header">
+                          <div className="text-xl font-black text-white uppercase leading-tight">{first}</div>
+                          {last && <div className="text-xl font-black text-white uppercase leading-tight">{last}</div>}
+                        </div>
+                      );
+                    })()}
+                    <div className="flex items-center gap-3 tabular-nums shrink-0">
                       <span className={cn("text-6xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
-                      <span className="text-gray-600 text-4xl">-</span>
+                      <span className="text-gray-600 text-4xl">–</span>
                       <span className={cn("text-6xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
                     </div>
-                    <span className="text-left text-xl font-black text-white uppercase truncate max-w-[160px]">
-                      {rightPlayer?.name || "Player 2"}
-                    </span>
+                    {(() => {
+                      const name = rightPlayer?.name || "Player 2";
+                      const spaceIdx = name.indexOf(' ');
+                      const first = spaceIdx !== -1 ? name.slice(0, spaceIdx) : name;
+                      const last = spaceIdx !== -1 ? name.slice(spaceIdx + 1) : '';
+                      return (
+                        <div className="text-left min-w-[120px]" data-testid="text-right-player-name-header">
+                          <div className="text-xl font-black text-white uppercase leading-tight">{first}</div>
+                          {last && <div className="text-xl font-black text-white uppercase leading-tight">{last}</div>}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
-                <div className={cn("w-full max-w-[680px]", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
-                  <div className="flex gap-2 items-center mb-3">
+                {/* Keypad — flex-1 so it fills remaining height */}
+                <div className={cn("w-full max-w-[680px] flex-1 flex flex-col min-h-0", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
+
+                  {/* Score input row */}
+                  <div className="flex gap-2 items-center mb-3 shrink-0">
                     <button
-                      className="w-14 h-[72px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation shrink-0"
+                      className="w-14 h-[64px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation shrink-0"
                       onClick={() => setShowQuickScores(!showQuickScores)}
                       data-testid="button-toggle-quick"
                     >
                       <Grid2x2 className="w-5 h-5 text-gray-400" />
                     </button>
                     <div
-                      className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-xl px-5 h-[72px] text-4xl font-medium tabular-nums flex items-center justify-between"
+                      className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-xl px-5 h-[64px] text-4xl font-medium tabular-nums flex items-center justify-between"
                       data-testid="text-input-value"
                     >
                       <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
@@ -2015,13 +2037,14 @@ export default function ScorerPage() {
                     </div>
                   </div>
 
+                  {/* Quick scores */}
                   {showQuickScores && !pendingCheckout && (
-                    <div className="grid grid-cols-4 gap-3 mb-3">
+                    <div className="grid grid-cols-4 gap-3 mb-3 shrink-0">
                       {QUICK_SCORES.map(qs => (
                         <button
                           key={qs}
                           className={cn(
-                            "h-14 rounded-xl text-base font-bold touch-manipulation transition-colors",
+                            "h-12 rounded-xl text-base font-bold touch-manipulation transition-colors",
                             qs === 180
                               ? "bg-yellow-700/40 text-yellow-300 border-2 border-yellow-600/50"
                               : "bg-[#2a2a2a] text-gray-300 border-2 border-[#3a3a3a]"
@@ -2036,23 +2059,29 @@ export default function ScorerPage() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-3 gap-3 mb-3">
-                    {['1','2','3','4','5','6','7','8','9'].map(key => (
-                      <button
-                        key={key}
-                        className="h-[112px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
-                        onClick={() => handleNumpad(key)}
-                        disabled={updateScoreMutation.isPending}
-                        data-testid={`button-numpad-${key}`}
-                      >
-                        {key}
-                      </button>
+                  {/* 3×3 numpad rows — each row grows equally */}
+                  <div className="flex-1 flex flex-col gap-3 min-h-0 mb-3">
+                    {[['1','2','3'],['4','5','6'],['7','8','9']].map((row, ri) => (
+                      <div key={ri} className="flex-1 grid grid-cols-3 gap-3">
+                        {row.map(key => (
+                          <button
+                            key={key}
+                            className="h-full rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                            onClick={() => handleNumpad(key)}
+                            disabled={updateScoreMutation.isPending}
+                            data-testid={`button-numpad-${key}`}
+                          >
+                            {key}
+                          </button>
+                        ))}
+                      </div>
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
+                  {/* Bottom row: undo / 0 / OK */}
+                  <div className="shrink-0 grid grid-cols-3 gap-3 h-[96px]">
                     <button
-                      className="h-[112px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
+                      className="h-full rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
                       onClick={handleUndo}
                       disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                       data-testid="button-undo"
@@ -2060,7 +2089,7 @@ export default function ScorerPage() {
                       <Undo2 className={cn("w-8 h-8", legVisits.length === 0 ? "text-gray-700" : "text-red-400")} />
                     </button>
                     <button
-                      className="h-[112px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                      className="h-full rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
                       onClick={() => handleNumpad('0')}
                       disabled={updateScoreMutation.isPending}
                       data-testid="button-numpad-0"
@@ -2068,7 +2097,7 @@ export default function ScorerPage() {
                       0
                     </button>
                     <button
-                      className="h-[112px] rounded-xl flex items-center justify-center touch-manipulation transition-all bg-primary border-2 border-primary/50 active:bg-primary/80 active:scale-[0.98]"
+                      className="h-full rounded-xl flex items-center justify-center touch-manipulation transition-all bg-primary border-2 border-primary/50 active:bg-primary/80 active:scale-[0.98]"
                       onClick={() => handleNumpad('OK')}
                       disabled={updateScoreMutation.isPending}
                       data-testid="button-numpad-OK"
@@ -2079,15 +2108,14 @@ export default function ScorerPage() {
                 </div>
 
                 {spinnerSection}
-                {modalsSection}
               </div>
 
               {/* RIGHT: stacked player cards */}
-              <div className="h-[calc(100vh-140px)] min-h-0 overflow-y-auto flex flex-col gap-8 pt-8 pr-2">
+              <div className="h-[calc(100vh-140px)] min-h-0 overflow-y-auto flex flex-col gap-8 pt-4 pr-2">
 
                 <div
                   className={cn(
-                    "w-full max-w-[460px] min-h-[330px] mx-auto rounded-2xl p-6 flex flex-col justify-center transition-all duration-300",
+                    "w-full max-w-[460px] min-h-[300px] mx-auto rounded-2xl p-6 flex flex-col justify-center transition-all duration-300",
                     currentThrower === leftThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
                       : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] opacity-80 grayscale-[30%]"
@@ -2128,7 +2156,7 @@ export default function ScorerPage() {
 
                 <div
                   className={cn(
-                    "w-full max-w-[460px] min-h-[330px] mx-auto rounded-2xl p-6 flex flex-col justify-center transition-all duration-300",
+                    "w-full max-w-[460px] min-h-[300px] mx-auto rounded-2xl p-6 flex flex-col justify-center transition-all duration-300",
                     currentThrower === rightThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
                       : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] opacity-80 grayscale-[30%]"
@@ -2169,6 +2197,158 @@ export default function ScorerPage() {
 
               </div>
             </div>
+
+            {/* Checkout / impossible overlay — fixed & centred so it's always visible */}
+            {(impossibleWarning || pendingCheckout) && (
+              <>
+                <div className="fixed inset-0 bg-black/60 z-[150]" />
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+                  <div className="w-full max-w-lg">
+
+                    {impossibleWarning && (
+                      <div className="bg-primary rounded-xl p-6" data-testid="impossible-warning">
+                        <p className="text-primary-foreground font-bold text-center text-3xl mb-2">
+                          {impossibleWarning.includes("not possible") ? "BUST!" : "Impossible Score"}
+                        </p>
+                        <p className="text-primary-foreground/80 text-center text-lg mb-5">{impossibleWarning}</p>
+                        <div className="flex gap-3">
+                          <button
+                            className="flex-1 h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-lg touch-manipulation active:bg-primary-foreground/30 transition-colors"
+                            onClick={() => { setImpossibleWarning(null); setInputValue(""); }}
+                            data-testid="button-dismiss-impossible"
+                          >
+                            OK
+                          </button>
+                          {impossibleWarning.includes("not possible") && (
+                            <button
+                              className="flex-1 h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-lg touch-manipulation active:bg-primary-foreground/30 transition-colors"
+                              onClick={() => { setImpossibleWarning(null); setInputValue(""); handleScoreSubmit(0); }}
+                              data-testid="button-pass-turn"
+                            >
+                              Pass Turn
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {pendingCheckout && !pendingDartsAtDouble && (
+                      <div className="bg-primary rounded-xl p-6" data-testid="checkout-confirm">
+                        <div className="text-center mb-4">
+                          <Trophy className="w-10 h-10 text-primary-foreground mx-auto mb-2" />
+                          <p className="text-primary-foreground font-bold text-2xl">Checkout!</p>
+                          <p className="text-primary-foreground/70 text-base mt-1">
+                            {pendingCheckout.player === 'A' ? (getPlayer(activeMatch.playerAId)?.name || 'Player 1') : (getPlayer(activeMatch.playerBId)?.name || 'Player 2')} checked out
+                          </p>
+                        </div>
+                        <div className="flex gap-3">
+                          <button
+                            className="flex-1 h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-lg touch-manipulation active:bg-primary-foreground/30 transition-colors"
+                            onClick={cancelCheckout}
+                            data-testid="button-cancel-checkout"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            className="flex-1 h-14 rounded-xl bg-primary-foreground/20 text-primary-foreground font-semibold text-lg touch-manipulation active:bg-primary-foreground/30 transition-colors"
+                            onClick={handleConfirmCheckoutClick}
+                            disabled={updateScoreMutation.isPending}
+                            data-testid="button-confirm-checkout"
+                          >
+                            Confirm Checkout
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {pendingCheckout && pendingDartsAtDouble && (
+                      <div className="bg-primary rounded-xl p-6" data-testid="darts-at-double">
+                        <div className="text-center mb-4">
+                          <Target className="w-10 h-10 text-primary-foreground mx-auto mb-2" />
+                          <p className="text-primary-foreground font-bold text-2xl">Checkout Stats</p>
+                        </div>
+
+                        <div className="mb-4">
+                          <p className="text-primary-foreground/70 text-xs font-semibold uppercase tracking-wider mb-2">
+                            Darts Used On A Double
+                          </p>
+                          <div className="flex gap-3">
+                            {[1, 2, 3].map(n => (
+                              <button
+                                key={n}
+                                className={cn(
+                                  "flex-1 h-16 rounded-xl font-bold text-2xl touch-manipulation transition-colors",
+                                  selectedDartsAtDouble === n
+                                    ? "bg-primary-foreground text-primary"
+                                    : "bg-primary-foreground/20 text-primary-foreground active:bg-primary-foreground/30"
+                                )}
+                                onClick={() => {
+                                  setSelectedDartsAtDouble(n);
+                                  if (selectedCheckoutDartsUsed !== null && selectedCheckoutDartsUsed < n) {
+                                    setSelectedCheckoutDartsUsed(null);
+                                  }
+                                }}
+                                disabled={updateScoreMutation.isPending}
+                                data-testid={`button-darts-at-double-${n}`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="mb-4">
+                          <p className="text-primary-foreground/70 text-xs font-semibold uppercase tracking-wider mb-2">
+                            Darts Used For Checkout
+                          </p>
+                          <div className="flex gap-3">
+                            {[1, 2, 3].map(n => {
+                              const tooFew = selectedDartsAtDouble !== null && n < selectedDartsAtDouble;
+                              return (
+                                <button
+                                  key={n}
+                                  className={cn(
+                                    "flex-1 h-16 rounded-xl font-bold text-2xl touch-manipulation transition-colors",
+                                    tooFew ? "opacity-30 pointer-events-none" : "",
+                                    selectedCheckoutDartsUsed === n
+                                      ? "bg-primary-foreground text-primary"
+                                      : "bg-primary-foreground/20 text-primary-foreground active:bg-primary-foreground/30"
+                                  )}
+                                  onClick={() => setSelectedCheckoutDartsUsed(n)}
+                                  disabled={updateScoreMutation.isPending || !!tooFew}
+                                  data-testid={`button-checkout-darts-used-${n}`}
+                                >
+                                  {n}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <button
+                          className={cn(
+                            "w-full h-14 rounded-xl font-semibold text-lg touch-manipulation transition-colors",
+                            selectedDartsAtDouble !== null && selectedCheckoutDartsUsed !== null
+                              ? "bg-primary-foreground text-primary"
+                              : "bg-primary-foreground/10 text-primary-foreground/40 pointer-events-none"
+                          )}
+                          onClick={() => {
+                            if (selectedDartsAtDouble !== null && selectedCheckoutDartsUsed !== null) {
+                              confirmCheckout(selectedDartsAtDouble, selectedCheckoutDartsUsed);
+                            }
+                          }}
+                          disabled={updateScoreMutation.isPending || selectedDartsAtDouble === null || selectedCheckoutDartsUsed === null}
+                          data-testid="button-confirm-darts-selection"
+                        >
+                          Confirm
+                        </button>
+                      </div>
+                    )}
+
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex-1 flex flex-col w-full max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto px-2 md:px-4 py-0.5 md:py-1 overflow-hidden">
