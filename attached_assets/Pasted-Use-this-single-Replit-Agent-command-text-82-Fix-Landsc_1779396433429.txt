@@ -1,0 +1,180 @@
+Use this **single Replit Agent command**:
+
+```text
+#82 - Fix Landscape Scorer Layout To Match Mockup
+
+Adjust ONLY the tablet scorer landscape layout. Do not change portrait mode, scoring logic, checkout logic, undo logic, API routes, database schema, board sessions, pairing, or overlays.
+
+Current issue:
+Landscape mode technically works, but the layout is wrong. The keypad is too far left/bottom and the player cards are too high/wide. It should match the supplied mockup: match info and keypad on the left, two stacked player score cards on the right, centred vertically and sized cleanly for iPad landscape / TV mirroring.
+
+Target landscape layout:
+- Header remains unchanged.
+- Below the green header, use a two-column landscape grid.
+- Left column: match info at the top, then score input/keypad below.
+- Right column: player score cards stacked vertically.
+- The whole layout should be horizontally centred with balanced spacing.
+- Avoid unused empty space on the far left.
+- Avoid the right player cards starting too high or being too wide.
+- Right column should scroll if needed.
+
+Implementation requirements:
+
+1. Only affect the `isLandscapeView === true` branch.
+Portrait branch must remain exactly as it is.
+
+2. Landscape outer wrapper should be centred and constrained:
+Use something similar to:
+
+className="
+  w-full
+  min-h-[calc(100vh-56px)]
+  px-8
+  py-10
+  overflow-hidden
+"
+
+Inside it, add a centred grid wrapper:
+
+className="
+  mx-auto
+  grid
+  max-w-[1280px]
+  grid-cols-[minmax(520px,58%)_minmax(360px,42%)]
+  gap-10
+  items-start
+"
+
+3. Left landscape column:
+This column should contain:
+- round label
+- leg / best-of label
+- player names either side of the match score
+- match score
+- score input field
+- keypad
+- undo / OK controls
+
+Use classes similar to:
+
+className="
+  flex
+  flex-col
+  items-center
+  justify-start
+  pt-8
+  min-w-0
+"
+
+The match info block should be above the keypad and centred:
+
+className="
+  mb-8
+  text-center
+"
+
+For the row with player names and match score, use:
+
+className="
+  flex
+  items-center
+  justify-center
+  gap-5
+"
+
+Player names in landscape should be visible beside the score, like the mockup:
+- left player name aligned right
+- score in the middle, large
+- right player name aligned left
+
+4. Keypad container sizing:
+The keypad/input group should have a fixed max width so it does not hug the screen edge.
+
+Use something similar to:
+
+className="
+  w-full
+  max-w-[680px]
+"
+
+Input row:
+- grid with small keypad-mode button and wide input.
+- height around 72px.
+- input text large.
+
+Numeric keypad:
+Use a 3-column grid:
+className="
+  grid
+  grid-cols-3
+  gap-3
+"
+
+Buttons should be large and touch-friendly:
+className should include:
+h-[112px]
+text-3xl
+rounded-xl
+
+The bottom row should preserve undo, 0, and OK exactly as existing buttons/handlers.
+
+5. Right landscape column:
+This column should contain the existing player panels/cards only, stacked vertically.
+
+Use:
+
+className="
+  h-[calc(100vh-140px)]
+  min-h-0
+  overflow-y-auto
+  flex
+  flex-col
+  gap-8
+  pt-8
+  pr-2
+"
+
+Player cards should be narrower and taller like the mockup:
+
+className should include something similar to:
+w-full
+max-w-[460px]
+min-h-[330px]
+mx-auto
+rounded-2xl
+
+The active player card can be slightly taller if needed, but both cards should align nicely and not stretch across the full right side.
+
+6. Player card typography in landscape:
+Inside the player cards only in landscape:
+- player name: text-2xl or similar
+- remaining score: very large but not oversized:
+  text-[8rem] leading-none for active card
+  text-[7rem] leading-none for inactive card
+- stats row remains at bottom
+- preserve active/inactive styling exactly, just adjust size/layout.
+
+7. Remove the incorrect landscape behaviour:
+Do not render player cards side-by-side in landscape.
+Do not place the keypad flush to the far left edge.
+Do not put the match score above/right of the player cards.
+Do not let the right column cards stretch too wide.
+Do not let the keypad drop to the bottom of the viewport.
+
+8. Keep all existing functionality:
+Reuse existing JSX/buttons/handlers wherever possible.
+Do not duplicate scoring state or calculations.
+Do not rename existing functions.
+Do not alter checkout, impossible-score warnings, quick scores, clear, undo, OK, or match completion logic.
+
+9. Verify after implementation:
+- Portrait mode is unchanged.
+- Landscape mode resembles the mockup:
+  - left side has match title, player names, score, input, keypad
+  - right side has two stacked player cards
+  - layout is centred and balanced
+  - no huge empty gap on the far left
+  - no player cards side-by-side
+- Landscape toggle still works.
+- No backend files changed.
+```

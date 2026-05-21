@@ -1,0 +1,106 @@
+```text
+#83 - Fix Landscape Scorer Layout To Match Uploaded Mockup
+
+Use the uploaded mockup image as the exact visual reference for spacing, sizing, positioning, and proportions.
+
+Critical constraints:
+- ONLY modify `client/src/pages/scorer.tsx`
+- ONLY modify the `isLandscapeView === true` branch
+- DO NOT modify portrait mode
+- DO NOT modify scoring logic, handlers, checkout logic, undo logic, API calls, DB schema, overlays, pairing, board sessions, routes, or shared state
+- DO NOT refactor unrelated components
+- Keep changes minimal and layout-only
+
+Current problem:
+The current landscape implementation is functionally correct but visually wrong:
+- keypad is pushed too far left/bottom
+- player cards are side-by-side and too wide
+- match info is positioned incorrectly
+- layout stretches edge-to-edge instead of being centred
+- spacing does not match the uploaded mockup
+
+Target layout (match the uploaded mockup closely):
+
+LEFT COLUMN:
+- centred vertically toward upper-middle
+- round label at top
+- leg / best-of label under it
+- row with:
+  left player name — match score — right player name
+- score input row
+- optional quick scores
+- large 3×3 keypad
+- undo / 0 / OK bottom row
+
+RIGHT COLUMN:
+- two player score cards stacked vertically
+- narrower and taller cards
+- cards centred horizontally
+- active card slightly larger visually
+- remaining score very large
+- averages + last score at bottom of each card
+
+OVERALL:
+- centred content with max width
+- balanced spacing like the mockup
+- no huge empty left margin
+- no full-width player cards
+- keypad should not touch viewport edges
+- player cards should not appear side-by-side
+- right column should scroll if needed
+
+Implementation requirements:
+
+Replace the current landscape wrapper with:
+
+Outer wrapper:
+`flex-1 w-full overflow-y-auto px-8 py-10`
+
+Inner wrapper:
+`mx-auto grid max-w-[1280px] grid-cols-[minmax(520px,58%)_minmax(360px,42%)] gap-10 items-start`
+
+Left column:
+`flex flex-col items-center justify-start min-w-0`
+
+Right column:
+`h-[calc(100vh-140px)] min-h-0 overflow-y-auto flex flex-col gap-8 pt-8 pr-2`
+
+Keypad container:
+`w-full max-w-[680px]`
+
+Landscape numpad buttons:
+`h-[112px] text-3xl rounded-xl`
+
+Landscape input row:
+`h-[72px] text-4xl`
+
+Landscape player cards:
+`w-full max-w-[460px] min-h-[330px] mx-auto rounded-2xl p-6 flex flex-col justify-center`
+
+Landscape score typography:
+- active player:
+  `text-[8rem] leading-none`
+- inactive player:
+  `text-[7rem] leading-none`
+
+Do NOT use `{playerPanelsSection}` in landscape mode because it creates side-by-side cards.
+
+Instead:
+- render the two existing player cards manually inside the landscape branch
+- reuse ALL existing data/logic/handlers/styles already used by `playerPanelsSection`
+- preserve throwing indicators, averages, last scores, active/inactive styling, and all match state behaviour
+
+Keep:
+- `{spinnerSection}`
+- `{modalsSection}`
+fully functional in landscape.
+
+Expected final result:
+The landscape scorer should visually resemble the uploaded mockup almost exactly:
+- left side = match info + keypad
+- right side = stacked player cards
+- centred balanced layout
+- optimised for iPad landscape and TV mirroring
+- portrait mode unchanged
+- zero backend or logic changes
+```

@@ -1959,15 +1959,215 @@ export default function ScorerPage() {
         </div>
 
         {isLandscapeView ? (
-          <div className="flex-1 overflow-hidden grid grid-cols-[minmax(320px,40%)_1fr]">
-            <div className="h-full overflow-y-auto flex flex-col px-2 py-1 border-r border-white/10">
-              {keypadSection}
-              {spinnerSection}
-            </div>
-            <div className="h-full overflow-y-auto px-3 py-2 space-y-2">
-              {matchInfoSection}
-              {playerPanelsSection}
-              {modalsSection}
+          <div className="flex-1 w-full overflow-y-auto px-8 py-10">
+            <div className="mx-auto grid max-w-[1280px] grid-cols-[minmax(520px,58%)_minmax(360px,42%)] gap-10 items-start">
+
+              {/* LEFT: match info + keypad */}
+              <div className="flex flex-col items-center justify-start min-w-0">
+
+                <div className="mb-6 text-center w-full">
+                  <p className="text-primary text-sm uppercase tracking-wider font-bold">
+                    {getMatchRoundLabel(activeMatch)}
+                  </p>
+                  <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-3">
+                    Leg {currentLeg} — Best of {matchBestOf}
+                  </p>
+                  <div className="flex items-center justify-center gap-5">
+                    <span className="text-right text-xl font-black text-white uppercase truncate max-w-[160px]">
+                      {leftPlayer?.name || "Player 1"}
+                    </span>
+                    <div className="flex items-center gap-3 tabular-nums">
+                      <span className={cn("text-6xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
+                      <span className="text-gray-600 text-4xl">-</span>
+                      <span className={cn("text-6xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
+                    </div>
+                    <span className="text-left text-xl font-black text-white uppercase truncate max-w-[160px]">
+                      {rightPlayer?.name || "Player 2"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={cn("w-full max-w-[680px]", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
+                  <div className="flex gap-2 items-center mb-3">
+                    <button
+                      className="w-14 h-[72px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation shrink-0"
+                      onClick={() => setShowQuickScores(!showQuickScores)}
+                      data-testid="button-toggle-quick"
+                    >
+                      <Grid2x2 className="w-5 h-5 text-gray-400" />
+                    </button>
+                    <div
+                      className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-xl px-5 h-[72px] text-4xl font-medium tabular-nums flex items-center justify-between"
+                      data-testid="text-input-value"
+                    >
+                      <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
+                      <button
+                        className={cn(
+                          "ml-2 p-3 rounded-lg touch-manipulation active:scale-90 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center",
+                          inputValue ? "opacity-100" : "opacity-30 pointer-events-none"
+                        )}
+                        onClick={() => setInputValue(prev => prev.slice(0, -1))}
+                        disabled={!inputValue}
+                        data-testid="button-backspace"
+                      >
+                        <Delete className="w-7 h-7 text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {showQuickScores && !pendingCheckout && (
+                    <div className="grid grid-cols-4 gap-3 mb-3">
+                      {QUICK_SCORES.map(qs => (
+                        <button
+                          key={qs}
+                          className={cn(
+                            "h-14 rounded-xl text-base font-bold touch-manipulation transition-colors",
+                            qs === 180
+                              ? "bg-yellow-700/40 text-yellow-300 border-2 border-yellow-600/50"
+                              : "bg-[#2a2a2a] text-gray-300 border-2 border-[#3a3a3a]"
+                          )}
+                          onClick={() => handleScoreSubmit(qs)}
+                          disabled={updateScoreMutation.isPending}
+                          data-testid={`button-quick-${qs}`}
+                        >
+                          {qs}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    {['1','2','3','4','5','6','7','8','9'].map(key => (
+                      <button
+                        key={key}
+                        className="h-[112px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                        onClick={() => handleNumpad(key)}
+                        disabled={updateScoreMutation.isPending}
+                        data-testid={`button-numpad-${key}`}
+                      >
+                        {key}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      className="h-[112px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
+                      onClick={handleUndo}
+                      disabled={legVisits.length === 0 || updateScoreMutation.isPending}
+                      data-testid="button-undo"
+                    >
+                      <Undo2 className={cn("w-8 h-8", legVisits.length === 0 ? "text-gray-700" : "text-red-400")} />
+                    </button>
+                    <button
+                      className="h-[112px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                      onClick={() => handleNumpad('0')}
+                      disabled={updateScoreMutation.isPending}
+                      data-testid="button-numpad-0"
+                    >
+                      0
+                    </button>
+                    <button
+                      className="h-[112px] rounded-xl flex items-center justify-center touch-manipulation transition-all bg-primary border-2 border-primary/50 active:bg-primary/80 active:scale-[0.98]"
+                      onClick={() => handleNumpad('OK')}
+                      disabled={updateScoreMutation.isPending}
+                      data-testid="button-numpad-OK"
+                    >
+                      <Check className="w-10 h-10 text-white stroke-[3px]" />
+                    </button>
+                  </div>
+                </div>
+
+                {spinnerSection}
+                {modalsSection}
+              </div>
+
+              {/* RIGHT: stacked player cards */}
+              <div className="h-[calc(100vh-140px)] min-h-0 overflow-y-auto flex flex-col gap-8 pt-8 pr-2">
+
+                <div
+                  className={cn(
+                    "w-full max-w-[460px] min-h-[330px] mx-auto rounded-2xl p-6 flex flex-col justify-center transition-all duration-300",
+                    currentThrower === leftThrower
+                      ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
+                      : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] opacity-80 grayscale-[30%]"
+                  )}
+                  data-testid="panel-player-a"
+                >
+                  <div className="h-6 mb-1">
+                    {currentThrower === leftThrower && (
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span className="text-xs font-black uppercase tracking-widest text-white">Throwing</span>
+                        <Crosshair className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-2xl font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5" data-testid="text-player-a-name">
+                    {leftPlayer?.name || "Player 1"}
+                    {legStartingThrower === leftThrower && (
+                      <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
+                    )}
+                  </p>
+                  <div
+                    className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", currentThrower === leftThrower ? "text-[8rem]" : "text-[7rem]")}
+                    data-testid="text-remaining-a"
+                  >
+                    {leftRemaining}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 border-t border-white/10 pt-2">
+                    <div className="flex flex-col">
+                      <span className="text-white/40 uppercase text-[9px] font-bold">3-dart avg</span>
+                      <span className="text-white font-bold tabular-nums text-lg">{leftAvg}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-white/40 uppercase text-[9px] font-bold">Last score</span>
+                      <span className="text-white font-bold tabular-nums text-lg">{leftLastScore !== null ? leftLastScore : '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className={cn(
+                    "w-full max-w-[460px] min-h-[330px] mx-auto rounded-2xl p-6 flex flex-col justify-center transition-all duration-300",
+                    currentThrower === rightThrower
+                      ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
+                      : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] opacity-80 grayscale-[30%]"
+                  )}
+                  data-testid="panel-player-b"
+                >
+                  <div className="h-6 mb-1">
+                    {currentThrower === rightThrower && (
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span className="text-xs font-black uppercase tracking-widest text-white">Throwing</span>
+                        <Crosshair className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-2xl font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5" data-testid="text-player-b-name">
+                    {rightPlayer?.name || "Player 2"}
+                    {legStartingThrower === rightThrower && (
+                      <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
+                    )}
+                  </p>
+                  <div
+                    className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", currentThrower === rightThrower ? "text-[8rem]" : "text-[7rem]")}
+                    data-testid="text-remaining-b"
+                  >
+                    {rightRemaining}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 border-t border-white/10 pt-2">
+                    <div className="flex flex-col">
+                      <span className="text-white/40 uppercase text-[9px] font-bold">3-dart avg</span>
+                      <span className="text-white font-bold tabular-nums text-lg">{rightAvg}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-white/40 uppercase text-[9px] font-bold">Last score</span>
+                      <span className="text-white font-bold tabular-nums text-lg">{rightLastScore !== null ? rightLastScore : '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
             </div>
           </div>
         ) : (
