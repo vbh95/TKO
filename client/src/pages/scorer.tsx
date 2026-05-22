@@ -2131,7 +2131,7 @@ export default function ScorerPage() {
                   className={cn(
                     "mx-auto flex flex-col justify-center transition-all duration-300",
                     isCompactLandscape
-                      ? "w-full max-w-[360px] min-h-[180px] rounded-xl p-3"
+                      ? "w-full max-w-[360px] min-h-[150px] rounded-xl p-2.5"
                       : "w-full max-w-[460px] min-h-[140px] md:min-h-[170px] lg:min-h-[190px] xl:min-h-[260px] rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6",
                     currentThrower === leftThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
@@ -2177,7 +2177,7 @@ export default function ScorerPage() {
                   className={cn(
                     "mx-auto flex flex-col justify-center transition-all duration-300",
                     isCompactLandscape
-                      ? "w-full max-w-[360px] min-h-[180px] rounded-xl p-3"
+                      ? "w-full max-w-[360px] min-h-[150px] rounded-xl p-2.5"
                       : "w-full max-w-[460px] min-h-[140px] md:min-h-[170px] lg:min-h-[190px] xl:min-h-[260px] rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6",
                     currentThrower === rightThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
