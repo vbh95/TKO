@@ -1985,10 +1985,10 @@ export default function ScorerPage() {
 
                 {/* Match info */}
                 <div className={cn("shrink-0 text-center w-full", isCompactLandscape ? "mb-3" : "mb-4")}>
-                  <p className="text-primary text-sm uppercase tracking-wider font-bold">
+                  <p className={cn("text-primary uppercase tracking-wider font-bold", isCompactLandscape ? "text-[10px]" : "text-sm")}>
                     {getMatchRoundLabel(activeMatch)}
                   </p>
-                  <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-3">
+                  <p className={cn("text-gray-400 uppercase tracking-wider font-semibold", isCompactLandscape ? "text-[9px] mb-1.5" : "text-xs mb-3")}>
                     Leg {currentLeg} — Best of {matchBestOf}
                   </p>
                   <div className={cn("flex items-center justify-center", isCompactLandscape ? "gap-3" : "gap-5")}>
