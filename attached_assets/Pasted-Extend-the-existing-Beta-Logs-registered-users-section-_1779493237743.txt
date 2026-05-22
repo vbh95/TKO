@@ -1,0 +1,119 @@
+Extend the existing Beta Logs registered users section with admin user-management tools AND add admin-controlled invitation-code signup protection.
+
+Critical constraints:
+- Do NOT break existing login, signup, tournaments, tablet scoring, OBS overlays, beta logs, admin logic, or existing registered users.
+- Existing users must be unaffected and able to log in normally unless later locked or deleted by an admin.
+- Only site admins can access these new actions.
+- Add proper backend permission checks; do not rely only on frontend hiding.
+- Keep changes targeted to the Beta Logs admin area, signup flow, auth validation, and required backend/database routes only.
+- Never hard-code the invitation code in frontend JavaScript.
+
+Feature 1: Invitation code required for new signups
+- Add an admin-controlled invitation code system.
+- The invitation code must be set, edited, enabled, and disabled by me from the existing Beta Logs tab.
+- Add a section in Beta Logs called “Signup Invitation Code” or similar.
+- This section should allow a site admin to:
+  - view whether invitation-code signup protection is enabled
+  - set/edit the current invitation code
+  - enable/disable the requirement
+  - optionally regenerate the code
+- During signup, add an “Invitation Code” field.
+- If invitation-code protection is enabled, new users must enter the correct invitation code before their account can be created.
+- If the code is missing or wrong, block signup and show: “Invalid invitation code.”
+- If invitation-code protection is disabled, signup should work exactly as it currently does.
+- Existing users must not be asked for an invitation code when logging in.
+- Store the invitation code server-side only.
+- Prefer storing a hashed version of the invite code rather than plain text if practical.
+- Add database support if needed, for example an admin_settings / site_settings table with:
+  - key
+  - value / hashedValue
+  - enabled
+  - updatedBy
+  - updatedAt
+- Log invitation-code setting changes and signup attempts in Beta Logs, including:
+  - admin ID/email for setting changes
+  - target/signup email where relevant
+  - success/failure
+  - reason if failed
+  - timestamp
+
+Feature 2: Open a user’s admin panel from Beta Logs
+- In the Beta Logs tab, inside the existing Registered Users section, make each user name clickable.
+- When a site admin clicks a user’s name, open a read/admin view for that specific user.
+- This should show that user’s tournament admin dashboard as if viewing their account, including:
+  - Not started tournaments
+  - In-progress tournaments
+  - Completed tournaments
+- This must NOT log the site admin out or permanently switch the authenticated session.
+- Make it clear in the UI that the site admin is “Viewing as [user name/email]”.
+- Add a safe “Back to Beta Logs” button.
+- The admin should be able to inspect the user’s tournaments without affecting normal user access.
+- Use backend routes that accept a target user ID only when the requester is a site admin.
+
+Feature 3: Lock user account from Beta Logs
+- In the Registered Users section, add a “Lock Account” / “Unlock Account” action.
+- Locked users must not be able to log in.
+- If a locked user attempts to log in, block login with:
+  “Your account has been locked. Please contact the site admin.”
+- Locking an account must not delete their tournaments or historical data.
+- Add a database field if needed, for example users.isLocked boolean default false.
+- Add confirmation popup before locking or unlocking.
+- Log lock/unlock actions in Beta Logs with:
+  - admin ID/email
+  - target user ID/email
+  - action type
+  - timestamp
+
+Feature 4: Delete user account from Beta Logs
+- In the Registered Users section, add a “Delete Account” action.
+- Use a strong confirmation popup before deleting, clearly warning that this is permanent.
+- Prefer a safe soft-delete approach using users.deletedAt / users.isDeleted rather than hard delete.
+- If soft-delete is used:
+  - deleted users cannot log in
+  - deleted users no longer appear as active registered users
+  - historical tournament records remain readable where needed
+- Do NOT accidentally delete unrelated tournament data or break historical results.
+- Log delete actions in Beta Logs with:
+  - admin ID/email
+  - target user ID/email
+  - action type
+  - timestamp
+
+Backend requirements:
+- Add protected admin-only API routes for:
+  - getting invitation-code settings
+  - setting/updating invitation code
+  - enabling/disabling invitation-code signup protection
+  - validating invitation code during signup
+  - viewing a user’s tournaments by user ID
+  - locking/unlocking users
+  - deleting/soft-deleting users
+- Validate the requesting user is a site admin on every admin route.
+- Never allow a normal user to access another user’s tournaments.
+- Never allow a normal user to manage invite codes, lock users, unlock users, or delete accounts.
+- Prevent admins from accidentally deleting or locking their own account unless explicitly handled safely.
+- Make sure locked or soft-deleted users cannot log in.
+
+Frontend requirements:
+- Update the Beta Logs tab only where needed.
+- Add the Signup Invitation Code controls in Beta Logs.
+- Update the existing Registered Users section with:
+  - clickable user names
+  - Lock/Unlock action
+  - Delete action
+- Add the invitation-code field to the signup form.
+- Add confirmation modals for lock/unlock/delete.
+- Add loading and error states.
+- Refresh Beta Logs / Registered Users after changes.
+- Keep the existing Beta Logs layout and styling consistent.
+
+Acceptance checks:
+- Existing users can still log in without an invite code.
+- New users cannot sign up without the correct invite code when the requirement is enabled.
+- New users can sign up normally when the requirement is disabled.
+- The invite code can be set and changed from the Beta Logs tab.
+- Clicking a registered user name lets a site admin view that user’s not started, in-progress, and completed tournaments.
+- Locked users cannot log in, but their tournament data remains.
+- Deleted/soft-deleted users cannot log in and no longer appear as active registered users.
+- All invite-code changes, signup attempts, lock/unlock actions, and delete actions are logged in Beta Logs.
+- Non-admin users cannot access these admin routes, even by manually calling the API.
