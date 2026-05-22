@@ -2125,13 +2125,13 @@ export default function ScorerPage() {
               </div>
 
               {/* RIGHT: stacked player cards */}
-              <div className={cn("min-h-0 overflow-y-auto flex flex-col pt-1 pr-1", isCompactLandscape ? "gap-3" : "gap-3 md:gap-4 lg:gap-5 xl:gap-8 md:pt-2 lg:pt-2 xl:pt-6 md:pr-2")}>
+              <div className={cn("min-h-0 overflow-y-auto flex flex-col pt-1 pr-1", isCompactLandscape ? "gap-2" : "gap-3 md:gap-4 lg:gap-5 xl:gap-8 md:pt-2 lg:pt-2 xl:pt-6 md:pr-2")}>
 
                 <div
                   className={cn(
                     "mx-auto flex flex-col justify-center transition-all duration-300",
                     isCompactLandscape
-                      ? "w-full max-w-[360px] min-h-[150px] rounded-xl p-2.5"
+                      ? "w-full max-w-[360px] min-h-[110px] rounded-xl p-2"
                       : "w-full max-w-[460px] min-h-[140px] md:min-h-[170px] lg:min-h-[190px] xl:min-h-[260px] rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6",
                     currentThrower === leftThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
@@ -2139,7 +2139,7 @@ export default function ScorerPage() {
                   )}
                   data-testid="panel-player-a"
                 >
-                  <div className="h-6 mb-1">
+                  <div className={isCompactLandscape ? "mb-0.5" : "h-6 mb-1"}>
                     {currentThrower === leftThrower && (
                       <div className="flex items-center justify-end gap-1.5">
                         <span className="text-xs font-black uppercase tracking-widest text-white">Throwing</span>
@@ -2147,7 +2147,7 @@ export default function ScorerPage() {
                       </div>
                     )}
                   </div>
-                  <p className={cn("font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5", isCompactLandscape ? "text-base" : "text-lg md:text-xl lg:text-2xl")} data-testid="text-player-a-name">
+                  <p className={cn("font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5", isCompactLandscape ? "text-sm" : "text-lg md:text-xl lg:text-2xl")} data-testid="text-player-a-name">
                     {leftPlayer?.name || "Player 1"}
                     {legStartingThrower === leftThrower && (
                       <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
@@ -2155,13 +2155,13 @@ export default function ScorerPage() {
                   </p>
                   <div
                     className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", isCompactLandscape
-                      ? (currentThrower === leftThrower ? "text-[4rem]" : "text-[3.5rem]")
+                      ? (currentThrower === leftThrower ? "text-[3.5rem]" : "text-[3rem]")
                       : (currentThrower === leftThrower ? "text-[3.5rem] md:text-[4rem] lg:text-[5rem] xl:text-[6.5rem]" : "text-[3rem] md:text-[3.5rem] lg:text-[4.5rem] xl:text-[6rem]"))}
                     data-testid="text-remaining-a"
                   >
                     {leftRemaining}
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 border-t border-white/10 pt-2">
+                  <div className={cn("grid grid-cols-2 gap-x-2 gap-y-1 border-t border-white/10", isCompactLandscape ? "mt-1.5 pt-1" : "mt-3 pt-2")}>
                     <div className="flex flex-col">
                       <span className="text-white/40 uppercase text-[9px] font-bold">3-dart avg</span>
                       <span className={cn("text-white font-bold tabular-nums", isCompactLandscape ? "text-sm" : "text-lg")}>{leftAvg}</span>
@@ -2177,7 +2177,7 @@ export default function ScorerPage() {
                   className={cn(
                     "mx-auto flex flex-col justify-center transition-all duration-300",
                     isCompactLandscape
-                      ? "w-full max-w-[360px] min-h-[150px] rounded-xl p-2.5"
+                      ? "w-full max-w-[360px] min-h-[110px] rounded-xl p-2"
                       : "w-full max-w-[460px] min-h-[140px] md:min-h-[170px] lg:min-h-[190px] xl:min-h-[260px] rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6",
                     currentThrower === rightThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
@@ -2185,7 +2185,7 @@ export default function ScorerPage() {
                   )}
                   data-testid="panel-player-b"
                 >
-                  <div className="h-6 mb-1">
+                  <div className={isCompactLandscape ? "mb-0.5" : "h-6 mb-1"}>
                     {currentThrower === rightThrower && (
                       <div className="flex items-center justify-end gap-1.5">
                         <span className="text-xs font-black uppercase tracking-widest text-white">Throwing</span>
@@ -2193,7 +2193,7 @@ export default function ScorerPage() {
                       </div>
                     )}
                   </div>
-                  <p className={cn("font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5", isCompactLandscape ? "text-base" : "text-lg md:text-xl lg:text-2xl")} data-testid="text-player-b-name">
+                  <p className={cn("font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5", isCompactLandscape ? "text-sm" : "text-lg md:text-xl lg:text-2xl")} data-testid="text-player-b-name">
                     {rightPlayer?.name || "Player 2"}
                     {legStartingThrower === rightThrower && (
                       <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
@@ -2201,13 +2201,13 @@ export default function ScorerPage() {
                   </p>
                   <div
                     className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", isCompactLandscape
-                      ? (currentThrower === rightThrower ? "text-[4rem]" : "text-[3.5rem]")
+                      ? (currentThrower === rightThrower ? "text-[3.5rem]" : "text-[3rem]")
                       : (currentThrower === rightThrower ? "text-[3.5rem] md:text-[4rem] lg:text-[5rem] xl:text-[6.5rem]" : "text-[3rem] md:text-[3.5rem] lg:text-[4.5rem] xl:text-[6rem]"))}
                     data-testid="text-remaining-b"
                   >
                     {rightRemaining}
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 border-t border-white/10 pt-2">
+                  <div className={cn("grid grid-cols-2 gap-x-2 gap-y-1 border-t border-white/10", isCompactLandscape ? "mt-1.5 pt-1" : "mt-3 pt-2")}>
                     <div className="flex flex-col">
                       <span className="text-white/40 uppercase text-[9px] font-bold">3-dart avg</span>
                       <span className={cn("text-white font-bold tabular-nums", isCompactLandscape ? "text-sm" : "text-lg")}>{rightAvg}</span>
