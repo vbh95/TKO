@@ -1396,10 +1396,11 @@ export default function ScorerPage() {
   const activeMatch = activeMatchId ? matches.find(m => m.id === activeMatchId) : null;
 
   const isDeviceLandscape = viewportWidth > viewportHeight;
-  const canUseLandscapeScorer = isDeviceLandscape && viewportWidth >= 768 && viewportHeight >= 500;
+  const canUseLandscapeScorer = isDeviceLandscape && viewportWidth >= 720 && viewportHeight >= 420;
   const canUsePortraitScorer = !isDeviceLandscape && viewportHeight >= 650;
   const shouldShowRotateDeviceMessage = view === "scoring" && !!activeMatch && !canUseLandscapeScorer && !canUsePortraitScorer;
   const shouldUseLandscapeLayout = view === "scoring" && !!activeMatch && canUseLandscapeScorer;
+  const isCompactLandscape = canUseLandscapeScorer && viewportWidth < 900;
 
   if (view === "bullThrow" && activeMatch) {
     const playerA = getPlayer(activeMatch.playerAId);
@@ -1976,37 +1977,37 @@ export default function ScorerPage() {
             </div>
           </div>
         ) : shouldUseLandscapeLayout ? (
-          <div className="flex-1 w-full overflow-y-auto px-2 sm:px-3 md:px-5 lg:px-8 py-2 md:py-3 lg:py-4 xl:py-8">
-            <div className="mx-auto grid w-full max-w-[1280px] grid-cols-[minmax(340px,58%)_minmax(280px,42%)] gap-3 md:gap-4 lg:gap-6 xl:gap-10 items-start">
+          <div className={cn("flex-1 w-full overflow-y-auto", isCompactLandscape ? "px-2 py-2" : "px-2 sm:px-3 md:px-5 lg:px-8 py-2 md:py-3 lg:py-4 xl:py-8")}>
+            <div className={cn("mx-auto grid w-full items-start", isCompactLandscape ? "max-w-[1100px] grid-cols-[minmax(300px,58%)_minmax(240px,42%)] gap-3" : "max-w-[1280px] grid-cols-[minmax(340px,58%)_minmax(280px,42%)] gap-3 md:gap-4 lg:gap-6 xl:gap-10")}>
 
               {/* LEFT: match info + keypad */}
               <div className="flex flex-col items-center justify-start min-w-0">
 
                 {/* Match info */}
-                <div className="shrink-0 mb-4 text-center w-full">
+                <div className={cn("shrink-0 text-center w-full", isCompactLandscape ? "mb-3" : "mb-4")}>
                   <p className="text-primary text-sm uppercase tracking-wider font-bold">
                     {getMatchRoundLabel(activeMatch)}
                   </p>
                   <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-3">
                     Leg {currentLeg} — Best of {matchBestOf}
                   </p>
-                  <div className="flex items-center justify-center gap-5">
+                  <div className={cn("flex items-center justify-center", isCompactLandscape ? "gap-3" : "gap-5")}>
                     {(() => {
                       const name = leftPlayer?.name || "Player 1";
                       const spaceIdx = name.indexOf(' ');
                       const first = spaceIdx !== -1 ? name.slice(0, spaceIdx) : name;
                       const last = spaceIdx !== -1 ? name.slice(spaceIdx + 1) : '';
                       return (
-                        <div className="text-right min-w-[120px]" data-testid="text-left-player-name-header">
-                          <div className="text-xl font-black text-white uppercase leading-tight">{first}</div>
-                          {last && <div className="text-xl font-black text-white uppercase leading-tight">{last}</div>}
+                        <div className={cn("text-right", isCompactLandscape ? "min-w-[80px]" : "min-w-[120px]")} data-testid="text-left-player-name-header">
+                          <div className={cn("font-black text-white uppercase leading-tight", isCompactLandscape ? "text-base" : "text-xl")}>{first}</div>
+                          {last && <div className={cn("font-black text-white uppercase leading-tight", isCompactLandscape ? "text-base" : "text-xl")}>{last}</div>}
                         </div>
                       );
                     })()}
                     <div className="flex items-center gap-3 tabular-nums shrink-0">
-                      <span className={cn("text-6xl font-bold", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
-                      <span className="text-gray-600 text-4xl">–</span>
-                      <span className={cn("text-6xl font-bold", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
+                      <span className={cn("font-bold", isCompactLandscape ? "text-4xl" : "text-6xl", leftLegs >= rightLegs ? "text-white" : "text-gray-500")}>{leftLegs}</span>
+                      <span className={cn("text-gray-600", isCompactLandscape ? "text-2xl" : "text-4xl")}>–</span>
+                      <span className={cn("font-bold", isCompactLandscape ? "text-4xl" : "text-6xl", rightLegs >= leftLegs ? "text-white" : "text-gray-500")}>{rightLegs}</span>
                     </div>
                     {(() => {
                       const name = rightPlayer?.name || "Player 2";
@@ -2014,9 +2015,9 @@ export default function ScorerPage() {
                       const first = spaceIdx !== -1 ? name.slice(0, spaceIdx) : name;
                       const last = spaceIdx !== -1 ? name.slice(spaceIdx + 1) : '';
                       return (
-                        <div className="text-left min-w-[120px]" data-testid="text-right-player-name-header">
-                          <div className="text-xl font-black text-white uppercase leading-tight">{first}</div>
-                          {last && <div className="text-xl font-black text-white uppercase leading-tight">{last}</div>}
+                        <div className={cn("text-left", isCompactLandscape ? "min-w-[80px]" : "min-w-[120px]")} data-testid="text-right-player-name-header">
+                          <div className={cn("font-black text-white uppercase leading-tight", isCompactLandscape ? "text-base" : "text-xl")}>{first}</div>
+                          {last && <div className={cn("font-black text-white uppercase leading-tight", isCompactLandscape ? "text-base" : "text-xl")}>{last}</div>}
                         </div>
                       );
                     })()}
@@ -2024,19 +2025,19 @@ export default function ScorerPage() {
                 </div>
 
                 {/* Keypad */}
-                <div className={cn("w-full max-w-[680px]", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
+                <div className={cn(isCompactLandscape ? "w-full max-w-[560px]" : "w-full max-w-[680px]", (pendingCheckout || impossibleWarning) && "opacity-30 pointer-events-none")}>
 
                   {/* Score input row */}
                   <div className="flex gap-2 items-center mb-3">
                     <button
-                      className="w-14 h-[72px] rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation shrink-0"
+                      className={cn("rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation shrink-0", isCompactLandscape ? "w-12 h-11" : "w-14 h-[72px]")}
                       onClick={() => setShowQuickScores(!showQuickScores)}
                       data-testid="button-toggle-quick"
                     >
                       <Grid2x2 className="w-5 h-5 text-gray-400" />
                     </button>
                     <div
-                      className="flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-xl px-5 h-12 md:h-16 lg:h-[72px] text-2xl md:text-3xl lg:text-4xl font-medium tabular-nums flex items-center justify-between"
+                      className={cn("flex-1 bg-[#2a2a2a] border-2 border-[#3a3a3a] rounded-xl px-5 font-medium tabular-nums flex items-center justify-between", isCompactLandscape ? "h-11 text-2xl" : "h-12 md:h-16 lg:h-[72px] text-2xl md:text-3xl lg:text-4xl")}
                       data-testid="text-input-value"
                     >
                       <span className={inputValue ? "text-white" : "text-gray-600"}>{inputValue || 'Enter a score'}</span>
@@ -2081,7 +2082,7 @@ export default function ScorerPage() {
                     {['1','2','3','4','5','6','7','8','9'].map(key => (
                       <button
                         key={key}
-                        className="h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl lg:text-2xl xl:text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                        className={cn("bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center", isCompactLandscape ? "h-12 rounded-lg text-xl" : "h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl text-xl md:text-2xl lg:text-2xl xl:text-3xl")}
                         onClick={() => handleNumpad(key)}
                         disabled={updateScoreMutation.isPending}
                         data-testid={`button-numpad-${key}`}
@@ -2094,7 +2095,7 @@ export default function ScorerPage() {
                   {/* Bottom row: undo / 0 / OK */}
                   <div className="grid grid-cols-3 gap-3">
                     <button
-                      className="h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all"
+                      className={cn("bg-[#2a2a2a] border-2 border-[#3a3a3a] flex items-center justify-center touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all", isCompactLandscape ? "h-12 rounded-lg" : "h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl")}
                       onClick={() => setShowUndoConfirm(true)}
                       disabled={legVisits.length === 0 || updateScoreMutation.isPending}
                       data-testid="button-undo"
@@ -2102,7 +2103,7 @@ export default function ScorerPage() {
                       <Undo2 className={cn("w-8 h-8", legVisits.length === 0 ? "text-gray-700" : "text-red-400")} />
                     </button>
                     <button
-                      className="h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white text-xl md:text-2xl lg:text-2xl xl:text-3xl font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center"
+                      className={cn("bg-[#2a2a2a] border-2 border-[#3a3a3a] text-white font-semibold touch-manipulation active:bg-[#3a3a3a] active:scale-[0.98] transition-all flex items-center justify-center", isCompactLandscape ? "h-12 rounded-lg text-xl" : "h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl text-xl md:text-2xl lg:text-2xl xl:text-3xl")}
                       onClick={() => handleNumpad('0')}
                       disabled={updateScoreMutation.isPending}
                       data-testid="button-numpad-0"
@@ -2110,7 +2111,7 @@ export default function ScorerPage() {
                       0
                     </button>
                     <button
-                      className="h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl flex items-center justify-center touch-manipulation transition-all bg-primary border-2 border-primary/50 active:bg-primary/80 active:scale-[0.98]"
+                      className={cn("flex items-center justify-center touch-manipulation transition-all bg-primary border-2 border-primary/50 active:bg-primary/80 active:scale-[0.98]", isCompactLandscape ? "h-12 rounded-lg" : "h-14 md:h-16 lg:h-20 xl:h-24 rounded-xl")}
                       onClick={() => handleNumpad('OK')}
                       disabled={updateScoreMutation.isPending}
                       data-testid="button-numpad-OK"
@@ -2124,11 +2125,14 @@ export default function ScorerPage() {
               </div>
 
               {/* RIGHT: stacked player cards */}
-              <div className="min-h-0 overflow-y-auto flex flex-col gap-3 md:gap-4 lg:gap-5 xl:gap-8 pt-1 md:pt-2 lg:pt-2 xl:pt-6 pr-1 md:pr-2">
+              <div className={cn("min-h-0 overflow-y-auto flex flex-col pt-1 pr-1", isCompactLandscape ? "gap-3" : "gap-3 md:gap-4 lg:gap-5 xl:gap-8 md:pt-2 lg:pt-2 xl:pt-6 md:pr-2")}>
 
                 <div
                   className={cn(
-                    "w-full max-w-[460px] min-h-[140px] md:min-h-[170px] lg:min-h-[190px] xl:min-h-[260px] mx-auto rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6 flex flex-col justify-center transition-all duration-300",
+                    "mx-auto flex flex-col justify-center transition-all duration-300",
+                    isCompactLandscape
+                      ? "w-full max-w-[360px] min-h-[180px] rounded-xl p-3"
+                      : "w-full max-w-[460px] min-h-[140px] md:min-h-[170px] lg:min-h-[190px] xl:min-h-[260px] rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6",
                     currentThrower === leftThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
                       : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] opacity-80 grayscale-[30%]"
@@ -2143,14 +2147,16 @@ export default function ScorerPage() {
                       </div>
                     )}
                   </div>
-                  <p className="text-lg md:text-xl lg:text-2xl font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5" data-testid="text-player-a-name">
+                  <p className={cn("font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5", isCompactLandscape ? "text-base" : "text-lg md:text-xl lg:text-2xl")} data-testid="text-player-a-name">
                     {leftPlayer?.name || "Player 1"}
                     {legStartingThrower === leftThrower && (
                       <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
                     )}
                   </p>
                   <div
-                    className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", currentThrower === leftThrower ? "text-[3.5rem] md:text-[4rem] lg:text-[5rem] xl:text-[6.5rem]" : "text-[3rem] md:text-[3.5rem] lg:text-[4.5rem] xl:text-[6rem]")}
+                    className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", isCompactLandscape
+                      ? (currentThrower === leftThrower ? "text-[4rem]" : "text-[3.5rem]")
+                      : (currentThrower === leftThrower ? "text-[3.5rem] md:text-[4rem] lg:text-[5rem] xl:text-[6.5rem]" : "text-[3rem] md:text-[3.5rem] lg:text-[4.5rem] xl:text-[6rem]"))}
                     data-testid="text-remaining-a"
                   >
                     {leftRemaining}
@@ -2158,18 +2164,21 @@ export default function ScorerPage() {
                   <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 border-t border-white/10 pt-2">
                     <div className="flex flex-col">
                       <span className="text-white/40 uppercase text-[9px] font-bold">3-dart avg</span>
-                      <span className="text-white font-bold tabular-nums text-lg">{leftAvg}</span>
+                      <span className={cn("text-white font-bold tabular-nums", isCompactLandscape ? "text-sm" : "text-lg")}>{leftAvg}</span>
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="text-white/40 uppercase text-[9px] font-bold">Last score</span>
-                      <span className="text-white font-bold tabular-nums text-lg">{leftLastScore !== null ? leftLastScore : '-'}</span>
+                      <span className={cn("text-white font-bold tabular-nums", isCompactLandscape ? "text-sm" : "text-lg")}>{leftLastScore !== null ? leftLastScore : '-'}</span>
                     </div>
                   </div>
                 </div>
 
                 <div
                   className={cn(
-                    "w-full max-w-[460px] min-h-[140px] md:min-h-[170px] lg:min-h-[190px] xl:min-h-[260px] mx-auto rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6 flex flex-col justify-center transition-all duration-300",
+                    "mx-auto flex flex-col justify-center transition-all duration-300",
+                    isCompactLandscape
+                      ? "w-full max-w-[360px] min-h-[180px] rounded-xl p-3"
+                      : "w-full max-w-[460px] min-h-[140px] md:min-h-[170px] lg:min-h-[190px] xl:min-h-[260px] rounded-2xl p-3 md:p-4 lg:p-5 xl:p-6",
                     currentThrower === rightThrower
                       ? "bg-primary ring-2 ring-primary ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] shadow-2xl"
                       : "bg-primary/20 ring-2 ring-primary/30 ring-offset-2 ring-offset-[hsl(222.2,84%,4.9%)] opacity-80 grayscale-[30%]"
@@ -2184,14 +2193,16 @@ export default function ScorerPage() {
                       </div>
                     )}
                   </div>
-                  <p className="text-lg md:text-xl lg:text-2xl font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5" data-testid="text-player-b-name">
+                  <p className={cn("font-black text-white truncate mb-1 uppercase tracking-tight flex items-center gap-1.5", isCompactLandscape ? "text-base" : "text-lg md:text-xl lg:text-2xl")} data-testid="text-player-b-name">
                     {rightPlayer?.name || "Player 2"}
                     {legStartingThrower === rightThrower && (
                       <span style={{ color: "#ef4444", fontSize: "0.6em", lineHeight: 1 }} title="Won the bull">●</span>
                     )}
                   </p>
                   <div
-                    className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", currentThrower === rightThrower ? "text-[3.5rem] md:text-[4rem] lg:text-[5rem] xl:text-[6.5rem]" : "text-[3rem] md:text-[3.5rem] lg:text-[4.5rem] xl:text-[6rem]")}
+                    className={cn("font-bold text-white tabular-nums leading-none tracking-tighter", isCompactLandscape
+                      ? (currentThrower === rightThrower ? "text-[4rem]" : "text-[3.5rem]")
+                      : (currentThrower === rightThrower ? "text-[3.5rem] md:text-[4rem] lg:text-[5rem] xl:text-[6.5rem]" : "text-[3rem] md:text-[3.5rem] lg:text-[4.5rem] xl:text-[6rem]"))}
                     data-testid="text-remaining-b"
                   >
                     {rightRemaining}
@@ -2199,11 +2210,11 @@ export default function ScorerPage() {
                   <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 border-t border-white/10 pt-2">
                     <div className="flex flex-col">
                       <span className="text-white/40 uppercase text-[9px] font-bold">3-dart avg</span>
-                      <span className="text-white font-bold tabular-nums text-lg">{rightAvg}</span>
+                      <span className={cn("text-white font-bold tabular-nums", isCompactLandscape ? "text-sm" : "text-lg")}>{rightAvg}</span>
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="text-white/40 uppercase text-[9px] font-bold">Last score</span>
-                      <span className="text-white font-bold tabular-nums text-lg">{rightLastScore !== null ? rightLastScore : '-'}</span>
+                      <span className={cn("text-white font-bold tabular-nums", isCompactLandscape ? "text-sm" : "text-lg")}>{rightLastScore !== null ? rightLastScore : '-'}</span>
                     </div>
                   </div>
                 </div>
