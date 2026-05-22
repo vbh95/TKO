@@ -1,0 +1,82 @@
+Fix tablet scorer landscape responsiveness for Huawei MediaPad T3 KOB-L09 and smaller Android tablets.
+
+Only modify `client/src/pages/scorer.tsx`. Do not change scoring logic, checkout logic, undo logic, handlers, API routes, DB schema, overlays, board sessions, pairing, tournament logic, or scorer URLs.
+
+Problem:
+Landscape works on iPad and iPad Pro, but not correctly on Huawei MediaPad T3 KOB-L09. This device needs a compact landscape layout.
+
+Update the responsive rules so landscape is allowed on smaller tablets:
+
+Replace landscape minimum rule with:
+const canUseLandscapeScorer =
+  isDeviceLandscape && viewportWidth >= 720 && viewportHeight >= 420;
+
+Keep portrait rule:
+const canUsePortraitScorer =
+  !isDeviceLandscape && viewportHeight >= 650;
+
+Add compact landscape detection:
+const isCompactLandscape =
+  canUseLandscapeScorer && viewportWidth < 900;
+
+When `isCompactLandscape` is true, use smaller landscape spacing/sizing:
+
+Outer wrapper:
+`flex-1 w-full overflow-y-auto px-2 py-2`
+
+Inner grid:
+`mx-auto grid w-full max-w-[1100px] grid-cols-[minmax(300px,58%)_minmax(240px,42%)] gap-3 items-start`
+
+Left column:
+`flex flex-col items-center justify-start min-w-0`
+
+Keypad wrapper:
+`w-full max-w-[560px]`
+
+Input:
+`h-11 text-2xl`
+
+Keypad buttons:
+`h-12 text-xl rounded-lg`
+
+Right column:
+`min-h-0 overflow-y-auto flex flex-col gap-3 pt-1 pr-1`
+
+Player cards:
+`w-full max-w-[360px] min-h-[180px] mx-auto rounded-xl p-3 flex flex-col justify-center`
+
+Active remaining score:
+`text-[4rem] leading-none`
+
+Inactive remaining score:
+`text-[3.5rem] leading-none`
+
+Player name:
+`text-base`
+
+Stats text:
+`text-sm`
+
+Match info block:
+- reduce bottom margin to `mb-3`
+- round label `text-sm`
+- leg/best-of label `text-xs`
+- player names `text-base max-w-[120px]`
+- match score `text-4xl`
+
+For normal larger landscape tablets, keep the current iPad/iPad Pro layout exactly as it is.
+
+Important:
+- Do not make player cards side-by-side.
+- Do not let the keypad push off screen.
+- Do not let the player cards overflow horizontally.
+- Both columns must scroll if needed.
+- Rotate-device warning should only show below the new smaller minimum: landscape width under 720 or height under 420.
+
+Final checks:
+- iPad landscape still looks the same.
+- iPad Pro landscape still looks the same.
+- Huawei MediaPad T3 KOB-L09 landscape uses compact layout and fits correctly.
+- Smaller Android tablets use compact layout.
+- Portrait mode remains unchanged.
+- No backend/API/database files changed.
