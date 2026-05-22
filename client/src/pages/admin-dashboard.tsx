@@ -43,6 +43,13 @@ import {
   ArrowUpDown,
   Loader2,
   Send,
+  Lock,
+  LockOpen,
+  Trash2,
+  Eye,
+  KeyRound,
+  X,
+  MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -94,6 +101,16 @@ interface AdminUser {
   email: string;
   createdAt: string | null;
   isSuperUser: boolean;
+  isLocked: boolean;
+  deletedAt: string | null;
+}
+
+interface UserTournament {
+  id: number;
+  name: string;
+  type: string;
+  status: string;
+  createdAt: string | null;
 }
 
 interface FeedbackItem {
@@ -343,6 +360,10 @@ export default function AdminDashboard() {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [userSearch, setUserSearch] = useState("");
   const [liveUsersExpanded, setLiveUsersExpanded] = useState(false);
+  const [viewingUserTournaments, setViewingUserTournaments] = useState<AdminUser | null>(null);
+  const [inviteCodeInput, setInviteCodeInput] = useState("");
+  const [inviteCodeSaving, setInviteCodeSaving] = useState(false);
+  const { toast } = useToast();
 
   const { data: stats } = useQuery<{
     totalUsers: number;
@@ -374,9 +395,57 @@ export default function AdminDashboard() {
     refetchInterval: 15000,
   });
 
-  const { data: allUsers } = useQuery<AdminUser[]>({
+  const { data: allUsers, refetch: refetchUsers } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
   });
+
+  const { data: inviteCodeData, refetch: refetchInviteCode } = useQuery<{ inviteCode: string | null }>({
+    queryKey: ["/api/admin/settings/invite-code"],
+  });
+
+  const { data: userTournaments, isLoading: userTournamentsLoading } = useQuery<UserTournament[]>({
+    queryKey: [`/api/admin/users/${viewingUserTournaments?.id}/tournaments`],
+    enabled: !!viewingUserTournaments,
+  });
+
+  const lockUserMutation = useMutation({
+    mutationFn: async ({ id, locked }: { id: number; locked: boolean }) => {
+      return apiRequest("PATCH", `/api/admin/users/${id}/lock`, { locked });
+    },
+    onSuccess: (_data, { locked }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: locked ? "User locked" : "User unlocked", description: locked ? "The user can no longer log in." : "The user can now log in again." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Action failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/admin/users/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "User deleted", description: "The user account has been soft-deleted." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const saveInviteCode = async () => {
+    setInviteCodeSaving(true);
+    try {
+      await apiRequest("POST", "/api/admin/settings/invite-code", { inviteCode: inviteCodeInput.trim() });
+      await refetchInviteCode();
+      toast({ title: "Invite code updated", description: inviteCodeInput.trim() ? "Signup now requires this code." : "Open signup is now enabled." });
+    } catch (err: any) {
+      toast({ title: "Failed to save", description: err.message, variant: "destructive" });
+    } finally {
+      setInviteCodeSaving(false);
+    }
+  };
 
   const connectedUserIds = new Set((connectedUsers || []).map(u => u.userId));
 
@@ -608,18 +677,19 @@ export default function AdminDashboard() {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead className="text-center">Joined</TableHead>
-                    <TableHead className="text-center">Role</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                         {allUsers && allUsers.length > 0 ? "No users match your search" : "No users yet"}
                       </TableCell>
                     </TableRow>
                   ) : filteredUsers.map((user) => (
-                    <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                    <TableRow key={user.id} data-testid={`row-user-${user.id}`} className={cn(user.deletedAt && "opacity-50")}>
                       <TableCell>
                         <span className={cn("w-2 h-2 rounded-full inline-block", connectedUserIds.has(user.id) ? "bg-green-500" : "bg-muted-foreground/30")} />
                       </TableCell>
@@ -629,17 +699,141 @@ export default function AdminDashboard() {
                         {user.createdAt ? format(new Date(user.createdAt), "dd MMM yyyy") : "—"}
                       </TableCell>
                       <TableCell className="text-center">
-                        {user.isSuperUser && (
-                          <Badge variant="default" className="text-xs gap-1">
-                            <Shield className="w-3 h-3" />
-                            Admin
-                          </Badge>
-                        )}
+                        <div className="flex items-center justify-center gap-1 flex-wrap">
+                          {user.isSuperUser && (
+                            <Badge variant="default" className="text-xs gap-1">
+                              <Shield className="w-3 h-3" />
+                              Admin
+                            </Badge>
+                          )}
+                          {user.deletedAt && (
+                            <Badge variant="outline" className="text-xs text-destructive border-destructive/40">
+                              Deleted
+                            </Badge>
+                          )}
+                          {user.isLocked && !user.deletedAt && (
+                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/40">
+                              <Lock className="w-3 h-3 mr-1" />
+                              Locked
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => setViewingUserTournaments(user)}
+                            title="View tournaments"
+                            data-testid={`button-view-tournaments-${user.id}`}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+                          {!user.isSuperUser && !user.deletedAt && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn("h-7 w-7 p-0", user.isLocked ? "text-amber-600 hover:text-amber-700" : "text-muted-foreground hover:text-foreground")}
+                                onClick={() => lockUserMutation.mutate({ id: user.id, locked: !user.isLocked })}
+                                disabled={lockUserMutation.isPending}
+                                title={user.isLocked ? "Unlock user" : "Lock user"}
+                                data-testid={`button-lock-${user.id}`}
+                              >
+                                {user.isLocked ? <LockOpen className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-destructive/70 hover:text-destructive"
+                                onClick={() => {
+                                  if (confirm(`Delete ${user.name}? This will soft-delete the account.`)) {
+                                    deleteUserMutation.mutate(user.id);
+                                  }
+                                }}
+                                disabled={deleteUserMutation.isPending}
+                                title="Delete user"
+                                data-testid={`button-delete-user-${user.id}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-primary" />
+              <CardTitle className="text-lg">Signup Settings</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Set an invite code to restrict who can create a new account. Leave blank to allow open signup.
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 max-w-sm">
+                  <Input
+                    placeholder={inviteCodeData?.inviteCode ? "Current code set — enter new code to change" : "No code set — open signup"}
+                    value={inviteCodeInput}
+                    onChange={(e) => setInviteCodeInput(e.target.value)}
+                    data-testid="input-invite-code-admin"
+                  />
+                </div>
+                <Button
+                  onClick={saveInviteCode}
+                  disabled={inviteCodeSaving}
+                  data-testid="button-save-invite-code"
+                >
+                  {inviteCodeSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                  Save
+                </Button>
+                {inviteCodeData?.inviteCode && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      setInviteCodeInput("");
+                      setInviteCodeSaving(true);
+                      try {
+                        await apiRequest("POST", "/api/admin/settings/invite-code", { inviteCode: "" });
+                        await refetchInviteCode();
+                        toast({ title: "Invite code removed", description: "Signup is now open to anyone." });
+                      } catch (err: any) {
+                        toast({ title: "Failed", description: err.message, variant: "destructive" });
+                      } finally {
+                        setInviteCodeSaving(false);
+                      }
+                    }}
+                    disabled={inviteCodeSaving}
+                    data-testid="button-clear-invite-code"
+                  >
+                    Remove Code
+                  </Button>
+                )}
+              </div>
+              {inviteCodeData?.inviteCode && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  Invite code is active — new signups require this code.
+                </p>
+              )}
+              {inviteCodeData !== undefined && !inviteCodeData?.inviteCode && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                  Open signup — anyone can create an account.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -746,6 +940,44 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {viewingUserTournaments && (
+        <Dialog open onOpenChange={(o) => !o && setViewingUserTournaments(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-primary" />
+                {viewingUserTournaments.name}'s Tournaments
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {userTournamentsLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading...
+                </div>
+              ) : (userTournaments || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No tournaments found.</p>
+              ) : (userTournaments || []).map((t) => (
+                <div key={t.id} className="flex items-center justify-between border rounded-lg px-3 py-2 text-sm" data-testid={`user-tournament-${t.id}`}>
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.type.replace(/_/g, " ")}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline" className={cn("text-xs", t.status === "IN_PROGRESS" && "text-green-600 border-green-500/40", t.status === "COMPLETED" && "text-muted-foreground")}>
+                      {t.status.replace(/_/g, " ")}
+                    </Badge>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => window.open(`/tournaments/${t.id}`, "_blank")} title="Open tournament">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </LayoutShell>
   );
 }

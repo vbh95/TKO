@@ -15,10 +15,19 @@ export const users = pgTable("users", {
   memorableWord: text("memorable_word"),
   recoveryKey: text("recovery_key"),
   isSuperUser: boolean("is_super_user").default(false),
+  isLocked: boolean("is_locked").default(false),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memorableWord: true, recoveryKey: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memorableWord: true, recoveryKey: true, isLocked: true, deletedAt: true });
+
+// === ADMIN SETTINGS ===
+export const adminSettings = pgTable("admin_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
 // === LEAGUES ===
 export const leagues = pgTable("leagues", {

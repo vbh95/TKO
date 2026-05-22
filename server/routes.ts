@@ -839,10 +839,12 @@ export async function registerRoutes(
     new LocalStrategy(async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
-        if (!user) return done(null, false);
+        if (!user) return done(null, false, { message: "Invalid credentials" });
+        if (user.deletedAt) return done(null, false, { message: "Account not found" });
+        if (user.isLocked) return done(null, false, { message: "Your account has been locked. Please contact support." });
         
         const isValid = await comparePassword(password, user.password);
-        if (!isValid) return done(null, false);
+        if (!isValid) return done(null, false, { message: "Invalid credentials" });
         
         return done(null, user);
       } catch (err) {
@@ -868,9 +870,30 @@ export async function registerRoutes(
   };
 
   // === AUTH ROUTES ===
+  app.get("/api/auth/signup-status", async (_req, res) => {
+    try {
+      const inviteCode = await storage.getAdminSetting("invite_code");
+      res.json({ inviteRequired: !!inviteCode });
+    } catch {
+      res.json({ inviteRequired: false });
+    }
+  });
+
   app.post(api.auth.signup.path, authLimiter, async (req, res) => {
     try {
       const input = api.auth.signup.input.parse(req.body);
+
+      const inviteCode = await storage.getAdminSetting("invite_code");
+      if (inviteCode) {
+        const provided = (req.body.inviteCode || "").trim();
+        if (!provided) {
+          return res.status(403).json({ message: "An invite code is required to create an account." });
+        }
+        if (provided !== inviteCode) {
+          return res.status(403).json({ message: "Invalid invite code." });
+        }
+      }
+
       const existing = await storage.getUserByUsername(input.email);
       if (existing) {
         return res.status(400).json({ message: "Email already exists" });
@@ -948,15 +971,21 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.auth.login.path, authLimiter, passport.authenticate("local"), (req, res) => {
-    if (req.body.rememberMe) {
-      req.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30; // 30 days
-    } else {
-      req.session.cookie.maxAge = 1000 * 60 * 60 * 24; // 1 day
-    }
-    const user = req.user as any;
-    const { password, memorableWord, recoveryKey, ...safeUser } = user;
-    res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
+  app.post(api.auth.login.path, authLimiter, (req, res, next) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) return res.status(500).json({ message: "Internal server error" });
+      if (!user) return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      req.login(user, (loginErr) => {
+        if (loginErr) return res.status(500).json({ message: "Login failed" });
+        if (req.body.rememberMe) {
+          req.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30;
+        } else {
+          req.session.cookie.maxAge = 1000 * 60 * 60 * 24;
+        }
+        const { password, memorableWord, recoveryKey, ...safeUser } = user;
+        res.json({ ...safeUser, hasMemorableWord: !!memorableWord });
+      });
+    })(req, res, next);
   });
 
   app.post(api.auth.logout.path, (req, res) => {
@@ -1112,6 +1141,85 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Notify user error:", err);
       res.status(500).json({ message: "Failed to send notification" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/lock", isSuperUser, async (req, res) => {
+    try {
+      const targetId = parseInt(req.params.id);
+      const currentUser = req.user as any;
+      if (targetId === currentUser.id) {
+        return res.status(400).json({ message: "You cannot lock your own account." });
+      }
+      const { locked } = req.body;
+      if (typeof locked !== "boolean") {
+        return res.status(400).json({ message: "locked (boolean) is required" });
+      }
+      const target = await storage.getUser(targetId);
+      if (!target) return res.status(404).json({ message: "User not found" });
+      if (target.deletedAt) return res.status(400).json({ message: "User is deleted" });
+      await storage.lockUser(targetId, locked);
+      res.json({ message: locked ? "User locked" : "User unlocked" });
+    } catch (err) {
+      console.error("Lock user error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", isSuperUser, async (req, res) => {
+    try {
+      const targetId = parseInt(req.params.id);
+      const currentUser = req.user as any;
+      if (targetId === currentUser.id) {
+        return res.status(400).json({ message: "You cannot delete your own account." });
+      }
+      const target = await storage.getUser(targetId);
+      if (!target) return res.status(404).json({ message: "User not found" });
+      if (target.isSuperUser) return res.status(400).json({ message: "Cannot delete a superuser account." });
+      await storage.softDeleteUser(targetId);
+      res.json({ message: "User deleted" });
+    } catch (err) {
+      console.error("Delete user error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/users/:id/tournaments", isSuperUser, async (req, res) => {
+    try {
+      const targetId = parseInt(req.params.id);
+      const ts = await storage.getTournamentsByUserId(targetId);
+      res.json(ts);
+    } catch (err) {
+      console.error("Admin user tournaments error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/settings/invite-code", isSuperUser, async (_req, res) => {
+    try {
+      const code = await storage.getAdminSetting("invite_code");
+      res.json({ inviteCode: code });
+    } catch (err) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/admin/settings/invite-code", isSuperUser, async (req, res) => {
+    try {
+      const { inviteCode } = req.body;
+      if (inviteCode === null || inviteCode === undefined) {
+        return res.status(400).json({ message: "inviteCode required (send empty string to disable)" });
+      }
+      const trimmed = String(inviteCode).trim();
+      if (trimmed === "") {
+        await storage.setAdminSetting("invite_code", "");
+        return res.json({ message: "Invite code disabled", inviteCode: "" });
+      }
+      await storage.setAdminSetting("invite_code", trimmed);
+      res.json({ message: "Invite code updated", inviteCode: trimmed });
+    } catch (err) {
+      console.error("Set invite code error:", err);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 

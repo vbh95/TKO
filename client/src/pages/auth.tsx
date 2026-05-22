@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLogin, useSignup } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Sun, Moon, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { Loader2, ArrowLeft, Sun, Moon, Eye, EyeOff, Copy, Check, KeyRound } from "lucide-react";
 import tkoLogoDark from "@assets/Untitled-1-02_1771177331378.png";
 import tkoLogoWhite from "@assets/TKO_White-02_1771177730966.png";
 import { useTheme } from "@/hooks/use-theme";
@@ -18,6 +19,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [showRecoveryKeyDialog, setShowRecoveryKeyDialog] = useState(false);
@@ -39,6 +41,11 @@ export default function AuthPage() {
   const { theme, toggleTheme } = useTheme();
   const tkoLogo = theme === 'dark' ? tkoLogoWhite : tkoLogoDark;
 
+  const { data: signupStatus } = useQuery<{ inviteRequired: boolean }>({
+    queryKey: ["/api/auth/signup-status"],
+    staleTime: 60000,
+  });
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     login.mutate({ username: email, password, rememberMe }, {
@@ -58,7 +65,7 @@ export default function AuthPage() {
       toast({ title: "Password too short", description: "Password must be at least 6 characters.", variant: "destructive" });
       return;
     }
-    signup.mutate({ email, password, name }, {
+    signup.mutate({ email, password, name, inviteCode: inviteCode.trim() || undefined } as any, {
       onSuccess: (data: any) => {
         if (data.recoveryKey) {
           setRecoveryKey(data.recoveryKey);
@@ -358,6 +365,23 @@ export default function AuthPage() {
                       data-testid="input-signup-confirm-password"
                     />
                   </div>
+                  {signupStatus?.inviteRequired && (
+                    <div className="space-y-2">
+                      <Label htmlFor="invite-code" className="flex items-center gap-1.5">
+                        <KeyRound className="w-3.5 h-3.5 text-muted-foreground" />
+                        Invite Code
+                      </Label>
+                      <Input
+                        id="invite-code"
+                        type="text"
+                        placeholder="Enter your invite code"
+                        value={inviteCode}
+                        onChange={(e) => setInviteCode(e.target.value)}
+                        required
+                        data-testid="input-invite-code"
+                      />
+                    </div>
+                  )}
                   <Button type="submit" className="w-full" disabled={signup.isPending} data-testid="button-signup">
                     {signup.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Create Account

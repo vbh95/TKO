@@ -1,4 +1,4 @@
-import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, boardSessions, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications } from "@shared/schema";
+import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, boardSessions, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications, adminSettings } from "@shared/schema";
 import { desc } from "drizzle-orm";
 import type { 
   User, InsertUser, 
@@ -115,7 +115,11 @@ export interface IStorage {
   markAllNotificationsRead(userId: number): Promise<void>;
 
   // Admin
-  getAllUsersAdmin(): Promise<Array<{ id: number; name: string; email: string; createdAt: Date | null; isSuperUser: boolean }>>;
+  getAllUsersAdmin(): Promise<Array<{ id: number; name: string; email: string; createdAt: Date | null; isSuperUser: boolean; isLocked: boolean; deletedAt: Date | null }>>;
+  lockUser(id: number, locked: boolean): Promise<void>;
+  softDeleteUser(id: number): Promise<void>;
+  getAdminSetting(key: string): Promise<string | null>;
+  setAdminSetting(key: string, value: string): Promise<void>;
   getLiveTournaments(): Promise<Tournament[]>;
 
   // Reset
@@ -542,15 +546,39 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getAllUsersAdmin(): Promise<Array<{ id: number; name: string; email: string; createdAt: Date | null; isSuperUser: boolean }>> {
+  async getAllUsersAdmin(): Promise<Array<{ id: number; name: string; email: string; createdAt: Date | null; isSuperUser: boolean; isLocked: boolean; deletedAt: Date | null }>> {
     const allUsers = await db.select({
       id: users.id,
       name: users.name,
       email: users.email,
       createdAt: users.createdAt,
       isSuperUser: users.isSuperUser,
+      isLocked: users.isLocked,
+      deletedAt: users.deletedAt,
     }).from(users).orderBy(desc(users.createdAt));
-    return allUsers.map(u => ({ ...u, isSuperUser: u.isSuperUser ?? false }));
+    return allUsers.map(u => ({ ...u, isSuperUser: u.isSuperUser ?? false, isLocked: u.isLocked ?? false, deletedAt: u.deletedAt ?? null }));
+  }
+
+  async lockUser(id: number, locked: boolean): Promise<void> {
+    await db.update(users).set({ isLocked: locked }).where(eq(users.id, id));
+  }
+
+  async softDeleteUser(id: number): Promise<void> {
+    await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, id));
+  }
+
+  async getAdminSetting(key: string): Promise<string | null> {
+    const [row] = await db.select().from(adminSettings).where(eq(adminSettings.key, key));
+    return row?.value ?? null;
+  }
+
+  async setAdminSetting(key: string, value: string): Promise<void> {
+    const existing = await this.getAdminSetting(key);
+    if (existing !== null) {
+      await db.update(adminSettings).set({ value, updatedAt: new Date() }).where(eq(adminSettings.key, key));
+    } else {
+      await db.insert(adminSettings).values({ key, value });
+    }
   }
 
   async getLiveTournaments(): Promise<Tournament[]> {
