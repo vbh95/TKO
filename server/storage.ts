@@ -1,5 +1,4 @@
-import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, boardSessions, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications, adminSettings } from "@shared/schema";
-import { desc } from "drizzle-orm";
+import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, boardSessions, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications, adminSettings, adminLogs } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -14,7 +13,9 @@ import type {
   League, InsertLeague,
   LeagueManualResult, InsertLeagueManualResult,
   BetaFeedback, InsertBetaFeedback,
-  FeedbackNotification
+  FeedbackNotification,
+  AdminSetting,
+  AdminLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { pool } from "./db";
@@ -118,8 +119,10 @@ export interface IStorage {
   getAllUsersAdmin(): Promise<Array<{ id: number; name: string; email: string; createdAt: Date | null; isSuperUser: boolean; isLocked: boolean; deletedAt: Date | null }>>;
   lockUser(id: number, locked: boolean): Promise<void>;
   softDeleteUser(id: number): Promise<void>;
-  getAdminSetting(key: string): Promise<string | null>;
-  setAdminSetting(key: string, value: string): Promise<void>;
+  getAdminSetting(key: string): Promise<AdminSetting | undefined>;
+  setAdminSetting(key: string, value: string | null, enabled: boolean, updatedBy: number): Promise<void>;
+  appendAdminLog(entry: { adminId?: number; adminEmail?: string; targetEmail?: string; action: string; detail?: string }): Promise<void>;
+  getAdminLogs(limit?: number): Promise<AdminLog[]>;
   getLiveTournaments(): Promise<Tournament[]>;
 
   // Reset
@@ -567,18 +570,32 @@ export class DatabaseStorage implements IStorage {
     await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, id));
   }
 
-  async getAdminSetting(key: string): Promise<string | null> {
+  async getAdminSetting(key: string): Promise<AdminSetting | undefined> {
     const [row] = await db.select().from(adminSettings).where(eq(adminSettings.key, key));
-    return row?.value ?? null;
+    return row;
   }
 
-  async setAdminSetting(key: string, value: string): Promise<void> {
+  async setAdminSetting(key: string, value: string | null, enabled: boolean, updatedBy: number): Promise<void> {
     const existing = await this.getAdminSetting(key);
-    if (existing !== null) {
-      await db.update(adminSettings).set({ value, updatedAt: new Date() }).where(eq(adminSettings.key, key));
+    if (existing) {
+      await db.update(adminSettings).set({ value, enabled, updatedBy, updatedAt: new Date() }).where(eq(adminSettings.key, key));
     } else {
-      await db.insert(adminSettings).values({ key, value });
+      await db.insert(adminSettings).values({ key, value, enabled, updatedBy });
     }
+  }
+
+  async appendAdminLog(entry: { adminId?: number; adminEmail?: string; targetEmail?: string; action: string; detail?: string }): Promise<void> {
+    await db.insert(adminLogs).values({
+      adminId: entry.adminId ?? null,
+      adminEmail: entry.adminEmail ?? null,
+      targetEmail: entry.targetEmail ?? null,
+      action: entry.action,
+      detail: entry.detail ?? null,
+    });
+  }
+
+  async getAdminLogs(limit = 200): Promise<AdminLog[]> {
+    return await db.select().from(adminLogs).orderBy(desc(adminLogs.createdAt)).limit(limit);
   }
 
   async getLiveTournaments(): Promise<Tournament[]> {

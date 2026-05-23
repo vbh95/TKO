@@ -46,10 +46,10 @@ import {
   Lock,
   LockOpen,
   Trash2,
-  Eye,
   KeyRound,
   X,
   MoreHorizontal,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -110,6 +110,16 @@ interface UserTournament {
   name: string;
   type: string;
   status: string;
+  createdAt: string | null;
+}
+
+interface AdminLogEntry {
+  id: number;
+  adminId: number | null;
+  adminEmail: string | null;
+  targetEmail: string | null;
+  action: string | null;
+  detail: string | null;
   createdAt: string | null;
 }
 
@@ -361,8 +371,6 @@ export default function AdminDashboard() {
   const [userSearch, setUserSearch] = useState("");
   const [liveUsersExpanded, setLiveUsersExpanded] = useState(false);
   const [viewingUserTournaments, setViewingUserTournaments] = useState<AdminUser | null>(null);
-  const [inviteCodeInput, setInviteCodeInput] = useState("");
-  const [inviteCodeSaving, setInviteCodeSaving] = useState(false);
   const { toast } = useToast();
 
   const { data: stats } = useQuery<{
@@ -395,12 +403,17 @@ export default function AdminDashboard() {
     refetchInterval: 15000,
   });
 
-  const { data: allUsers, refetch: refetchUsers } = useQuery<AdminUser[]>({
+  const { data: allUsers } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
   });
 
-  const { data: inviteCodeData, refetch: refetchInviteCode } = useQuery<{ inviteCode: string | null }>({
-    queryKey: ["/api/admin/settings/invite-code"],
+  const { data: inviteCodeData, refetch: refetchInviteCode } = useQuery<{ enabled: boolean; codeSet: boolean }>({
+    queryKey: ["/api/admin/invite-code"],
+  });
+
+  const { data: adminLogs } = useQuery<AdminLogEntry[]>({
+    queryKey: ["/api/admin/logs"],
+    refetchInterval: 30000,
   });
 
   const { data: userTournaments, isLoading: userTournamentsLoading } = useQuery<UserTournament[]>({
@@ -414,6 +427,7 @@ export default function AdminDashboard() {
     },
     onSuccess: (_data, { locked }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/logs"] });
       toast({ title: locked ? "User locked" : "User unlocked", description: locked ? "The user can no longer log in." : "The user can now log in again." });
     },
     onError: (err: any) => {
@@ -427,6 +441,7 @@ export default function AdminDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/logs"] });
       toast({ title: "User deleted", description: "The user account has been soft-deleted." });
     },
     onError: (err: any) => {
@@ -434,16 +449,44 @@ export default function AdminDashboard() {
     },
   });
 
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "lock" | "unlock" | "delete";
+    user: AdminUser;
+  } | null>(null);
+
+  const [inviteCodeNewValue, setInviteCodeNewValue] = useState("");
+  const [inviteCodeSaving, setInviteCodeSaving] = useState(false);
+  const [inviteToggling, setInviteToggling] = useState(false);
+  const [logsExpanded, setLogsExpanded] = useState(false);
+
   const saveInviteCode = async () => {
+    if (!inviteCodeNewValue.trim()) return;
     setInviteCodeSaving(true);
     try {
-      await apiRequest("POST", "/api/admin/settings/invite-code", { inviteCode: inviteCodeInput.trim() });
+      await apiRequest("POST", "/api/admin/invite-code", { code: inviteCodeNewValue.trim(), enabled: inviteCodeData?.enabled ?? false });
       await refetchInviteCode();
-      toast({ title: "Invite code updated", description: inviteCodeInput.trim() ? "Signup now requires this code." : "Open signup is now enabled." });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/logs"] });
+      setInviteCodeNewValue("");
+      toast({ title: "Invite code saved", description: "The invite code has been updated." });
     } catch (err: any) {
       toast({ title: "Failed to save", description: err.message, variant: "destructive" });
     } finally {
       setInviteCodeSaving(false);
+    }
+  };
+
+  const toggleInviteCode = async () => {
+    setInviteToggling(true);
+    try {
+      const newEnabled = !(inviteCodeData?.enabled ?? false);
+      await apiRequest("PATCH", "/api/admin/invite-code/toggle", { enabled: newEnabled });
+      await refetchInviteCode();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/logs"] });
+      toast({ title: newEnabled ? "Invite code enabled" : "Invite code disabled" });
+    } catch (err: any) {
+      toast({ title: "Failed to toggle", description: err.message, variant: "destructive" });
+    } finally {
+      setInviteToggling(false);
     }
   };
 
@@ -693,7 +736,15 @@ export default function AdminDashboard() {
                       <TableCell>
                         <span className={cn("w-2 h-2 rounded-full inline-block", connectedUserIds.has(user.id) ? "bg-green-500" : "bg-muted-foreground/30")} />
                       </TableCell>
-                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <button
+                          className="hover:underline text-left"
+                          onClick={() => setViewingUserTournaments(user)}
+                          data-testid={`button-view-user-${user.id}`}
+                        >
+                          {user.name}
+                        </button>
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">{user.email}</TableCell>
                       <TableCell className="text-center text-sm text-muted-foreground">
                         {user.createdAt ? format(new Date(user.createdAt), "dd MMM yyyy") : "—"}
@@ -721,23 +772,13 @@ export default function AdminDashboard() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                            onClick={() => setViewingUserTournaments(user)}
-                            title="View tournaments"
-                            data-testid={`button-view-tournaments-${user.id}`}
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </Button>
                           {!user.isSuperUser && !user.deletedAt && (
                             <>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className={cn("h-7 w-7 p-0", user.isLocked ? "text-amber-600 hover:text-amber-700" : "text-muted-foreground hover:text-foreground")}
-                                onClick={() => lockUserMutation.mutate({ id: user.id, locked: !user.isLocked })}
+                                onClick={() => setConfirmAction({ type: user.isLocked ? "unlock" : "lock", user })}
                                 disabled={lockUserMutation.isPending}
                                 title={user.isLocked ? "Unlock user" : "Lock user"}
                                 data-testid={`button-lock-${user.id}`}
@@ -748,11 +789,7 @@ export default function AdminDashboard() {
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 w-7 p-0 text-destructive/70 hover:text-destructive"
-                                onClick={() => {
-                                  if (confirm(`Delete ${user.name}? This will soft-delete the account.`)) {
-                                    deleteUserMutation.mutate(user.id);
-                                  }
-                                }}
+                                onClick={() => setConfirmAction({ type: "delete", user })}
                                 disabled={deleteUserMutation.isPending}
                                 title="Delete user"
                                 data-testid={`button-delete-user-${user.id}`}
@@ -779,61 +816,74 @@ export default function AdminDashboard() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-3">
-                Set an invite code to restrict who can create a new account. Leave blank to allow open signup.
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">Require invitation code</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  When enabled, new signups must provide a valid code.
+                </p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={inviteCodeData?.enabled ?? false}
+                onClick={toggleInviteCode}
+                disabled={inviteToggling || !inviteCodeData?.codeSet}
+                data-testid="switch-invite-code-enabled"
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+                  inviteCodeData?.enabled ? "bg-primary" : "bg-muted",
+                  (inviteToggling || !inviteCodeData?.codeSet) && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <span className={cn("inline-block h-4 w-4 transform rounded-full bg-white transition-transform", inviteCodeData?.enabled ? "translate-x-6" : "translate-x-1")} />
+              </button>
+            </div>
+
+            {!inviteCodeData?.codeSet && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Set a code below before enabling.
+              </p>
+            )}
+            {inviteCodeData?.enabled && inviteCodeData?.codeSet && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Invite code active — new signups require the code.
+              </p>
+            )}
+            {inviteCodeData !== undefined && !inviteCodeData?.enabled && inviteCodeData?.codeSet && (
+              <p className="text-xs text-green-600 dark:text-green-400">
+                Open signup — code set but not required.
+              </p>
+            )}
+
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-2">
+                {inviteCodeData?.codeSet ? "Regenerate invite code" : "Set invite code"}
               </p>
               <div className="flex items-center gap-2">
                 <div className="flex-1 max-w-sm">
                   <Input
-                    placeholder={inviteCodeData?.inviteCode ? "Current code set — enter new code to change" : "No code set — open signup"}
-                    value={inviteCodeInput}
-                    onChange={(e) => setInviteCodeInput(e.target.value)}
+                    placeholder="Enter new invite code…"
+                    value={inviteCodeNewValue}
+                    onChange={(e) => setInviteCodeNewValue(e.target.value)}
                     data-testid="input-invite-code-admin"
+                    type="text"
+                    autoComplete="off"
                   />
                 </div>
                 <Button
                   onClick={saveInviteCode}
-                  disabled={inviteCodeSaving}
+                  disabled={inviteCodeSaving || !inviteCodeNewValue.trim()}
                   data-testid="button-save-invite-code"
                 >
                   {inviteCodeSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                  Save
+                  {inviteCodeData?.codeSet ? "Regenerate" : "Set Code"}
                 </Button>
-                {inviteCodeData?.inviteCode && (
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      setInviteCodeInput("");
-                      setInviteCodeSaving(true);
-                      try {
-                        await apiRequest("POST", "/api/admin/settings/invite-code", { inviteCode: "" });
-                        await refetchInviteCode();
-                        toast({ title: "Invite code removed", description: "Signup is now open to anyone." });
-                      } catch (err: any) {
-                        toast({ title: "Failed", description: err.message, variant: "destructive" });
-                      } finally {
-                        setInviteCodeSaving(false);
-                      }
-                    }}
-                    disabled={inviteCodeSaving}
-                    data-testid="button-clear-invite-code"
-                  >
-                    Remove Code
-                  </Button>
-                )}
               </div>
-              {inviteCodeData?.inviteCode && (
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
-                  <Lock className="w-3 h-3" />
-                  Invite code is active — new signups require this code.
-                </p>
-              )}
-              {inviteCodeData !== undefined && !inviteCodeData?.inviteCode && (
-                <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                  Open signup — anyone can create an account.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground mt-2">
+                The code is stored as a secure hash — it cannot be retrieved after saving.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -939,7 +989,112 @@ export default function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ScrollText className="w-5 h-5 text-primary" />
+                <CardTitle className="text-lg">Admin Audit Log</CardTitle>
+                <Badge variant="secondary" className="tabular-nums">{(adminLogs || []).length}</Badge>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLogsExpanded(!logsExpanded)}
+                data-testid="button-toggle-logs"
+              >
+                {logsExpanded ? "Collapse" : "Expand"}
+              </Button>
+            </div>
+          </CardHeader>
+          {logsExpanded && (
+            <CardContent>
+              {(adminLogs || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No audit log entries yet.</p>
+              ) : (
+                <div className="space-y-1 max-h-96 overflow-y-auto">
+                  {(adminLogs || []).map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-start gap-3 text-xs border-b last:border-b-0 py-2"
+                      data-testid={`log-entry-${entry.id}`}
+                    >
+                      <span className="text-muted-foreground shrink-0 tabular-nums">
+                        {entry.createdAt ? format(new Date(entry.createdAt), "dd MMM HH:mm") : "—"}
+                      </span>
+                      <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-xs shrink-0">{entry.action ?? "—"}</span>
+                      <div className="min-w-0">
+                        {entry.adminEmail && (
+                          <span className="text-muted-foreground">{entry.adminEmail}</span>
+                        )}
+                        {entry.targetEmail && (
+                          <span className="text-muted-foreground"> → {entry.targetEmail}</span>
+                        )}
+                        {entry.detail && (
+                          <span className="text-foreground/70 ml-1 truncate">— {entry.detail}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
       </div>
+
+      {confirmAction && (
+        <Dialog open onOpenChange={(o) => !o && setConfirmAction(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {confirmAction.type === "delete" ? (
+                  <Trash2 className="w-5 h-5 text-destructive" />
+                ) : confirmAction.type === "lock" ? (
+                  <Lock className="w-5 h-5 text-amber-500" />
+                ) : (
+                  <LockOpen className="w-5 h-5 text-green-500" />
+                )}
+                {confirmAction.type === "delete" ? "Delete user?" :
+                  confirmAction.type === "lock" ? "Lock user?" : "Unlock user?"}
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              {confirmAction.type === "delete"
+                ? `This will soft-delete ${confirmAction.user.name}'s account. They will no longer be able to log in. This cannot be undone from the UI.`
+                : confirmAction.type === "lock"
+                ? `${confirmAction.user.name} will be immediately logged out and unable to sign in until unlocked.`
+                : `${confirmAction.user.name} will be able to sign in again.`}
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setConfirmAction(null)} data-testid="button-confirm-cancel">
+                Cancel
+              </Button>
+              <Button
+                variant={confirmAction.type === "delete" ? "destructive" : "default"}
+                data-testid="button-confirm-ok"
+                disabled={lockUserMutation.isPending || deleteUserMutation.isPending}
+                onClick={() => {
+                  if (confirmAction.type === "delete") {
+                    deleteUserMutation.mutate(confirmAction.user.id, { onSettled: () => setConfirmAction(null) });
+                  } else {
+                    lockUserMutation.mutate(
+                      { id: confirmAction.user.id, locked: confirmAction.type === "lock" },
+                      { onSettled: () => setConfirmAction(null) }
+                    );
+                  }
+                }}
+              >
+                {(lockUserMutation.isPending || deleteUserMutation.isPending) && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                )}
+                {confirmAction.type === "delete" ? "Delete" : confirmAction.type === "lock" ? "Lock" : "Unlock"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {viewingUserTournaments && (
         <Dialog open onOpenChange={(o) => !o && setViewingUserTournaments(null)}>
@@ -950,7 +1105,7 @@ export default function AdminDashboard() {
                 {viewingUserTournaments.name}'s Tournaments
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-4 max-h-[26rem] overflow-y-auto">
               {userTournamentsLoading ? (
                 <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -958,22 +1113,29 @@ export default function AdminDashboard() {
                 </div>
               ) : (userTournaments || []).length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No tournaments found.</p>
-              ) : (userTournaments || []).map((t) => (
-                <div key={t.id} className="flex items-center justify-between border rounded-lg px-3 py-2 text-sm" data-testid={`user-tournament-${t.id}`}>
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{t.name}</p>
-                    <p className="text-xs text-muted-foreground">{t.type.replace(/_/g, " ")}</p>
+              ) : (["IN_PROGRESS", "NOT_STARTED", "COMPLETED"] as const).map((statusGroup) => {
+                const group = (userTournaments || []).filter(t => t.status === statusGroup);
+                if (group.length === 0) return null;
+                const label = statusGroup === "IN_PROGRESS" ? "In Progress" : statusGroup === "NOT_STARTED" ? "Not Started" : "Completed";
+                return (
+                  <div key={statusGroup}>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{label}</p>
+                    <div className="space-y-1.5">
+                      {group.map((t) => (
+                        <div key={t.id} className="flex items-center justify-between border rounded-lg px-3 py-2 text-sm" data-testid={`user-tournament-${t.id}`}>
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{t.name}</p>
+                            <p className="text-xs text-muted-foreground">{t.type.replace(/_/g, " ")}</p>
+                          </div>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => window.open(`/tournaments/${t.id}`, "_blank")} title="Open tournament">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="outline" className={cn("text-xs", t.status === "IN_PROGRESS" && "text-green-600 border-green-500/40", t.status === "COMPLETED" && "text-muted-foreground")}>
-                      {t.status.replace(/_/g, " ")}
-                    </Badge>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => window.open(`/tournaments/${t.id}`, "_blank")} title="Open tournament">
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </DialogContent>
         </Dialog>

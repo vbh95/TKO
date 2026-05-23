@@ -872,8 +872,8 @@ export async function registerRoutes(
   // === AUTH ROUTES ===
   app.get("/api/auth/signup-status", async (_req, res) => {
     try {
-      const inviteCode = await storage.getAdminSetting("invite_code");
-      res.json({ inviteRequired: !!inviteCode });
+      const setting = await storage.getAdminSetting("invite_code");
+      res.json({ inviteRequired: !!(setting?.enabled) });
     } catch {
       res.json({ inviteRequired: false });
     }
@@ -883,14 +883,19 @@ export async function registerRoutes(
     try {
       const input = api.auth.signup.input.parse(req.body);
 
-      const inviteCode = await storage.getAdminSetting("invite_code");
-      if (inviteCode) {
-        const provided = (req.body.inviteCode || "").trim();
+      const inviteSetting = await storage.getAdminSetting("invite_code");
+      if (inviteSetting?.enabled) {
+        const provided = ((req.body as any).inviteCode || "").trim();
         if (!provided) {
-          return res.status(403).json({ message: "An invite code is required to create an account." });
+          return res.status(400).json({ message: "Invitation code required." });
         }
-        if (provided !== inviteCode) {
-          return res.status(403).json({ message: "Invalid invite code." });
+        if (!inviteSetting.value) {
+          return res.status(400).json({ message: "Invitation code required." });
+        }
+        const codeValid = await comparePassword(provided, inviteSetting.value);
+        if (!codeValid) {
+          await storage.appendAdminLog({ action: "SIGNUP_BLOCKED", targetEmail: input.email, detail: "Invalid invitation code" });
+          return res.status(400).json({ message: "Invalid invitation code." });
         }
       }
 
@@ -1149,7 +1154,7 @@ export async function registerRoutes(
       const targetId = parseInt(req.params.id);
       const currentUser = req.user as any;
       if (targetId === currentUser.id) {
-        return res.status(400).json({ message: "You cannot lock your own account." });
+        return res.status(403).json({ message: "You cannot lock your own account." });
       }
       const { locked } = req.body;
       if (typeof locked !== "boolean") {
@@ -1159,6 +1164,13 @@ export async function registerRoutes(
       if (!target) return res.status(404).json({ message: "User not found" });
       if (target.deletedAt) return res.status(400).json({ message: "User is deleted" });
       await storage.lockUser(targetId, locked);
+      await storage.appendAdminLog({
+        adminId: currentUser.id,
+        adminEmail: currentUser.email,
+        targetEmail: target.email,
+        action: locked ? "LOCK_USER" : "UNLOCK_USER",
+        detail: locked ? `Locked ${target.email}` : `Unlocked ${target.email}`,
+      });
       res.json({ message: locked ? "User locked" : "User unlocked" });
     } catch (err) {
       console.error("Lock user error:", err);
@@ -1171,12 +1183,19 @@ export async function registerRoutes(
       const targetId = parseInt(req.params.id);
       const currentUser = req.user as any;
       if (targetId === currentUser.id) {
-        return res.status(400).json({ message: "You cannot delete your own account." });
+        return res.status(403).json({ message: "You cannot delete your own account." });
       }
       const target = await storage.getUser(targetId);
       if (!target) return res.status(404).json({ message: "User not found" });
-      if (target.isSuperUser) return res.status(400).json({ message: "Cannot delete a superuser account." });
+      if (target.isSuperUser) return res.status(403).json({ message: "Cannot delete a superuser account." });
       await storage.softDeleteUser(targetId);
+      await storage.appendAdminLog({
+        adminId: currentUser.id,
+        adminEmail: currentUser.email,
+        targetEmail: target.email,
+        action: "DELETE_USER",
+        detail: `Soft-deleted ${target.email}`,
+      });
       res.json({ message: "User deleted" });
     } catch (err) {
       console.error("Delete user error:", err);
@@ -1195,30 +1214,71 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/settings/invite-code", isSuperUser, async (_req, res) => {
+  app.get("/api/admin/invite-code", isSuperUser, async (_req, res) => {
     try {
-      const code = await storage.getAdminSetting("invite_code");
-      res.json({ inviteCode: code });
+      const setting = await storage.getAdminSetting("invite_code");
+      res.json({ enabled: setting?.enabled ?? false, codeSet: !!(setting?.value) });
     } catch (err) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  app.post("/api/admin/settings/invite-code", isSuperUser, async (req, res) => {
+  app.post("/api/admin/invite-code", isSuperUser, async (req, res) => {
     try {
-      const { inviteCode } = req.body;
-      if (inviteCode === null || inviteCode === undefined) {
-        return res.status(400).json({ message: "inviteCode required (send empty string to disable)" });
+      const currentUser = req.user as any;
+      const { code, enabled } = req.body;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ message: "enabled (boolean) is required" });
       }
-      const trimmed = String(inviteCode).trim();
-      if (trimmed === "") {
-        await storage.setAdminSetting("invite_code", "");
-        return res.json({ message: "Invite code disabled", inviteCode: "" });
+      let hashedCode: string | null = null;
+      const existingSetting = await storage.getAdminSetting("invite_code");
+      if (code !== undefined && String(code).trim() !== "") {
+        hashedCode = await hashPassword(String(code).trim());
+      } else {
+        hashedCode = existingSetting?.value ?? null;
       }
-      await storage.setAdminSetting("invite_code", trimmed);
-      res.json({ message: "Invite code updated", inviteCode: trimmed });
+      await storage.setAdminSetting("invite_code", hashedCode, enabled, currentUser.id);
+      await storage.appendAdminLog({
+        adminId: currentUser.id,
+        adminEmail: currentUser.email,
+        action: "INVITE_CODE_UPDATED",
+        detail: enabled ? (code ? "Code set and enabled" : "Enabled (code unchanged)") : "Disabled",
+      });
+      res.json({ message: "Invite code updated", enabled, codeSet: !!(hashedCode) });
     } catch (err) {
       console.error("Set invite code error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/admin/invite-code/toggle", isSuperUser, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { enabled } = req.body;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ message: "enabled (boolean) is required" });
+      }
+      const existingSetting = await storage.getAdminSetting("invite_code");
+      await storage.setAdminSetting("invite_code", existingSetting?.value ?? null, enabled, currentUser.id);
+      await storage.appendAdminLog({
+        adminId: currentUser.id,
+        adminEmail: currentUser.email,
+        action: "INVITE_CODE_UPDATED",
+        detail: enabled ? "Enabled invite code requirement" : "Disabled invite code requirement",
+      });
+      res.json({ message: enabled ? "Invite code enabled" : "Invite code disabled", enabled });
+    } catch (err) {
+      console.error("Toggle invite code error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/logs", isSuperUser, async (_req, res) => {
+    try {
+      const logs = await storage.getAdminLogs(200);
+      res.json(logs);
+    } catch (err) {
+      console.error("Admin logs error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });

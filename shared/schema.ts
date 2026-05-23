@@ -15,19 +15,37 @@ export const users = pgTable("users", {
   memorableWord: text("memorable_word"),
   recoveryKey: text("recovery_key"),
   isSuperUser: boolean("is_super_user").default(false),
-  isLocked: boolean("is_locked").default(false),
+  isLocked: boolean("is_locked").notNull().default(false),
   deletedAt: timestamp("deleted_at"),
+  inviteCodeUsed: text("invite_code_used"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memorableWord: true, recoveryKey: true, isLocked: true, deletedAt: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memorableWord: true, recoveryKey: true, isLocked: true, deletedAt: true, inviteCodeUsed: true });
 
 // === ADMIN SETTINGS ===
 export const adminSettings = pgTable("admin_settings", {
   key: text("key").primaryKey(),
-  value: text("value").notNull(),
+  value: text("value"),
+  enabled: boolean("enabled").notNull().default(false),
+  updatedBy: integer("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export type AdminSetting = typeof adminSettings.$inferSelect;
+
+// === ADMIN LOGS ===
+export const adminLogs = pgTable("admin_logs", {
+  id: serial("id").primaryKey(),
+  adminId: integer("admin_id").references(() => users.id),
+  adminEmail: text("admin_email"),
+  targetEmail: text("target_email"),
+  action: text("action"),
+  detail: text("detail"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AdminLog = typeof adminLogs.$inferSelect;
 
 // === LEAGUES ===
 export const leagues = pgTable("leagues", {
