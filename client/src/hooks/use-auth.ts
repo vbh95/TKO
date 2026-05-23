@@ -27,8 +27,12 @@ export function useLogin() {
       });
       
       if (!res.ok) {
-        if (res.status === 401) throw new Error("Invalid email or password");
-        throw new Error("Login failed");
+        let msg = "Invalid email or password";
+        try {
+          const body = await res.json();
+          if (body?.message) msg = body.message;
+        } catch {}
+        throw new Error(msg);
       }
       
       return res.json();

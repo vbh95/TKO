@@ -864,7 +864,7 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2">
                 <div className="flex-1 max-w-sm">
                   <Input
-                    placeholder="Enter new invite code…"
+                    placeholder="Enter or generate a code…"
                     value={inviteCodeNewValue}
                     onChange={(e) => setInviteCodeNewValue(e.target.value)}
                     data-testid="input-invite-code-admin"
@@ -873,12 +873,25 @@ export default function AdminDashboard() {
                   />
                 </div>
                 <Button
+                  variant="outline"
+                  onClick={() => {
+                    const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+                    let code = "";
+                    for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+                    setInviteCodeNewValue(code);
+                  }}
+                  data-testid="button-generate-invite-code"
+                  title="Generate a random code"
+                >
+                  Generate
+                </Button>
+                <Button
                   onClick={saveInviteCode}
                   disabled={inviteCodeSaving || !inviteCodeNewValue.trim()}
                   data-testid="button-save-invite-code"
                 >
                   {inviteCodeSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                  {inviteCodeData?.codeSet ? "Regenerate" : "Set Code"}
+                  Save
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
@@ -1102,8 +1115,9 @@ export default function AdminDashboard() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-primary" />
-                {viewingUserTournaments.name}'s Tournaments
+                Viewing as {viewingUserTournaments.name}
               </DialogTitle>
+              <p className="text-sm text-muted-foreground">{viewingUserTournaments.email}</p>
             </DialogHeader>
             <div className="space-y-4 max-h-[26rem] overflow-y-auto">
               {userTournamentsLoading ? (
@@ -1136,6 +1150,11 @@ export default function AdminDashboard() {
                   </div>
                 );
               })}
+            </div>
+            <div className="flex justify-end pt-2 border-t">
+              <Button variant="outline" onClick={() => setViewingUserTournaments(null)} data-testid="button-view-as-back">
+                Back
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
