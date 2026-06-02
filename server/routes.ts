@@ -977,6 +977,11 @@ export async function registerRoutes(
   });
 
   app.post(api.auth.login.path, authLimiter, (req, res, next) => {
+    console.log("LOGIN ROUTE HIT:", {
+      bodyKeys: Object.keys(req.body || {}),
+      hasUsername: !!req.body?.username,
+      hasPassword: !!req.body?.password,
+    });
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
         console.error("LOGIN ERROR FULL:", err);
