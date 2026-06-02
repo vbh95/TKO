@@ -978,10 +978,16 @@ export async function registerRoutes(
 
   app.post(api.auth.login.path, authLimiter, (req, res, next) => {
     passport.authenticate("local", (err: any, user: any, info: any) => {
-      if (err) return res.status(500).json({ message: "Internal server error" });
+      if (err) {
+        console.error("LOGIN ERROR FULL:", err);
+        return res.status(500).json({ message: "Internal server error" });
+      }
       if (!user) return res.status(401).json({ message: info?.message || "Invalid credentials" });
       req.login(user, (loginErr) => {
-        if (loginErr) return res.status(500).json({ message: "Login failed" });
+        if (loginErr) {
+          console.error("LOGIN SESSION ERROR FULL:", loginErr);
+          return res.status(500).json({ message: "Login failed" });
+        }
         if (req.body.rememberMe) {
           req.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30;
         } else {
