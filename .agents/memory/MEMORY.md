@@ -1,1 +1,2 @@
 - [Scoring side-effect recovery](scoring-side-effect-recovery.md) — accepted leg submissions durably track whether post-commit tournament processing finished.
+- [Unfinished scorer legs](unfinished-scorer-legs.md) — server-owned current-leg snapshots are version-bound and must survive scorer turnover and process restarts.

@@ -1,4 +1,4 @@
-import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, matchLegSubmissions, boardSessions, scorerLeases, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications, adminSettings, adminLogs, SCORER_LEASE_TTL_MS } from "@shared/schema";
+import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, matchLegSubmissions, boardSessions, scorerLeases, scorerCurrentLegs, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications, adminSettings, adminLogs, SCORER_LEASE_TTL_MS } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -10,6 +10,7 @@ import type {
   MatchNote, InsertMatchNote,
   BoardSession, InsertBoardSession,
   ScorerLease,
+  ScorerCurrentLeg,
   BoardOverlaySettings,
   League, InsertLeague,
   LeagueManualResult, InsertLeagueManualResult,
@@ -18,10 +19,18 @@ import type {
   AdminSetting,
   AdminLog,
 } from "@shared/schema";
+import {
+  emptyScorerCheckoutStats,
+  type DurableCurrentLegState,
+  type ScorerCheckoutStats,
+  type ScorerPendingCheckout,
+  type ScorerVisit,
+} from "@shared/current-leg";
 import { db } from "./db";
 import { pool } from "./db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { assertCompletedLegMatchesTransition, assertExpectedScoringVersion, assertIdempotentReplayMatches, assertLegHistoryMatchesScore, ScoringConflictError, ScoringValidationError, validateOneLegAdvance } from "./scoring-integrity";
+import { canonicalJson } from "@shared/scoring-integrity";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 
@@ -88,6 +97,20 @@ export type AcquireScorerLeaseResult = {
   tookOver: boolean;
 };
 
+export type PersistCurrentLegInput = {
+  matchId: number;
+  boardSessionId: number;
+  scoringVersion: number;
+  remainingA: number;
+  remainingB: number;
+  currentThrower: "A" | "B";
+  legStartingThrower: "A" | "B";
+  visits: ScorerVisit[];
+  checkoutStats: ScorerCheckoutStats;
+  pendingCheckout: ScorerPendingCheckout | null;
+  swapPlayers: boolean;
+};
+
 export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
@@ -134,6 +157,8 @@ export interface IStorage {
   takeoverScorerLease(input: Omit<AcquireScorerLeaseInput, "takeover">): Promise<AcquireScorerLeaseResult>;
   heartbeatScorerLease(matchId: number, boardSessionId: number): Promise<ScorerLease>;
   assertActiveScorerLease(matchId: number, boardSessionId: number): Promise<ScorerLease>;
+  getCurrentLegState(matchId: number): Promise<DurableCurrentLegState | undefined>;
+  persistCurrentLegStateWithLease(input: PersistCurrentLegInput): Promise<DurableCurrentLegState>;
   startMatchWithLease(input: {
     matchId: number;
     tournamentId: number;
@@ -164,6 +189,7 @@ export interface IStorage {
     completedLeg: unknown;
     notes: Partial<InsertMatchNote>;
     boardSessionId?: number;
+    checkout?: { dartsAtDouble: number; checkoutDartsUsed: number };
   }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }>;
   submitCompletedLegWithLease(input: {
     matchId: number;
@@ -174,6 +200,7 @@ export interface IStorage {
     completedLeg: unknown;
     notes: Partial<InsertMatchNote>;
     boardSessionId: number;
+    checkout: { dartsAtDouble: number; checkoutDartsUsed: number };
   }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }>;
   markCompletedLegSideEffectsComplete(matchId: number, submissionId: string): Promise<void>;
   
@@ -251,6 +278,62 @@ function leaseOwner(lease: ScorerLease): ScorerLeaseOwner {
 
 function leaseIsExpired(lease: ScorerLease, now = new Date()): boolean {
   return lease.expiresAt.getTime() <= now.getTime();
+}
+
+function durableCurrentLeg(row: ScorerCurrentLeg): DurableCurrentLegState {
+  return {
+    matchId: row.matchId,
+    scoringVersion: row.scoringVersion,
+    remainingA: row.remainingA,
+    remainingB: row.remainingB,
+    currentThrower: row.currentThrower as "A" | "B",
+    legStartingThrower: row.legStartingThrower as "A" | "B",
+    visits: (Array.isArray(row.visits) ? row.visits : []) as ScorerVisit[],
+    checkoutStats: {
+      ...emptyScorerCheckoutStats(),
+      ...((row.checkoutStats && typeof row.checkoutStats === "object") ? row.checkoutStats : {}),
+    } as ScorerCheckoutStats,
+    pendingCheckout: (row.pendingCheckout && typeof row.pendingCheckout === "object")
+      ? row.pendingCheckout as ScorerPendingCheckout
+      : null,
+    swapPlayers: row.swapPlayers,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function completedLegNotes(
+  history: Array<{ visits?: ScorerVisit[] }>,
+  checkoutStats: ScorerCheckoutStats,
+): Partial<InsertMatchNote> {
+  const visits = history.flatMap(leg => Array.isArray(leg?.visits) ? leg.visits : []);
+  const visitsA = visits.filter(visit => visit.player === "A");
+  const visitsB = visits.filter(visit => visit.player === "B");
+  return {
+    highestCheckout: Math.max(checkoutStats.finishA, checkoutStats.finishB) || null,
+    numberOf180s: visits.filter(visit => visit.score === 180).length,
+    totalVisitsA: visitsA.length,
+    totalVisitsB: visitsB.length,
+    totalScoredA: visitsA.reduce((sum, visit) => sum + visit.score, 0),
+    totalScoredB: visitsB.reduce((sum, visit) => sum + visit.score, 0),
+    highestVisitA: visitsA.length ? Math.max(...visitsA.map(visit => visit.score)) : 0,
+    highestVisitB: visitsB.length ? Math.max(...visitsB.map(visit => visit.score)) : 0,
+    highestFinishA: checkoutStats.finishA,
+    highestFinishB: checkoutStats.finishB,
+    ton80sA: visitsA.filter(visit => visit.score === 180).length,
+    ton80sB: visitsB.filter(visit => visit.score === 180).length,
+    ton40sA: visitsA.filter(visit => visit.score >= 140 && visit.score < 180).length,
+    ton40sB: visitsB.filter(visit => visit.score >= 140 && visit.score < 180).length,
+    tonsA: visitsA.filter(visit => visit.score >= 100 && visit.score < 140).length,
+    tonsB: visitsB.filter(visit => visit.score >= 100 && visit.score < 140).length,
+    checkoutAttemptsA: checkoutStats.attemptsA,
+    checkoutAttemptsB: checkoutStats.attemptsB,
+    checkoutSuccessA: checkoutStats.successA,
+    checkoutSuccessB: checkoutStats.successB,
+    first9PointsA: checkoutStats.first9PointsA,
+    first9DartsA: checkoutStats.first9DartsA,
+    first9PointsB: checkoutStats.first9PointsB,
+    first9DartsB: checkoutStats.first9DartsB,
+  };
 }
 
 export class DatabaseStorage implements IStorage {
@@ -443,6 +526,7 @@ export class DatabaseStorage implements IStorage {
       "bestOf",
       "status",
       "winnerId",
+      "scoringVersion",
     ] as const;
     const changesAuthoritativeState = authoritativeFields.some(
       field => Object.prototype.hasOwnProperty.call(match, field),
@@ -451,8 +535,13 @@ export class DatabaseStorage implements IStorage {
     if (changesAuthoritativeState && !Object.prototype.hasOwnProperty.call(match, "scoringVersion")) {
       values.scoringVersion = sql`${matches.scoringVersion} + 1`;
     }
-    const [updated] = await db.update(matches).set(values as any).where(eq(matches.id, id)).returning();
-    return updated;
+    return db.transaction(async (tx) => {
+      const [updated] = await tx.update(matches).set(values as any).where(eq(matches.id, id)).returning();
+      if (changesAuthoritativeState) {
+        await tx.delete(scorerCurrentLegs).where(eq(scorerCurrentLegs.matchId, id));
+      }
+      return updated;
+    });
   }
   
   async getMatch(id: number): Promise<Match | undefined> {
@@ -628,6 +717,66 @@ export class DatabaseStorage implements IStorage {
     return this.heartbeatScorerLease(matchId, boardSessionId);
   }
 
+  async getCurrentLegState(matchId: number): Promise<DurableCurrentLegState | undefined> {
+    const [row] = await db
+      .select()
+      .from(scorerCurrentLegs)
+      .where(eq(scorerCurrentLegs.matchId, matchId));
+    return row ? durableCurrentLeg(row) : undefined;
+  }
+
+  async persistCurrentLegStateWithLease(input: PersistCurrentLegInput): Promise<DurableCurrentLegState> {
+    return db.transaction(async (tx) => {
+      const match = await this.lockMatchInTransaction(tx, input.matchId);
+      if (!match) {
+        throw new ScoringValidationError("Match not found", "MATCH_NOT_FOUND");
+      }
+      await this.assertActiveScorerLeaseInTransaction(tx, input.matchId, input.boardSessionId);
+      if (match.status !== "IN_PROGRESS") {
+        throw new ScoringConflictError(
+          "Match is no longer in progress",
+          match,
+          "MATCH_NOT_IN_PROGRESS",
+        );
+      }
+      assertExpectedScoringVersion(match.scoringVersion, input.scoringVersion, match);
+
+      const now = new Date();
+      const [row] = await tx
+        .insert(scorerCurrentLegs)
+        .values({
+          matchId: input.matchId,
+          scoringVersion: input.scoringVersion,
+          remainingA: input.remainingA,
+          remainingB: input.remainingB,
+          currentThrower: input.currentThrower,
+          legStartingThrower: input.legStartingThrower,
+          visits: input.visits,
+          checkoutStats: input.checkoutStats,
+          pendingCheckout: input.pendingCheckout,
+          swapPlayers: input.swapPlayers,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: scorerCurrentLegs.matchId,
+          set: {
+            scoringVersion: input.scoringVersion,
+            remainingA: input.remainingA,
+            remainingB: input.remainingB,
+            currentThrower: input.currentThrower,
+            legStartingThrower: input.legStartingThrower,
+            visits: input.visits,
+            checkoutStats: input.checkoutStats,
+            pendingCheckout: input.pendingCheckout,
+            swapPlayers: input.swapPlayers,
+            updatedAt: now,
+          },
+        })
+        .returning();
+      return durableCurrentLeg(row);
+    });
+  }
+
   async startMatchWithLease(input: {
     matchId: number;
     tournamentId: number;
@@ -686,6 +835,8 @@ export class DatabaseStorage implements IStorage {
         boardSessionId: input.boardSessionId,
         takeover: input.takeover,
       }, match);
+
+      await tx.delete(scorerCurrentLegs).where(eq(scorerCurrentLegs.matchId, input.matchId));
 
       const [updatedMatch] = await tx
         .update(matches)
@@ -754,6 +905,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(matches.id, input.matchId))
         .returning();
       await tx.delete(scorerLeases).where(eq(scorerLeases.matchId, input.matchId));
+      await tx.delete(scorerCurrentLegs).where(eq(scorerCurrentLegs.matchId, input.matchId));
       return { match: updatedMatch, priorOwner: leaseOwner(lease) };
     });
   }
@@ -794,6 +946,7 @@ export class DatabaseStorage implements IStorage {
     completedLeg: unknown;
     notes: Partial<InsertMatchNote>;
     boardSessionId?: number;
+    checkout?: { dartsAtDouble: number; checkoutDartsUsed: number };
   }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }> {
     return db.transaction(async (tx) => {
       await tx.execute(sql`SELECT id FROM matches WHERE id = ${input.matchId} FOR UPDATE`);
@@ -881,6 +1034,109 @@ export class DatabaseStorage implements IStorage {
         throw error;
       }
 
+      let authoritativeCompletedLeg = input.completedLeg as {
+        startingThrower: "A" | "B";
+        visits: ScorerVisit[];
+        winner: "A" | "B";
+        checkoutDartsUsed?: number;
+      };
+      let nextCheckoutStats: ScorerCheckoutStats | undefined;
+      let authoritativeCurrentLeg: DurableCurrentLegState | undefined;
+
+      if (input.boardSessionId !== undefined) {
+        const [currentLegRow] = await tx
+          .select()
+          .from(scorerCurrentLegs)
+          .where(eq(scorerCurrentLegs.matchId, input.matchId));
+        if (!currentLegRow) {
+          throw new ScoringConflictError(
+            "The unfinished leg is not available on the server",
+            current,
+            "CURRENT_LEG_STATE_MISSING",
+          );
+        }
+        authoritativeCurrentLeg = durableCurrentLeg(currentLegRow);
+        if (authoritativeCurrentLeg.scoringVersion !== current.scoringVersion) {
+          throw new ScoringConflictError(
+            "The unfinished leg belongs to an older match version",
+            current,
+            "STALE_CURRENT_LEG_STATE",
+          );
+        }
+        const winner = authoritativeCurrentLeg.remainingA === 0 && authoritativeCurrentLeg.remainingB > 0
+          ? "A"
+          : authoritativeCurrentLeg.remainingB === 0 && authoritativeCurrentLeg.remainingA > 0
+            ? "B"
+            : null;
+        if (!winner || !authoritativeCurrentLeg.pendingCheckout || !input.checkout) {
+          throw new ScoringValidationError(
+            "The authoritative unfinished leg is not ready for checkout confirmation",
+            "CURRENT_LEG_NOT_COMPLETE",
+          );
+        }
+        const submittedLeg = input.completedLeg as {
+          startingThrower?: "A" | "B";
+          visits?: ScorerVisit[];
+          winner?: "A" | "B";
+          checkoutDartsUsed?: number;
+        };
+        if (
+          submittedLeg.startingThrower !== authoritativeCurrentLeg.legStartingThrower
+          || submittedLeg.winner !== winner
+          || canonicalJson(submittedLeg.visits) !== canonicalJson(authoritativeCurrentLeg.visits)
+          || submittedLeg.checkoutDartsUsed !== input.checkout.checkoutDartsUsed
+        ) {
+          throw new ScoringConflictError(
+            "Completed leg does not match the authoritative unfinished leg",
+            current,
+            "CURRENT_LEG_STATE_MISMATCH",
+          );
+        }
+        if (
+          authoritativeCurrentLeg.pendingCheckout.player !== winner
+          || authoritativeCurrentLeg.pendingCheckout.newLegsA !== input.scoreA
+          || authoritativeCurrentLeg.pendingCheckout.newLegsB !== input.scoreB
+        ) {
+          throw new ScoringConflictError(
+            "Checkout state does not match the requested score transition",
+            current,
+            "CURRENT_LEG_STATE_MISMATCH",
+          );
+        }
+
+        authoritativeCompletedLeg = {
+          startingThrower: authoritativeCurrentLeg.legStartingThrower,
+          visits: authoritativeCurrentLeg.visits,
+          winner,
+          checkoutDartsUsed: input.checkout.checkoutDartsUsed,
+        };
+        nextCheckoutStats = { ...authoritativeCurrentLeg.checkoutStats };
+        const playerKey = winner === "A" ? "A" : "B";
+        if (playerKey === "A") {
+          nextCheckoutStats.attemptsA += input.checkout.dartsAtDouble;
+          nextCheckoutStats.successA += 1;
+          nextCheckoutStats.finishA = Math.max(
+            nextCheckoutStats.finishA,
+            authoritativeCurrentLeg.pendingCheckout.checkoutScore,
+          );
+          nextCheckoutStats.totalCheckoutDartsUsedA += input.checkout.checkoutDartsUsed;
+        } else {
+          nextCheckoutStats.attemptsB += input.checkout.dartsAtDouble;
+          nextCheckoutStats.successB += 1;
+          nextCheckoutStats.finishB = Math.max(
+            nextCheckoutStats.finishB,
+            authoritativeCurrentLeg.pendingCheckout.checkoutScore,
+          );
+          nextCheckoutStats.totalCheckoutDartsUsedB += input.checkout.checkoutDartsUsed;
+        }
+        const first9A = authoritativeCurrentLeg.visits.filter(visit => visit.player === "A").slice(0, 3);
+        const first9B = authoritativeCurrentLeg.visits.filter(visit => visit.player === "B").slice(0, 3);
+        nextCheckoutStats.first9PointsA += first9A.reduce((sum, visit) => sum + visit.score, 0);
+        nextCheckoutStats.first9DartsA += first9A.length * 3;
+        nextCheckoutStats.first9PointsB += first9B.reduce((sum, visit) => sum + visit.score, 0);
+        nextCheckoutStats.first9DartsB += first9B.length * 3;
+      }
+
       const [existingNote] = await tx
         .select()
         .from(matchNotes)
@@ -899,9 +1155,9 @@ export class DatabaseStorage implements IStorage {
         current.scoreB ?? 0,
         input.scoreA,
         input.scoreB,
-        (input.completedLeg as { winner?: "A" | "B" } | null)?.winner as "A" | "B",
+        authoritativeCompletedLeg.winner,
       );
-      const nextHistory = [...existingHistory, input.completedLeg];
+      const nextHistory = [...existingHistory, authoritativeCompletedLeg];
 
       const legsToWin = Math.ceil(current.bestOf / 2);
       const isFinished = input.scoreA >= legsToWin || input.scoreB >= legsToWin;
@@ -910,7 +1166,9 @@ export class DatabaseStorage implements IStorage {
         : null;
       const nextVersion = current.scoringVersion + 1;
 
-      const noteValues = { ...input.notes, legHistory: nextHistory };
+      const noteValues = input.boardSessionId !== undefined && nextCheckoutStats
+        ? { ...completedLegNotes(nextHistory, nextCheckoutStats), legHistory: nextHistory }
+        : { ...input.notes, legHistory: nextHistory };
       await tx
         .insert(matchNotes)
         .values({ ...noteValues, matchId: input.matchId } as InsertMatchNote)
@@ -954,6 +1212,47 @@ export class DatabaseStorage implements IStorage {
         requestPayload,
       });
 
+      if (
+        input.boardSessionId !== undefined
+        && authoritativeCurrentLeg
+        && nextCheckoutStats
+        && !isFinished
+      ) {
+        const nextStarter = authoritativeCurrentLeg.legStartingThrower === "A" ? "B" : "A";
+        await tx
+          .insert(scorerCurrentLegs)
+          .values({
+            matchId: input.matchId,
+            scoringVersion: nextVersion,
+            remainingA: 501,
+            remainingB: 501,
+            currentThrower: nextStarter,
+            legStartingThrower: nextStarter,
+            visits: [],
+            checkoutStats: nextCheckoutStats,
+            pendingCheckout: null,
+            swapPlayers: authoritativeCurrentLeg.swapPlayers,
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: scorerCurrentLegs.matchId,
+            set: {
+              scoringVersion: nextVersion,
+              remainingA: 501,
+              remainingB: 501,
+              currentThrower: nextStarter,
+              legStartingThrower: nextStarter,
+              visits: [],
+              checkoutStats: nextCheckoutStats,
+              pendingCheckout: null,
+              swapPlayers: authoritativeCurrentLeg.swapPlayers,
+              updatedAt: new Date(),
+            },
+          });
+      } else {
+        await tx.delete(scorerCurrentLegs).where(eq(scorerCurrentLegs.matchId, input.matchId));
+      }
+
       return { match: updatedMatch, replayed: false, sideEffectsCompleted: false };
     });
   }
@@ -967,6 +1266,7 @@ export class DatabaseStorage implements IStorage {
     completedLeg: unknown;
     notes: Partial<InsertMatchNote>;
     boardSessionId: number;
+    checkout: { dartsAtDouble: number; checkoutDartsUsed: number };
   }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }> {
     return this.submitCompletedLeg(input);
   }

@@ -265,6 +265,26 @@ export const scorerLeases = pgTable("scorer_leases", {
 
 export const SCORER_LEASE_TTL_MS = 2 * 60 * 1000;
 
+// === SCORER CURRENT LEG STATE ===
+// One durable, version-bound snapshot of the unfinished leg.  This is the
+// authoritative recovery source for refreshes, scorer takeover, and restarts.
+export const scorerCurrentLegs = pgTable("scorer_current_legs", {
+  matchId: integer("match_id").primaryKey().references(() => matches.id, { onDelete: "cascade" }),
+  scoringVersion: integer("scoring_version").notNull(),
+  remainingA: integer("remaining_a").notNull(),
+  remainingB: integer("remaining_b").notNull(),
+  currentThrower: text("current_thrower").notNull(),
+  legStartingThrower: text("leg_starting_thrower").notNull(),
+  visits: jsonb("visits").notNull().default([]),
+  checkoutStats: jsonb("checkout_stats").notNull().default({}),
+  pendingCheckout: jsonb("pending_checkout"),
+  swapPlayers: boolean("swap_players").notNull().default(false),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  scoringVersionIdx: index("scorer_current_legs_scoring_version_idx")
+    .on(table.scoringVersion),
+}));
+
 // === RELATIONS ===
 export const usersRelations = relations(users, ({ many }) => ({
   tournaments: many(tournaments),
@@ -319,6 +339,7 @@ export const matchesRelations = relations(matches, ({ one }) => ({
   playerB: one(players, { fields: [matches.playerBId], references: [players.id], relationName: "playerB" }),
   winner: one(players, { fields: [matches.winnerId], references: [players.id], relationName: "winner" }),
   notes: one(matchNotes, { fields: [matches.id], references: [matchNotes.matchId] }),
+  currentLeg: one(scorerCurrentLegs, { fields: [matches.id], references: [scorerCurrentLegs.matchId] }),
   scorerLease: one(scorerLeases, { fields: [matches.id], references: [scorerLeases.matchId] }),
 }));
 
@@ -335,6 +356,10 @@ export const scorerLeasesRelations = relations(scorerLeases, ({ one }) => ({
   match: one(matches, { fields: [scorerLeases.matchId], references: [matches.id] }),
   tournament: one(tournaments, { fields: [scorerLeases.tournamentId], references: [tournaments.id] }),
   boardSession: one(boardSessions, { fields: [scorerLeases.boardSessionId], references: [boardSessions.id] }),
+}));
+
+export const scorerCurrentLegsRelations = relations(scorerCurrentLegs, ({ one }) => ({
+  match: one(matches, { fields: [scorerCurrentLegs.matchId], references: [matches.id] }),
 }));
 
 // === TYPES ===
@@ -368,6 +393,7 @@ export type InsertMatchNote = z.infer<typeof insertMatchNoteSchema>;
 export type BoardSession = typeof boardSessions.$inferSelect;
 export type InsertBoardSession = z.infer<typeof insertBoardSessionSchema>;
 export type ScorerLease = typeof scorerLeases.$inferSelect;
+export type ScorerCurrentLeg = typeof scorerCurrentLegs.$inferSelect;
 
 // === API DTOs ===
 export type TournamentSettings = {

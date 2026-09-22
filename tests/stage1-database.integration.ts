@@ -147,11 +147,18 @@ async function getSubmission(matchId: number, submissionId: string) {
 }
 
 function leg(winner: "A" | "B", marker: number) {
+  const loser = winner === "A" ? "B" : "A";
   return {
-    startingThrower: marker % 2 === 0 ? "A" as const : "B" as const,
-    visits: [{ player: winner, score: 100 + marker }],
+    startingThrower: winner,
+    visits: [
+      { player: winner, score: 180 },
+      { player: loser, score: 0 },
+      { player: winner, score: 180 },
+      { player: loser, score: 0 },
+      { player: winner, score: 141 },
+    ],
     winner,
-    checkoutDartsUsed: 1,
+    checkoutDartsUsed: 3,
   };
 }
 
@@ -222,7 +229,7 @@ async function scorerRequest(
       "content-type": "application/json",
       cookie: `boardAccessToken=${accessToken}`,
     },
-    body: method === "PUT" ? JSON.stringify(body) : undefined,
+    body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
   });
   const responseBody = await response.json().catch(() => null);
   return { status: response.status, body: responseBody };
@@ -529,24 +536,80 @@ async function main() {
       assert.equal(adopted.status, "IN_PROGRESS");
       assert.equal(isSavedStateCompatible(adopted, response.body), true);
 
+      const firstCompletedLeg = leg("A", 17);
+      assert.equal((await scorerRequest(token, matchId, {
+        scoringVersion: adopted.scoringVersion,
+        remainingA: 0,
+        remainingB: 501,
+        currentThrower: "A",
+        legStartingThrower: "A",
+        visits: firstCompletedLeg.visits,
+        checkoutStats: {
+          attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0,
+          first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0,
+          totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0,
+        },
+        pendingCheckout: { player: "A", newLegsA: 1, newLegsB: 0, checkoutScore: 141 },
+        swapPlayers: false,
+        legsWonA: 0,
+        legsWonB: 0,
+        playerAName: "A",
+        playerBName: "B",
+        bestOf: 5,
+        avgA: "167.00",
+        avgB: "0.00",
+        dartsA: 9,
+        dartsB: 6,
+        lastScoreA: 141,
+        lastScoreB: 0,
+      }, "POST", "/leg-scoring")).status, 200);
       const firstLeg = await scorerRequest(token, matchId, {
         scoreA: 1,
         scoreB: 0,
         expectedVersion: adopted.scoringVersion,
         legSubmissionId: randomUUID(),
-        completedLeg: leg("A", 17),
+        completedLeg: firstCompletedLeg,
         notes: notes(17),
+        checkout: { dartsAtDouble: 1, checkoutDartsUsed: 3 },
       });
       assert.equal(firstLeg.status, 200);
       assert.equal(firstLeg.body.scoringVersion, 2);
 
+      const secondCompletedLeg = leg("B", 18);
+      assert.equal((await scorerRequest(token, matchId, {
+        scoringVersion: firstLeg.body.scoringVersion,
+        remainingA: 501,
+        remainingB: 0,
+        currentThrower: "B",
+        legStartingThrower: "B",
+        visits: secondCompletedLeg.visits,
+        checkoutStats: {
+          attemptsA: 1, attemptsB: 0, successA: 1, successB: 0, finishA: 141, finishB: 0,
+          first9PointsA: 501, first9DartsA: 9, first9PointsB: 0, first9DartsB: 6,
+          totalCheckoutDartsUsedA: 3, totalCheckoutDartsUsedB: 0,
+        },
+        pendingCheckout: { player: "B", newLegsA: 1, newLegsB: 1, checkoutScore: 141 },
+        swapPlayers: false,
+        legsWonA: 1,
+        legsWonB: 0,
+        playerAName: "A",
+        playerBName: "B",
+        bestOf: 5,
+        avgA: "0.00",
+        avgB: "167.00",
+        dartsA: 6,
+        dartsB: 9,
+        lastScoreA: 0,
+        lastScoreB: 141,
+      }, "POST", "/leg-scoring")).status, 200);
       const secondLeg = await scorerRequest(token, matchId, {
         scoreA: 1,
         scoreB: 1,
         expectedVersion: firstLeg.body.scoringVersion,
         legSubmissionId: randomUUID(),
-        completedLeg: leg("B", 18),
+        completedLeg: secondCompletedLeg,
         notes: notes(18),
+        checkout: { dartsAtDouble: 1, checkoutDartsUsed: 3 },
       });
       assert.equal(secondLeg.status, 200);
       assert.equal(secondLeg.body.scoringVersion, 3);
@@ -584,13 +647,41 @@ async function main() {
       assert.equal(adopted.scoringVersion, 8);
       assert.equal(isSavedStateCompatible(adopted, response.body), true);
 
+      const completedLeg = leg("A", 19);
+      assert.equal((await scorerRequest(token, matchId, {
+        scoringVersion: adopted.scoringVersion,
+        remainingA: 0,
+        remainingB: 501,
+        currentThrower: "A",
+        legStartingThrower: "A",
+        visits: completedLeg.visits,
+        checkoutStats: {
+          attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0,
+          first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0,
+          totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0,
+        },
+        pendingCheckout: { player: "A", newLegsA: 1, newLegsB: 0, checkoutScore: 141 },
+        swapPlayers: false,
+        legsWonA: 0,
+        legsWonB: 0,
+        playerAName: "A",
+        playerBName: "B",
+        bestOf: 5,
+        avgA: "167.00",
+        avgB: "0.00",
+        dartsA: 9,
+        dartsB: 6,
+        lastScoreA: 141,
+        lastScoreB: 0,
+      }, "POST", "/leg-scoring")).status, 200);
       const firstLeg = await scorerRequest(token, matchId, {
         scoreA: 1,
         scoreB: 0,
         expectedVersion: adopted.scoringVersion,
         legSubmissionId: randomUUID(),
-        completedLeg: leg("A", 19),
+        completedLeg,
         notes: notes(19),
+        checkout: { dartsAtDouble: 1, checkoutDartsUsed: 3 },
       });
       assert.equal(firstLeg.status, 200);
       assert.equal(firstLeg.body.scoringVersion, 9);

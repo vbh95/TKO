@@ -2437,12 +2437,18 @@ export async function registerRoutes(
       const boardMatchNotes = await storage.getMatchNotesByMatchIds(boardMatchesBase.map(m => m.id));
       const notesByMatchId = new Map(boardMatchNotes.map(note => [note.matchId, note]));
       const boardMatches = await Promise.all(boardMatchesBase.map(async match => {
-        const lease = match.status === "IN_PROGRESS"
-          ? await storage.getScorerLease(match.id)
-          : undefined;
+        const [lease, currentLegState] = match.status === "IN_PROGRESS"
+          ? await Promise.all([
+              storage.getScorerLease(match.id),
+              storage.getCurrentLegState(match.id),
+            ])
+          : [undefined, undefined];
         return {
           ...match,
           notes: notesByMatchId.get(match.id) || null,
+          currentLegState: currentLegState?.scoringVersion === match.scoringVersion
+            ? currentLegState
+            : null,
           ownership: match.status === "IN_PROGRESS"
             ? {
                 ownedByCurrentSession: lease?.boardSessionId === req.boardSession.id,
@@ -2740,6 +2746,10 @@ export async function registerRoutes(
           checkoutDartsUsed: z.number().int().positive().optional(),
         }),
         notes: z.record(z.any()),
+        checkout: z.object({
+          dartsAtDouble: z.number().int().positive(),
+          checkoutDartsUsed: z.number().int().positive(),
+        }),
       });
       const parsed = scorerSubmissionSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -2749,7 +2759,7 @@ export async function registerRoutes(
         });
       }
 
-      const { scoreA, scoreB, expectedVersion, legSubmissionId, completedLeg, notes } = parsed.data;
+      const { scoreA, scoreB, expectedVersion, legSubmissionId, completedLeg, notes, checkout } = parsed.data;
       const atomicResult = await storage.submitCompletedLegWithLease({
         matchId,
         expectedVersion,
@@ -2759,6 +2769,7 @@ export async function registerRoutes(
         completedLeg,
         notes,
         boardSessionId: req.boardSession.id,
+        checkout,
       });
       const updatedMatch = atomicResult.match;
       const status = updatedMatch.status;
@@ -2766,9 +2777,7 @@ export async function registerRoutes(
       if (atomicResult.replayed && atomicResult.sideEffectsCompleted) {
         return res.json({ ...updatedMatch, idempotentReplay: true });
       }
-      if (status === "COMPLETED") {
-        clearLiveScoringCache(matchId);
-      }
+      clearLiveScoringCache(matchId);
 
       const tournament = await storage.getTournament(tournamentId);
 
@@ -2925,6 +2934,52 @@ export async function registerRoutes(
     }
   });
 
+  const checkoutStatsSchema = z.object({
+    attemptsA: z.number().int().nonnegative(),
+    attemptsB: z.number().int().nonnegative(),
+    successA: z.number().int().nonnegative(),
+    successB: z.number().int().nonnegative(),
+    finishA: z.number().int().nonnegative(),
+    finishB: z.number().int().nonnegative(),
+    first9PointsA: z.number().int().nonnegative(),
+    first9DartsA: z.number().int().nonnegative(),
+    first9PointsB: z.number().int().nonnegative(),
+    first9DartsB: z.number().int().nonnegative(),
+    totalCheckoutDartsUsedA: z.number().int().nonnegative(),
+    totalCheckoutDartsUsedB: z.number().int().nonnegative(),
+  });
+  const scorerVisitSchema = z.object({
+    player: z.enum(["A", "B"]),
+    score: z.number().int().min(0).max(180),
+  });
+  const currentLegSchema = z.object({
+    scoringVersion: z.number().int().nonnegative(),
+    remainingA: z.number().int().min(0).max(501),
+    remainingB: z.number().int().min(0).max(501),
+    currentThrower: z.enum(["A", "B"]),
+    legStartingThrower: z.enum(["A", "B"]),
+    visits: z.array(scorerVisitSchema).max(200),
+    checkoutStats: checkoutStatsSchema,
+    pendingCheckout: z.object({
+      player: z.enum(["A", "B"]),
+      newLegsA: z.number().int().nonnegative(),
+      newLegsB: z.number().int().nonnegative(),
+      checkoutScore: z.number().int().min(0).max(170),
+    }).nullable(),
+    swapPlayers: z.boolean(),
+    legsWonA: z.number().int().nonnegative(),
+    legsWonB: z.number().int().nonnegative(),
+    playerAName: z.string(),
+    playerBName: z.string(),
+    bestOf: z.number().int().positive(),
+    avgA: z.string(),
+    avgB: z.string(),
+    dartsA: z.number().int().nonnegative(),
+    dartsB: z.number().int().nonnegative(),
+    lastScoreA: z.number().int().min(0).max(180).nullable(),
+    lastScoreB: z.number().int().min(0).max(180).nullable(),
+  }).passthrough();
+
   app.post('/api/scorer/matches/:matchId/leg-scoring', isBoardAuthenticated, async (req: any, res) => {
     try {
       const matchId = parseInt(req.params.matchId);
@@ -2947,20 +3002,82 @@ export async function registerRoutes(
         boardNumber,
       );
       assertScorerMatchAssignedToBoard(match, liveAssignment);
-      await storage.assertActiveScorerLease(matchId, req.boardSession.id);
+      const parsed = currentLegSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "Invalid unfinished-leg state",
+          code: "INVALID_CURRENT_LEG_STATE",
+          details: parsed.error.flatten(),
+        });
+      }
+      const state = parsed.data;
+      if (state.legsWonA !== (match.scoreA || 0) || state.legsWonB !== (match.scoreB || 0)) {
+        return res.status(409).json({
+          message: "Unfinished leg does not match the current match score",
+          code: "STALE_SCORING_VERSION",
+          currentMatch: match,
+        });
+      }
+      let expectedPlayer: "A" | "B" = state.legStartingThrower;
+      let scoredA = 0;
+      let scoredB = 0;
+      for (const visit of state.visits) {
+        if (visit.player !== expectedPlayer) {
+          return res.status(400).json({ message: "Visit order is invalid", code: "INVALID_CURRENT_LEG_STATE" });
+        }
+        if (visit.player === "A") scoredA += visit.score;
+        else scoredB += visit.score;
+        expectedPlayer = expectedPlayer === "A" ? "B" : "A";
+      }
+      if (501 - scoredA !== state.remainingA || 501 - scoredB !== state.remainingB) {
+        return res.status(400).json({ message: "Visits do not match remaining scores", code: "INVALID_CURRENT_LEG_STATE" });
+      }
+      const checkoutWinner = state.remainingA === 0 && state.remainingB > 0
+        ? "A"
+        : state.remainingB === 0 && state.remainingA > 0
+          ? "B"
+          : null;
+      if (
+        checkoutWinner
+          ? state.currentThrower !== checkoutWinner
+            || state.pendingCheckout?.player !== checkoutWinner
+          : state.currentThrower !== expectedPlayer || state.pendingCheckout !== null
+      ) {
+        return res.status(400).json({ message: "Current thrower or checkout state is invalid", code: "INVALID_CURRENT_LEG_STATE" });
+      }
+
+      const persisted = await storage.persistCurrentLegStateWithLease({
+        matchId,
+        boardSessionId: req.boardSession.id,
+        scoringVersion: state.scoringVersion,
+        remainingA: state.remainingA,
+        remainingB: state.remainingB,
+        currentThrower: state.currentThrower,
+        legStartingThrower: state.legStartingThrower,
+        visits: state.visits,
+        checkoutStats: state.checkoutStats,
+        pendingCheckout: state.pendingCheckout,
+        swapPlayers: state.swapPlayers,
+      });
 
       emitLegScoring(tournamentId, boardNumber, liveTournament?.shareToken || null, {
         matchId,
-        ...req.body,
+        ...state,
       });
 
-      res.json({ success: true });
+      res.json({ success: true, currentLegState: persisted });
     } catch (err) {
       if (err instanceof ScorerBoardAuthorizationError) {
         return res.status(403).json({ message: err.message, code: err.code });
       }
       if (err instanceof ScorerLeaseConflictError) {
         return res.status(409).json({ message: err.message, code: err.code });
+      }
+      if (err instanceof ScoringConflictError) {
+        return res.status(409).json({ message: err.message, code: err.code, currentMatch: err.currentMatch });
+      }
+      if (err instanceof ScoringValidationError) {
+        return res.status(err.code === "MATCH_NOT_FOUND" ? 404 : 400).json({ message: err.message, code: err.code });
       }
       console.error("Scorer leg scoring error:", err);
       res.status(500).json({ message: "Internal server error" });
