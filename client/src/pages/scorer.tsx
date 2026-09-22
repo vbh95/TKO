@@ -129,6 +129,7 @@ interface ScorerState {
   serverScoreA: number;
   serverScoreB: number;
   scoringVersion: number;
+  status: string;
   remainingA: number;
   remainingB: number;
   currentThrower: 'A' | 'B';
@@ -879,6 +880,7 @@ export default function ScorerPage() {
       serverScoreA: legsWonA,
       serverScoreB: legsWonB,
       scoringVersion,
+      status: activeM.status,
       remainingA,
       remainingB,
       currentThrower,
@@ -1123,6 +1125,7 @@ export default function ScorerPage() {
           serverScoreA: updatedMatch.scoreA || 0,
           serverScoreB: updatedMatch.scoreB || 0,
           scoringVersion: updatedMatch.scoringVersion || scoringVersion + 1,
+          status: updatedMatch.status,
           legsWonA: updatedMatch.scoreA || 0,
           legsWonB: updatedMatch.scoreB || 0,
         allMatchVisits: allVisitsIncludingCurrent,
@@ -1487,6 +1490,7 @@ export default function ScorerPage() {
           serverScoreA: initLegsA,
           serverScoreB: initLegsB,
           scoringVersion: activeMatch.scoringVersion || 0,
+          status: "IN_PROGRESS",
           remainingA: STARTING_SCORE,
           remainingB: STARTING_SCORE,
           currentThrower: thrower,

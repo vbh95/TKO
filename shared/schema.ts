@@ -211,6 +211,9 @@ export const matchLegSubmissions = pgTable("match_leg_submissions", {
   resultingVersion: integer("resulting_version").notNull(),
   resultingScoreA: integer("resulting_score_a").notNull(),
   resultingScoreB: integer("resulting_score_b").notNull(),
+  resultingStatus: text("resulting_status"),
+  resultingWinnerId: integer("resulting_winner_id").references(() => players.id, { onDelete: "set null" }),
+  sideEffectsCompleted: boolean("side_effects_completed").notNull().default(false),
   requestPayload: jsonb("request_payload").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({

@@ -6,7 +6,9 @@ import {
 } from "../shared/scoring-integrity";
 import {
   assertExpectedScoringVersion,
+  assertCompletedLegMatchesTransition,
   assertIdempotentReplayMatches,
+  assertLegHistoryMatchesScore,
   ScoringConflictError,
   validateOneLegAdvance,
 } from "../server/scoring-integrity";
@@ -49,6 +51,36 @@ test("same submission ID with the same payload is a valid idempotent replay", ()
   assert.doesNotThrow(() => assertIdempotentReplayMatches(payload, payload, { id: 1 }));
 });
 
+test("idempotent replay comparison is canonical and includes note data", () => {
+  const stored = { notes: { totalVisitsB: 2, totalVisitsA: 3 }, scoreA: 1 };
+  const reordered = { scoreA: 1, notes: { totalVisitsA: 3, totalVisitsB: 2 } };
+  assert.doesNotThrow(() => assertIdempotentReplayMatches(stored, reordered, { id: 1 }));
+  assert.throws(
+    () => assertIdempotentReplayMatches(stored, {
+      scoreA: 1,
+      notes: { totalVisitsA: 4, totalVisitsB: 2 },
+    }, { id: 1 }),
+    (error: unknown) => error instanceof ScoringConflictError && error.code === "SUBMISSION_ID_REUSED",
+  );
+});
+
+test("completed-leg winner must match the side whose score advanced", () => {
+  assert.doesNotThrow(() => assertCompletedLegMatchesTransition(1, 0, 1, 1, "B"));
+  assert.throws(
+    () => assertCompletedLegMatchesTransition(1, 0, 1, 1, "A"),
+    (error: unknown) => error instanceof ScoringConflictError && error.code === "LEG_WINNER_MISMATCH",
+  );
+});
+
+test("stored leg history must match the authoritative score", () => {
+  assert.doesNotThrow(() => assertLegHistoryMatchesScore([], 0, 0, { id: 1 }));
+  assert.doesNotThrow(() => assertLegHistoryMatchesScore([{}, {}], 1, 1, { id: 1 }));
+  assert.throws(
+    () => assertLegHistoryMatchesScore([], 1, 0, { id: 1 }),
+    (error: unknown) => error instanceof ScoringConflictError && error.code === "LEG_HISTORY_SCORE_MISMATCH",
+  );
+});
+
 test("same submission ID cannot be reused with different data", () => {
   assert.throws(
     () => assertIdempotentReplayMatches(
@@ -77,6 +109,7 @@ test("stale local scorer state is rejected but matching unfinished-leg state res
     scoreA: 1,
     scoreB: 0,
     scoringVersion: 7,
+    status: "IN_PROGRESS",
   };
   const saved = {
     matchId: 10,
@@ -88,10 +121,12 @@ test("stale local scorer state is rejected but matching unfinished-leg state res
     legsWonA: 1,
     legsWonB: 0,
     scoringVersion: 7,
+    status: "IN_PROGRESS",
   };
 
   assert.equal(isSavedStateCompatible(saved, match), true);
   assert.equal(isSavedStateCompatible(saved, { ...match, scoreA: 0, scoringVersion: 8 }), false);
   assert.equal(isSavedStateCompatible(saved, { ...match, playerBId: 3 }), false);
   assert.equal(isSavedStateCompatible(saved, { ...match, bestOf: 5 }), false);
+  assert.equal(isSavedStateCompatible(saved, { ...match, status: "COMPLETED" }), false);
 });

@@ -2768,6 +2768,9 @@ export async function registerRoutes(
       const updatedMatch = atomicResult.match;
       const status = updatedMatch.status;
       const winnerId = updatedMatch.winnerId;
+      if (atomicResult.replayed && atomicResult.sideEffectsCompleted) {
+        return res.json({ ...updatedMatch, idempotentReplay: true });
+      }
       if (status === "COMPLETED") {
         clearLiveScoringCache(matchId);
       }
@@ -2866,6 +2869,7 @@ export async function registerRoutes(
           await deduplicateRoundScorers(tournamentId, tournament?.shareToken || null);
         } catch (progressionError) {
           console.error("Progression error:", progressionError);
+          throw progressionError;
         }
       }
 
@@ -2885,7 +2889,8 @@ export async function registerRoutes(
             await storage.updateTournament(tournamentId, { status: "COMPLETED" });
           }
         } catch (completeError) {
-          console.error("Scorer auto-complete error (non-fatal):", completeError);
+          console.error("Scorer auto-complete error:", completeError);
+          throw completeError;
         }
       }
 
@@ -2900,6 +2905,7 @@ export async function registerRoutes(
         emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
       }
 
+      await storage.markCompletedLegSideEffectsComplete(matchId, legSubmissionId);
       res.json({ ...updatedMatch, idempotentReplay: atomicResult.replayed });
     } catch (err) {
       if (err instanceof ScoringConflictError) {

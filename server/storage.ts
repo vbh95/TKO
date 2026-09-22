@@ -20,7 +20,7 @@ import type {
 import { db } from "./db";
 import { pool } from "./db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
-import { assertExpectedScoringVersion, assertIdempotentReplayMatches, ScoringConflictError, ScoringValidationError, validateOneLegAdvance } from "./scoring-integrity";
+import { assertCompletedLegMatchesTransition, assertExpectedScoringVersion, assertIdempotentReplayMatches, assertLegHistoryMatchesScore, ScoringConflictError, ScoringValidationError, validateOneLegAdvance } from "./scoring-integrity";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 
@@ -81,7 +81,8 @@ export interface IStorage {
     scoreB: number;
     completedLeg: unknown;
     notes: Partial<InsertMatchNote>;
-  }): Promise<{ match: Match; replayed: boolean }>;
+  }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }>;
+  markCompletedLegSideEffectsComplete(matchId: number, submissionId: string): Promise<void>;
   
   // Board Sessions
   createBoardSession(session: InsertBoardSession): Promise<BoardSession>;
@@ -328,7 +329,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateMatch(id: number, match: Partial<InsertMatch>): Promise<Match> {
-    const [updated] = await db.update(matches).set(match).where(eq(matches.id, id)).returning();
+    const authoritativeFields = [
+      "playerAId",
+      "playerBId",
+      "scoreA",
+      "scoreB",
+      "bestOf",
+      "status",
+      "winnerId",
+    ] as const;
+    const changesAuthoritativeState = authoritativeFields.some(
+      field => Object.prototype.hasOwnProperty.call(match, field),
+    );
+    const values = { ...match } as Record<string, unknown>;
+    if (changesAuthoritativeState && !Object.prototype.hasOwnProperty.call(match, "scoringVersion")) {
+      values.scoringVersion = sql`${matches.scoringVersion} + 1`;
+    }
+    const [updated] = await db.update(matches).set(values as any).where(eq(matches.id, id)).returning();
     return updated;
   }
   
@@ -372,7 +389,7 @@ export class DatabaseStorage implements IStorage {
     scoreB: number;
     completedLeg: unknown;
     notes: Partial<InsertMatchNote>;
-  }): Promise<{ match: Match; replayed: boolean }> {
+  }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }> {
     return db.transaction(async (tx) => {
       await tx.execute(sql`SELECT id FROM matches WHERE id = ${input.matchId} FOR UPDATE`);
 
@@ -394,11 +411,34 @@ export class DatabaseStorage implements IStorage {
         scoreB: input.scoreB,
         expectedVersion: input.expectedVersion,
         completedLeg: input.completedLeg,
+        notes: input.notes,
       };
 
       if (existingSubmission) {
         assertIdempotentReplayMatches(existingSubmission.requestPayload, requestPayload, current);
-        return { match: current, replayed: true };
+        const replayStatus = existingSubmission.resultingStatus
+          ?? (existingSubmission.resultingScoreA >= Math.ceil(current.bestOf / 2)
+            || existingSubmission.resultingScoreB >= Math.ceil(current.bestOf / 2)
+            ? "COMPLETED"
+            : "IN_PROGRESS");
+        const replayWinnerId = existingSubmission.resultingWinnerId
+          ?? (replayStatus === "COMPLETED"
+            ? (existingSubmission.resultingScoreA > existingSubmission.resultingScoreB
+              ? current.playerAId
+              : current.playerBId)
+            : null);
+        return {
+          match: {
+            ...current,
+            scoreA: existingSubmission.resultingScoreA,
+            scoreB: existingSubmission.resultingScoreB,
+            status: replayStatus,
+            winnerId: replayWinnerId,
+            scoringVersion: existingSubmission.resultingVersion,
+          },
+          replayed: true,
+          sideEffectsCompleted: existingSubmission.sideEffectsCompleted,
+        };
       }
 
       if (current.status !== "IN_PROGRESS") {
@@ -432,6 +472,19 @@ export class DatabaseStorage implements IStorage {
       const existingHistory = Array.isArray(existingNote?.legHistory)
         ? existingNote.legHistory
         : [];
+      assertLegHistoryMatchesScore(
+        existingHistory,
+        current.scoreA ?? 0,
+        current.scoreB ?? 0,
+        current,
+      );
+      assertCompletedLegMatchesTransition(
+        current.scoreA ?? 0,
+        current.scoreB ?? 0,
+        input.scoreA,
+        input.scoreB,
+        (input.completedLeg as { winner?: "A" | "B" } | null)?.winner as "A" | "B",
+      );
       const nextHistory = [...existingHistory, input.completedLeg];
 
       const legsToWin = Math.ceil(current.bestOf / 2);
@@ -480,11 +533,23 @@ export class DatabaseStorage implements IStorage {
         resultingVersion: nextVersion,
         resultingScoreA: input.scoreA,
         resultingScoreB: input.scoreB,
+        resultingStatus: updatedMatch.status,
+        resultingWinnerId: updatedMatch.winnerId,
         requestPayload,
       });
 
-      return { match: updatedMatch, replayed: false };
+      return { match: updatedMatch, replayed: false, sideEffectsCompleted: false };
     });
+  }
+
+  async markCompletedLegSideEffectsComplete(matchId: number, submissionId: string): Promise<void> {
+    await db
+      .update(matchLegSubmissions)
+      .set({ sideEffectsCompleted: true })
+      .where(and(
+        eq(matchLegSubmissions.matchId, matchId),
+        eq(matchLegSubmissions.submissionId, submissionId),
+      ));
   }
 
   // Board Sessions

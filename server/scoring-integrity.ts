@@ -69,6 +69,22 @@ export function assertCompletedLegMatchesTransition(
   }
 }
 
+export function assertLegHistoryMatchesScore(
+  existingHistory: unknown[],
+  scoreA: number,
+  scoreB: number,
+  currentMatch: unknown,
+): void {
+  const completedLegs = scoreA + scoreB;
+  if (existingHistory.length !== completedLegs) {
+    throw new ScoringConflictError(
+      "Stored leg history does not match the current match score",
+      currentMatch,
+      "LEG_HISTORY_SCORE_MISMATCH",
+    );
+  }
+}
+
 export function validateOneLegAdvance(
   previousScoreA: number,
   previousScoreB: number,
