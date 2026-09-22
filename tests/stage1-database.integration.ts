@@ -792,6 +792,7 @@ async function main() {
       const token2 = await createBoardAccess(tournamentId, 1);
       const ownership = await scorerRequest(token1, matchId, {}, "POST", "/ownership/acquire");
       assert.equal(ownership.status, 200);
+      assert.equal((await persistCheckoutReadyLeg(token1, matchId, "A", 0)).status, 200);
       const before = await getMatch(matchId);
       const id1 = randomUUID();
       const id2 = randomUUID();
@@ -802,6 +803,7 @@ async function main() {
         legSubmissionId: id1,
         completedLeg: leg("A", 12),
         notes: notes(12),
+        checkout: { dartsAtDouble: 1, checkoutDartsUsed: 3 },
       };
       const body2 = {
         scoreA: 0,
@@ -810,6 +812,7 @@ async function main() {
         legSubmissionId: id2,
         completedLeg: leg("B", 13),
         notes: notes(13),
+        checkout: { dartsAtDouble: 1, checkoutDartsUsed: 3 },
       };
       const responses = await Promise.all([
         scorerRequest(token1, matchId, body1),
@@ -862,6 +865,7 @@ async function main() {
       const token = await createBoardAccess(tournamentId, 1);
       const ownership = await scorerRequest(token, currentId, {}, "POST", "/ownership/acquire");
       assert.equal(ownership.status, 200);
+      assert.equal((await persistCheckoutReadyLeg(token, currentId, "A", 0)).status, 200);
       const submissionId = randomUUID();
       const before = await getMatch(currentId);
       const body = {
@@ -871,6 +875,7 @@ async function main() {
         legSubmissionId: submissionId,
         completedLeg: leg("A", 14),
         notes: notes(14),
+        checkout: { dartsAtDouble: 1, checkoutDartsUsed: 3 },
       };
       const first = await scorerRequest(token, currentId, body);
       assert.equal(first.status, 500);
@@ -929,6 +934,7 @@ async function main() {
       const token = await createBoardAccess(tournamentId, 1);
       const ownership = await scorerRequest(token, currentId, {}, "POST", "/ownership/acquire");
       assert.equal(ownership.status, 200);
+      assert.equal((await persistCheckoutReadyLeg(token, currentId, "A", 0)).status, 200);
       const submissionId = randomUUID();
       const before = await getMatch(currentId);
       const body = {
@@ -938,6 +944,7 @@ async function main() {
         legSubmissionId: submissionId,
         completedLeg: leg("A", 15),
         notes: notes(15),
+        checkout: { dartsAtDouble: 1, checkoutDartsUsed: 3 },
       };
       const first = await scorerRequest(token, currentId, body);
       assert.equal(first.status, 200);
