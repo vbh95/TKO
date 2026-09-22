@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/hooks/use-socket";
 import { useToast } from "@/hooks/use-toast";
+import { isSavedStateCompatible } from "@shared/scoring-integrity";
 
 interface BoardData {
   tournament: {
@@ -66,6 +67,11 @@ interface BoardData {
     boardNumber: number | null;
     scorerId: number | null;
     scorerName: string | null;
+    scoringVersion: number;
+    notes?: {
+      legHistory?: Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B'; checkoutDartsUsed?: number }> | null;
+      [key: string]: any;
+    } | null;
   }>;
   accessToken?: string;
 }
@@ -117,6 +123,12 @@ const IMPOSSIBLE_SCORES = new Set([163, 166, 169, 172, 173, 175, 176, 178, 179])
 
 interface ScorerState {
   matchId: number;
+  playerAId: number | null;
+  playerBId: number | null;
+  bestOf: number;
+  serverScoreA: number;
+  serverScoreB: number;
+  scoringVersion: number;
   remainingA: number;
   remainingB: number;
   currentThrower: 'A' | 'B';
@@ -537,6 +549,7 @@ export default function ScorerPage() {
 
   const [legsWonA, setLegsWonA] = useState(0);
   const [legsWonB, setLegsWonB] = useState(0);
+  const [scoringVersion, setScoringVersion] = useState(0);
 
   const [remainingA, setRemainingA] = useState(STARTING_SCORE);
   const [remainingB, setRemainingB] = useState(STARTING_SCORE);
@@ -563,6 +576,7 @@ export default function ScorerPage() {
   const checkoutStatsRef = useRef({ attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0, totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0 });
   const legHistoryRef = useRef<Array<{ startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B'; checkoutDartsUsed?: number }>>([]);
   const isSubmittingLegRef = useRef(false);
+  const pendingLegSubmissionIdRef = useRef<string | null>(null);
   const legResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [swapPlayers, setSwapPlayers] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
@@ -624,10 +638,11 @@ export default function ScorerPage() {
       const inProgress = data.matches.find(m => m.status === 'IN_PROGRESS');
       if (inProgress) {
         const saved = loadScorerState(inProgress.id);
-        if (saved && saved.matchId === inProgress.id) {
+        if (saved && isSavedStateCompatible(saved, inProgress)) {
           setActiveMatchId(inProgress.id);
           setLegsWonA(saved.legsWonA);
           setLegsWonB(saved.legsWonB);
+          setScoringVersion(saved.scoringVersion);
           setRemainingA(saved.remainingA);
           setRemainingB(saved.remainingB);
           setCurrentThrower(saved.currentThrower);
@@ -640,7 +655,15 @@ export default function ScorerPage() {
           setCheckoutSuccessB(saved.checkoutStats.successB);
           setHighestFinishA(saved.checkoutStats.finishA);
           setHighestFinishB(saved.checkoutStats.finishB);
-          checkoutStatsRef.current = { first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0, totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0, ...saved.checkoutStats };
+          checkoutStatsRef.current = {
+            ...saved.checkoutStats,
+            first9PointsA: saved.checkoutStats.first9PointsA ?? 0,
+            first9DartsA: saved.checkoutStats.first9DartsA ?? 0,
+            first9PointsB: saved.checkoutStats.first9PointsB ?? 0,
+            first9DartsB: saved.checkoutStats.first9DartsB ?? 0,
+            totalCheckoutDartsUsedA: saved.checkoutStats.totalCheckoutDartsUsedA ?? 0,
+            totalCheckoutDartsUsedB: saved.checkoutStats.totalCheckoutDartsUsedB ?? 0,
+          };
           legHistoryRef.current = saved.legHistory || [];
           setSwapPlayers(saved.swapPlayers);
           setView("scoring");
@@ -673,12 +696,17 @@ export default function ScorerPage() {
             }).catch(() => {});
           }
         } else {
+          if (saved) clearScorerState(inProgress.id);
           const totalLegs = (inProgress.scoreA || 0) + (inProgress.scoreB || 0);
           const starter: 'A' | 'B' = totalLegs % 2 === 0 ? 'A' : 'B';
           setActiveMatchId(inProgress.id);
           setLegsWonA(inProgress.scoreA || 0);
           setLegsWonB(inProgress.scoreB || 0);
-          setAllMatchVisits([]);
+          setScoringVersion(inProgress.scoringVersion || 0);
+          const persistedHistory = Array.isArray(inProgress.notes?.legHistory)
+            ? inProgress.notes!.legHistory!
+            : [];
+          setAllMatchVisits(persistedHistory.flatMap(leg => leg.visits || []));
           setCheckoutAttemptsA(0);
           setCheckoutAttemptsB(0);
           setCheckoutSuccessA(0);
@@ -686,7 +714,7 @@ export default function ScorerPage() {
           setHighestFinishA(0);
           setHighestFinishB(0);
           checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0, totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0 };
-          legHistoryRef.current = [];
+          legHistoryRef.current = persistedHistory;
           resetLeg(starter);
           setView("scoring");
         }
@@ -769,116 +797,49 @@ export default function ScorerPage() {
   });
 
   const updateScoreMutation = useMutation({
-    mutationFn: async ({ matchId, scoreA, scoreB, notes }: { matchId: number; scoreA: number; scoreB: number; notes?: any }) => {
+    mutationFn: async ({
+      matchId,
+      scoreA,
+      scoreB,
+      notes,
+      expectedVersion,
+      legSubmissionId,
+      completedLeg,
+    }: {
+      matchId: number;
+      scoreA: number;
+      scoreB: number;
+      notes: any;
+      expectedVersion: number;
+      legSubmissionId: string;
+      completedLeg: { startingThrower: 'A' | 'B'; visits: Visit[]; winner: 'A' | 'B'; checkoutDartsUsed?: number };
+    }) => {
       const res = await fetch(`/api/scorer/matches/${matchId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ scoreA, scoreB, notes }),
+        body: JSON.stringify({
+          scoreA,
+          scoreB,
+          notes,
+          expectedVersion,
+          legSubmissionId,
+          completedLeg,
+        }),
       });
-      if (!res.ok) throw new Error("Failed to update score");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const error = new Error(body.message || "Failed to update score") as Error & {
+          status?: number;
+          code?: string;
+          currentMatch?: BoardData["matches"][number];
+        };
+        error.status = res.status;
+        error.code = body.code;
+        error.currentMatch = body.currentMatch;
+        throw error;
+      }
       return res.json();
-    },
-    onSuccess: (updatedMatch) => {
-      if (updatedMatch.status === 'COMPLETED') {
-        const vA = allMatchVisits.filter(v => v.player === 'A');
-        const vB = allMatchVisits.filter(v => v.player === 'B');
-        const pA = data?.players.find(p => p.id === updatedMatch.playerAId);
-        const pB = data?.players.find(p => p.id === updatedMatch.playerBId);
-        const cs = checkoutStatsRef.current;
-        setMatchReport({
-          totalVisitsA: vA.length,
-          totalVisitsB: vB.length,
-          totalScoredA: vA.reduce((s: number, v: Visit) => s + v.score, 0),
-          totalScoredB: vB.reduce((s: number, v: Visit) => s + v.score, 0),
-          highestVisitA: vA.length > 0 ? Math.max(...vA.map(v => v.score)) : 0,
-          highestVisitB: vB.length > 0 ? Math.max(...vB.map(v => v.score)) : 0,
-          highestFinishA: cs.finishA,
-          highestFinishB: cs.finishB,
-          ton80sA: vA.filter(v => v.score === 180).length,
-          ton80sB: vB.filter(v => v.score === 180).length,
-          ton40sA: vA.filter(v => v.score >= 140 && v.score < 180).length,
-          ton40sB: vB.filter(v => v.score >= 140 && v.score < 180).length,
-          tonsA: vA.filter(v => v.score >= 100 && v.score < 140).length,
-          tonsB: vB.filter(v => v.score >= 100 && v.score < 140).length,
-          legsWonA: updatedMatch.scoreA || 0,
-          legsWonB: updatedMatch.scoreB || 0,
-          checkoutAttemptsA: cs.attemptsA,
-          checkoutAttemptsB: cs.attemptsB,
-          checkoutSuccessA: cs.successA,
-          checkoutSuccessB: cs.successB,
-          checkoutDartsUsedA: cs.totalCheckoutDartsUsedA,
-          checkoutDartsUsedB: cs.totalCheckoutDartsUsedB,
-          first9PointsA: cs.first9PointsA,
-          first9DartsA: cs.first9DartsA,
-          first9PointsB: cs.first9PointsB,
-          first9DartsB: cs.first9DartsB,
-          playerAName: pA?.name || 'Player 1',
-          playerBName: pB?.name || 'Player 2',
-          winnerId: updatedMatch.winnerId,
-          playerAId: updatedMatch.playerAId,
-          playerBId: updatedMatch.playerBId,
-          legHistory: legHistoryRef.current,
-        });
-        setActiveMatchId(null);
-        setMatchScoresOpen(false);
-        setView("matchReport");
-      }
-      refetch();
-    },
-    onError: async (err: any) => {
-      const freshData = await refetch();
-      const completedMatch = freshData.data?.matches.find(
-        (m: any) => m.status === 'COMPLETED' && m.id === activeMatchId
-      );
-      if (completedMatch) {
-        const vA = allMatchVisits.filter(v => v.player === 'A');
-        const vB = allMatchVisits.filter(v => v.player === 'B');
-        const pA = freshData.data?.players.find((p: any) => p.id === completedMatch.playerAId);
-        const pB = freshData.data?.players.find((p: any) => p.id === completedMatch.playerBId);
-        const cs = checkoutStatsRef.current;
-        setMatchReport({
-          totalVisitsA: vA.length,
-          totalVisitsB: vB.length,
-          totalScoredA: vA.reduce((s: number, v: Visit) => s + v.score, 0),
-          totalScoredB: vB.reduce((s: number, v: Visit) => s + v.score, 0),
-          highestVisitA: vA.length > 0 ? Math.max(...vA.map(v => v.score)) : 0,
-          highestVisitB: vB.length > 0 ? Math.max(...vB.map(v => v.score)) : 0,
-          highestFinishA: cs.finishA,
-          highestFinishB: cs.finishB,
-          ton80sA: vA.filter(v => v.score === 180).length,
-          ton80sB: vB.filter(v => v.score === 180).length,
-          ton40sA: vA.filter(v => v.score >= 140 && v.score < 180).length,
-          ton40sB: vB.filter(v => v.score >= 140 && v.score < 180).length,
-          tonsA: vA.filter(v => v.score >= 100 && v.score < 140).length,
-          tonsB: vB.filter(v => v.score >= 100 && v.score < 140).length,
-          legsWonA: completedMatch.scoreA || 0,
-          legsWonB: completedMatch.scoreB || 0,
-          checkoutAttemptsA: cs.attemptsA,
-          checkoutAttemptsB: cs.attemptsB,
-          checkoutSuccessA: cs.successA,
-          checkoutSuccessB: cs.successB,
-          checkoutDartsUsedA: cs.totalCheckoutDartsUsedA,
-          checkoutDartsUsedB: cs.totalCheckoutDartsUsedB,
-          first9PointsA: cs.first9PointsA,
-          first9DartsA: cs.first9DartsA,
-          first9PointsB: cs.first9PointsB,
-          first9DartsB: cs.first9DartsB,
-          playerAName: pA?.name || 'Player 1',
-          playerBName: pB?.name || 'Player 2',
-          winnerId: completedMatch.winnerId,
-          playerAId: completedMatch.playerAId,
-          playerBId: completedMatch.playerBId,
-          legHistory: legHistoryRef.current,
-        });
-        setActiveMatchId(null);
-        setMatchScoresOpen(false);
-        setView("matchReport");
-        clearScorerState(completedMatch.id);
-        return;
-      }
-      isSubmittingLegRef.current = false;
-      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -908,8 +869,16 @@ export default function ScorerPage() {
 
   const persistCurrentState = useCallback((overrides?: Partial<ScorerState>) => {
     if (activeMatchId === null) return;
+    const activeM = data?.matches.find(m => m.id === activeMatchId);
+    if (!activeM) return;
     const state: ScorerState = {
       matchId: activeMatchId,
+      playerAId: activeM.playerAId,
+      playerBId: activeM.playerBId,
+      bestOf: activeM.bestOf || 3,
+      serverScoreA: legsWonA,
+      serverScoreB: legsWonB,
+      scoringVersion,
       remainingA,
       remainingB,
       currentThrower,
@@ -924,7 +893,7 @@ export default function ScorerPage() {
       ...overrides,
     };
     saveScorerState(state);
-  }, [activeMatchId, remainingA, remainingB, currentThrower, legsWonA, legsWonB, legVisits, allMatchVisits, legStartingThrower, swapPlayers]);
+  }, [activeMatchId, data, remainingA, remainingB, currentThrower, legsWonA, legsWonB, scoringVersion, legVisits, allMatchVisits, legStartingThrower, swapPlayers]);
 
   const emitLiveState = useCallback((rA: number, rB: number, thrower: 'A' | 'B', lA: number, lB: number, visits?: Visit[], lstOverride?: 'A' | 'B', lastLegResult?: { winnerName: string; checkout: number; checkoutDarts: number }) => {
     const activeM = data?.matches.find(m => m.id === activeMatchId);
@@ -1027,36 +996,13 @@ export default function ScorerPage() {
     setPendingDartsAtDouble(true);
   };
 
-  const confirmCheckout = (dartsAtDouble: number, checkoutDartsUsed: number) => {
+  const confirmCheckout = async (dartsAtDouble: number, checkoutDartsUsed: number) => {
     if (isSubmittingLegRef.current) return;
     if (checkoutDartsUsed < dartsAtDouble) return;
     if (!pendingCheckout || !activeMatchId) return;
     isSubmittingLegRef.current = true;
 
-    setPendingCheckout(null);
-    setPendingDartsAtDouble(false);
-    setSelectedDartsAtDouble(null);
-    setSelectedCheckoutDartsUsed(null);
-
     const { player, newLegsA, newLegsB, newVisits, checkoutScore } = pendingCheckout;
-
-    if (player === 'A') {
-      checkoutStatsRef.current.attemptsA += dartsAtDouble;
-      checkoutStatsRef.current.successA += 1;
-      checkoutStatsRef.current.finishA = Math.max(checkoutStatsRef.current.finishA, checkoutScore);
-      checkoutStatsRef.current.totalCheckoutDartsUsedA += checkoutDartsUsed;
-      setCheckoutAttemptsA(checkoutStatsRef.current.attemptsA);
-      setCheckoutSuccessA(checkoutStatsRef.current.successA);
-      setHighestFinishA(checkoutStatsRef.current.finishA);
-    } else {
-      checkoutStatsRef.current.attemptsB += dartsAtDouble;
-      checkoutStatsRef.current.successB += 1;
-      checkoutStatsRef.current.finishB = Math.max(checkoutStatsRef.current.finishB, checkoutScore);
-      checkoutStatsRef.current.totalCheckoutDartsUsedB += checkoutDartsUsed;
-      setCheckoutAttemptsB(checkoutStatsRef.current.attemptsB);
-      setCheckoutSuccessB(checkoutStatsRef.current.successB);
-      setHighestFinishB(checkoutStatsRef.current.finishB);
-    }
 
     const activeM = data?.matches.find(m => m.id === activeMatchId);
     if (!activeM) {
@@ -1066,110 +1012,202 @@ export default function ScorerPage() {
     const matchBestOf = activeM.bestOf || 3;
     const matchLegsToWin = Math.ceil(matchBestOf / 2);
     const isPlayerA = player === 'A';
-
-    setLegsWonA(newLegsA);
-    setLegsWonB(newLegsB);
-
-    const legWinnerName = isPlayerA
-      ? (data?.players.find(p => p.id === activeM.playerAId)?.name || 'Player A')
-      : (data?.players.find(p => p.id === activeM.playerBId)?.name || 'Player B');
-
-    emitLiveState(
-      isPlayerA ? 0 : remainingA,
-      !isPlayerA ? 0 : remainingB,
-      player,
-      newLegsA,
-      newLegsB,
-      undefined,
-      undefined,
-      { winnerName: legWinnerName, checkout: checkoutScore, checkoutDarts: dartsAtDouble },
-    );
-
     const allVisitsIncludingCurrent = [...allMatchVisits, ...newVisits];
-
-    const expectedLegCount = newLegsA + newLegsB;
-    if (legHistoryRef.current.length < expectedLegCount) {
-      legHistoryRef.current = [...legHistoryRef.current, { startingThrower: legStartingThrower, visits: newVisits, winner: player, checkoutDartsUsed }];
+    const completedLeg = { startingThrower: legStartingThrower, visits: newVisits, winner: player, checkoutDartsUsed };
+    const nextLegHistory = [...legHistoryRef.current, completedLeg];
+    const nextStats = { ...checkoutStatsRef.current };
+    if (player === 'A') {
+      nextStats.attemptsA += dartsAtDouble;
+      nextStats.successA += 1;
+      nextStats.finishA = Math.max(nextStats.finishA, checkoutScore);
+      nextStats.totalCheckoutDartsUsedA += checkoutDartsUsed;
+    } else {
+      nextStats.attemptsB += dartsAtDouble;
+      nextStats.successB += 1;
+      nextStats.finishB = Math.max(nextStats.finishB, checkoutScore);
+      nextStats.totalCheckoutDartsUsedB += checkoutDartsUsed;
     }
 
     // Accumulate first-9-darts data for this leg (first 3 visits per player = 9 darts each)
     const legFirst9A = newVisits.filter(v => v.player === 'A').slice(0, 3);
     const legFirst9B = newVisits.filter(v => v.player === 'B').slice(0, 3);
-    checkoutStatsRef.current.first9PointsA += legFirst9A.reduce((s, v) => s + v.score, 0);
-    checkoutStatsRef.current.first9DartsA += legFirst9A.length * 3;
-    checkoutStatsRef.current.first9PointsB += legFirst9B.reduce((s, v) => s + v.score, 0);
-    checkoutStatsRef.current.first9DartsB += legFirst9B.length * 3;
+    nextStats.first9PointsA += legFirst9A.reduce((s, v) => s + v.score, 0);
+    nextStats.first9DartsA += legFirst9A.length * 3;
+    nextStats.first9PointsB += legFirst9B.reduce((s, v) => s + v.score, 0);
+    nextStats.first9DartsB += legFirst9B.length * 3;
 
     const isMatchFinished = newLegsA >= matchLegsToWin || newLegsB >= matchLegsToWin;
-    let matchNotes: any = undefined;
-    if (isMatchFinished) {
-      const vA = allVisitsIncludingCurrent.filter(v => v.player === 'A');
-      const vB = allVisitsIncludingCurrent.filter(v => v.player === 'B');
-      const cs = checkoutStatsRef.current;
-      const highestCheckoutVal = Math.max(cs.finishA, cs.finishB);
-      const total180s = vA.filter(v => v.score === 180).length + vB.filter(v => v.score === 180).length;
-      matchNotes = {
-        highestCheckout: highestCheckoutVal > 0 ? highestCheckoutVal : undefined,
-        numberOf180s: total180s,
-        totalVisitsA: vA.length,
-        totalVisitsB: vB.length,
-        totalScoredA: vA.reduce((s: number, v: Visit) => s + v.score, 0),
-        totalScoredB: vB.reduce((s: number, v: Visit) => s + v.score, 0),
-        highestVisitA: vA.length > 0 ? Math.max(...vA.map(v => v.score)) : 0,
-        highestVisitB: vB.length > 0 ? Math.max(...vB.map(v => v.score)) : 0,
-        highestFinishA: cs.finishA,
-        highestFinishB: cs.finishB,
-        ton80sA: vA.filter(v => v.score === 180).length,
-        ton80sB: vB.filter(v => v.score === 180).length,
-        ton40sA: vA.filter(v => v.score >= 140 && v.score < 180).length,
-        ton40sB: vB.filter(v => v.score >= 140 && v.score < 180).length,
-        tonsA: vA.filter(v => v.score >= 100 && v.score < 140).length,
-        tonsB: vB.filter(v => v.score >= 100 && v.score < 140).length,
-        checkoutAttemptsA: cs.attemptsA,
-        checkoutAttemptsB: cs.attemptsB,
-        checkoutSuccessA: cs.successA,
-        checkoutSuccessB: cs.successB,
-        checkoutDartsUsedA: cs.totalCheckoutDartsUsedA,
-        checkoutDartsUsedB: cs.totalCheckoutDartsUsedB,
-        first9PointsA: cs.first9PointsA,
-        first9DartsA: cs.first9DartsA,
-        first9PointsB: cs.first9PointsB,
-        first9DartsB: cs.first9DartsB,
-        legHistory: legHistoryRef.current,
-      };
-    }
+    const vA = allVisitsIncludingCurrent.filter(v => v.player === 'A');
+    const vB = allVisitsIncludingCurrent.filter(v => v.player === 'B');
+    const highestCheckoutVal = Math.max(nextStats.finishA, nextStats.finishB);
+    const matchNotes = {
+      highestCheckout: highestCheckoutVal > 0 ? highestCheckoutVal : null,
+      numberOf180s: vA.filter(v => v.score === 180).length + vB.filter(v => v.score === 180).length,
+      totalVisitsA: vA.length,
+      totalVisitsB: vB.length,
+      totalScoredA: vA.reduce((s: number, v: Visit) => s + v.score, 0),
+      totalScoredB: vB.reduce((s: number, v: Visit) => s + v.score, 0),
+      highestVisitA: vA.length > 0 ? Math.max(...vA.map(v => v.score)) : 0,
+      highestVisitB: vB.length > 0 ? Math.max(...vB.map(v => v.score)) : 0,
+      highestFinishA: nextStats.finishA,
+      highestFinishB: nextStats.finishB,
+      ton80sA: vA.filter(v => v.score === 180).length,
+      ton80sB: vB.filter(v => v.score === 180).length,
+      ton40sA: vA.filter(v => v.score >= 140 && v.score < 180).length,
+      ton40sB: vB.filter(v => v.score >= 140 && v.score < 180).length,
+      tonsA: vA.filter(v => v.score >= 100 && v.score < 140).length,
+      tonsB: vB.filter(v => v.score >= 100 && v.score < 140).length,
+      checkoutAttemptsA: nextStats.attemptsA,
+      checkoutAttemptsB: nextStats.attemptsB,
+      checkoutSuccessA: nextStats.successA,
+      checkoutSuccessB: nextStats.successB,
+      first9PointsA: nextStats.first9PointsA,
+      first9DartsA: nextStats.first9DartsA,
+      first9PointsB: nextStats.first9PointsB,
+      first9DartsB: nextStats.first9DartsB,
+    };
 
-    updateScoreMutation.mutate({
-      matchId: activeMatchId,
-      scoreA: newLegsA,
-      scoreB: newLegsB,
-      notes: matchNotes,
-    });
+    const submissionId = pendingLegSubmissionIdRef.current || crypto.randomUUID();
+    pendingLegSubmissionIdRef.current = submissionId;
 
-    setAllMatchVisits(allVisitsIncludingCurrent);
-
-    if (newLegsA < matchLegsToWin && newLegsB < matchLegsToWin) {
-      const nextStarter = legStartingThrower === 'A' ? 'B' : 'A';
-      persistCurrentState({
-        legsWonA: newLegsA,
-        legsWonB: newLegsB,
-        allMatchVisits: allVisitsIncludingCurrent,
-        remainingA: STARTING_SCORE,
-        remainingB: STARTING_SCORE,
-        currentThrower: nextStarter,
-        legStartingThrower: nextStarter,
-        legVisits: [],
-        legHistory: legHistoryRef.current,
+    try {
+      const updatedMatch = await updateScoreMutation.mutateAsync({
+        matchId: activeMatchId,
+        scoreA: newLegsA,
+        scoreB: newLegsB,
+        notes: matchNotes,
+        expectedVersion: scoringVersion,
+        legSubmissionId: submissionId,
+        completedLeg,
       });
-      clearTimeout(legResetTimerRef.current ?? undefined);
-      legResetTimerRef.current = setTimeout(() => {
-        legResetTimerRef.current = null;
-        resetLeg(nextStarter);
-      }, 1500);
-    } else {
+
+      pendingLegSubmissionIdRef.current = null;
+      setPendingCheckout(null);
+      setPendingDartsAtDouble(false);
+      setSelectedDartsAtDouble(null);
+      setSelectedCheckoutDartsUsed(null);
+      checkoutStatsRef.current = nextStats;
+      legHistoryRef.current = nextLegHistory;
+      setLegsWonA(updatedMatch.scoreA || 0);
+      setLegsWonB(updatedMatch.scoreB || 0);
+      setScoringVersion(updatedMatch.scoringVersion || scoringVersion + 1);
+      setAllMatchVisits(allVisitsIncludingCurrent);
+      setCheckoutAttemptsA(nextStats.attemptsA);
+      setCheckoutAttemptsB(nextStats.attemptsB);
+      setCheckoutSuccessA(nextStats.successA);
+      setCheckoutSuccessB(nextStats.successB);
+      setHighestFinishA(nextStats.finishA);
+      setHighestFinishB(nextStats.finishB);
+
+      const legWinnerName = isPlayerA
+        ? (data?.players.find(p => p.id === activeM.playerAId)?.name || 'Player A')
+        : (data?.players.find(p => p.id === activeM.playerBId)?.name || 'Player B');
+      emitLiveState(
+        isPlayerA ? 0 : remainingA,
+        !isPlayerA ? 0 : remainingB,
+        player,
+        updatedMatch.scoreA || 0,
+        updatedMatch.scoreB || 0,
+        undefined,
+        undefined,
+        { winnerName: legWinnerName, checkout: checkoutScore, checkoutDarts: checkoutDartsUsed },
+      );
+
+      if (!isMatchFinished) {
+      const nextStarter = legStartingThrower === 'A' ? 'B' : 'A';
+        saveScorerState({
+          matchId: activeMatchId,
+          playerAId: activeM.playerAId,
+          playerBId: activeM.playerBId,
+          bestOf: matchBestOf,
+          serverScoreA: updatedMatch.scoreA || 0,
+          serverScoreB: updatedMatch.scoreB || 0,
+          scoringVersion: updatedMatch.scoringVersion || scoringVersion + 1,
+          legsWonA: updatedMatch.scoreA || 0,
+          legsWonB: updatedMatch.scoreB || 0,
+        allMatchVisits: allVisitsIncludingCurrent,
+          remainingA: STARTING_SCORE,
+          remainingB: STARTING_SCORE,
+          currentThrower: nextStarter,
+          legStartingThrower: nextStarter,
+          legVisits: [],
+          legHistory: nextLegHistory,
+          checkoutStats: nextStats,
+          swapPlayers,
+        });
+        clearTimeout(legResetTimerRef.current ?? undefined);
+        legResetTimerRef.current = setTimeout(() => {
+          legResetTimerRef.current = null;
+          resetLeg(nextStarter);
+        }, 1500);
+      } else {
+        const pA = data?.players.find(p => p.id === updatedMatch.playerAId);
+        const pB = data?.players.find(p => p.id === updatedMatch.playerBId);
+        setMatchReport({
+          totalVisitsA: vA.length,
+          totalVisitsB: vB.length,
+          totalScoredA: matchNotes.totalScoredA,
+          totalScoredB: matchNotes.totalScoredB,
+          highestVisitA: matchNotes.highestVisitA,
+          highestVisitB: matchNotes.highestVisitB,
+          highestFinishA: nextStats.finishA,
+          highestFinishB: nextStats.finishB,
+          ton80sA: matchNotes.ton80sA,
+          ton80sB: matchNotes.ton80sB,
+          ton40sA: matchNotes.ton40sA,
+          ton40sB: matchNotes.ton40sB,
+          tonsA: matchNotes.tonsA,
+          tonsB: matchNotes.tonsB,
+          legsWonA: updatedMatch.scoreA || 0,
+          legsWonB: updatedMatch.scoreB || 0,
+          checkoutAttemptsA: nextStats.attemptsA,
+          checkoutAttemptsB: nextStats.attemptsB,
+          checkoutSuccessA: nextStats.successA,
+          checkoutSuccessB: nextStats.successB,
+          checkoutDartsUsedA: nextStats.totalCheckoutDartsUsedA,
+          checkoutDartsUsedB: nextStats.totalCheckoutDartsUsedB,
+          first9PointsA: nextStats.first9PointsA,
+          first9DartsA: nextStats.first9DartsA,
+          first9PointsB: nextStats.first9PointsB,
+          first9DartsB: nextStats.first9DartsB,
+          playerAName: pA?.name || 'Player 1',
+          playerBName: pB?.name || 'Player 2',
+          winnerId: updatedMatch.winnerId,
+          playerAId: updatedMatch.playerAId,
+          playerBId: updatedMatch.playerBId,
+          legHistory: nextLegHistory,
+        });
+        clearScorerState(activeMatchId);
+        setActiveMatchId(null);
+        setMatchScoresOpen(false);
+        setView("matchReport");
+      }
+      await refetch();
+    } catch (err: any) {
       isSubmittingLegRef.current = false;
-      clearScorerState(activeMatchId);
+      if (err?.status === 409) {
+        pendingLegSubmissionIdRef.current = null;
+        clearScorerState(activeMatchId);
+        setPendingCheckout(null);
+        setPendingDartsAtDouble(false);
+        setActiveMatchId(null);
+        setView("matchList");
+        await refetch();
+        toast({
+          title: "Score changed on another device",
+          description: "The match has been reloaded from the server. Your stale leg was not recorded.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Leg not recorded",
+          description: `${err?.message || "The request failed"}. Nothing was advanced; press confirm again to retry.`,
+          variant: "destructive",
+        });
+      }
+      return;
     }
+    isSubmittingLegRef.current = false;
   };
 
   const cancelCheckout = () => {
@@ -1320,10 +1358,11 @@ export default function ScorerPage() {
 
     if (match.status === 'IN_PROGRESS') {
       const saved = loadScorerState(matchId);
-      if (saved && saved.matchId === matchId) {
+      if (saved && isSavedStateCompatible(saved, match)) {
         setActiveMatchId(matchId);
         setLegsWonA(saved.legsWonA);
         setLegsWonB(saved.legsWonB);
+        setScoringVersion(saved.scoringVersion);
         setRemainingA(saved.remainingA);
         setRemainingB(saved.remainingB);
         setCurrentThrower(saved.currentThrower);
@@ -1336,7 +1375,15 @@ export default function ScorerPage() {
         setCheckoutSuccessB(saved.checkoutStats.successB);
         setHighestFinishA(saved.checkoutStats.finishA);
         setHighestFinishB(saved.checkoutStats.finishB);
-        checkoutStatsRef.current = { first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0, totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0, ...saved.checkoutStats };
+        checkoutStatsRef.current = {
+          ...saved.checkoutStats,
+          first9PointsA: saved.checkoutStats.first9PointsA ?? 0,
+          first9DartsA: saved.checkoutStats.first9DartsA ?? 0,
+          first9PointsB: saved.checkoutStats.first9PointsB ?? 0,
+          first9DartsB: saved.checkoutStats.first9DartsB ?? 0,
+          totalCheckoutDartsUsedA: saved.checkoutStats.totalCheckoutDartsUsedA ?? 0,
+          totalCheckoutDartsUsedB: saved.checkoutStats.totalCheckoutDartsUsedB ?? 0,
+        };
         legHistoryRef.current = saved.legHistory || [];
         setSwapPlayers(saved.swapPlayers);
         setView("scoring");
@@ -1369,12 +1416,17 @@ export default function ScorerPage() {
           }).catch(() => {});
         }
       } else {
+        if (saved) clearScorerState(matchId);
         const totalLegs = (match.scoreA || 0) + (match.scoreB || 0);
         const starter: 'A' | 'B' = totalLegs % 2 === 0 ? 'A' : 'B';
         setActiveMatchId(matchId);
         setLegsWonA(match.scoreA || 0);
         setLegsWonB(match.scoreB || 0);
-        setAllMatchVisits([]);
+        setScoringVersion(match.scoringVersion || 0);
+        const persistedHistory = Array.isArray(match.notes?.legHistory)
+          ? match.notes!.legHistory!
+          : [];
+        setAllMatchVisits(persistedHistory.flatMap(leg => leg.visits || []));
         setCheckoutAttemptsA(0);
         setCheckoutAttemptsB(0);
         setCheckoutSuccessA(0);
@@ -1382,7 +1434,7 @@ export default function ScorerPage() {
         setHighestFinishA(0);
         setHighestFinishB(0);
         checkoutStatsRef.current = { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0, totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0 };
-        legHistoryRef.current = [];
+        legHistoryRef.current = persistedHistory;
         setSwapPlayers(false);
         resetLeg(starter);
         setView("scoring");
@@ -1429,6 +1481,12 @@ export default function ScorerPage() {
         setView("scoring");
         saveScorerState({
           matchId: activeMatch.id,
+          playerAId: activeMatch.playerAId,
+          playerBId: activeMatch.playerBId,
+          bestOf: activeMatch.bestOf || 3,
+          serverScoreA: initLegsA,
+          serverScoreB: initLegsB,
+          scoringVersion: activeMatch.scoringVersion || 0,
           remainingA: STARTING_SCORE,
           remainingB: STARTING_SCORE,
           currentThrower: thrower,
@@ -1437,7 +1495,7 @@ export default function ScorerPage() {
           legVisits: [],
           allMatchVisits: [],
           legStartingThrower: thrower,
-          checkoutStats: { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0 },
+          checkoutStats: { attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0, first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0, totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0 },
           swapPlayers: thrower === 'B',
           legHistory: [],
         });
