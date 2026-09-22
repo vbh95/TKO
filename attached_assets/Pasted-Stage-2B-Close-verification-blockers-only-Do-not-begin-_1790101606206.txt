@@ -1,0 +1,122 @@
+Stage 2B — Close verification blockers only
+
+Do not begin Stage 3.
+
+Do not redesign the durable current-leg model.
+
+Do not deploy.
+
+Do not modify production Neon.
+
+Work only against tko-development.
+
+Stage 2B implementation is complete, but three blockers remain.
+
+Fix/verify only those blockers.
+
+Blocker 1 — Stage 1 legacy integration suite
+
+The legacy Stage 1 database integration test has a two-device HTTP case that now submits completed legs without first creating the required durable scorer_current_legs state.
+
+This is a test-fixture incompatibility caused by the new server-authoritative current-leg requirement.
+
+Do not weaken production validation to make the old test pass.
+
+Update the Stage 1 HTTP integration fixture so it behaves like a real Stage 2B scorer:
+
+Start/acquire the match normally.
+Persist the current-leg state required by Stage 2B.
+Make the durable state checkout-ready.
+Then submit the competing completed-leg HTTP requests.
+
+The original Stage 1 invariant must still be tested:
+
+one request succeeds
+the stale/concurrent request is rejected
+exactly one leg is persisted
+scoring version increments once
+no duplicate submission is created
+
+Re-run the ENTIRE Stage 1 database integration suite from beginning to end.
+
+Do not stop after the previously failing case.
+
+Report every Stage 1 test result.
+
+Blocker 2 — Real server restart recovery
+
+Perform the exact end-to-end restart scenario on tko-development:
+
+Create a disposable test tournament/match.
+Start the match.
+Score several visits so remaining scores are no longer 501.
+Confirm scorer_current_legs contains the exact unfinished state.
+Stop the actual development Node/server process.
+Start a fresh process.
+Reopen/refetch the scorer.
+Verify the exact unfinished leg hydrates from PostgreSQL.
+Confirm:
+remaining scores
+current thrower
+leg starter
+raw visit order
+current statistics
+scoring version
+Continue the leg and complete it.
+Verify the persisted completed leg contains both pre-restart and post-restart visits.
+
+This must be a genuine process restart, not merely a cache clear or helper simulation.
+
+Clean up only the disposable data afterward.
+
+Blocker 3 — TypeScript baseline
+
+Do not attempt to fix the existing project-wide TypeScript debt.
+
+Verify whether Stage 2B introduces any NEW TypeScript diagnostics compared with the current known baseline.
+
+Compare the Stage 2B branch against its pre-Stage-2B parent using the same TypeScript toolchain.
+
+Report:
+
+diagnostic count before Stage 2B
+diagnostic count after Stage 2B
+whether any NEW error appears in files changed by Stage 2B
+
+If the overall repository still has 63 existing diagnostics but Stage 2B adds none, state that clearly.
+
+Full regression after blocker fixes
+
+After the above:
+
+Run all unit tests.
+Run the COMPLETE Stage 1 database suite.
+Run the COMPLETE Stage 2 lease/ownership suite.
+Run the COMPLETE Stage 2B durable-leg suite.
+Run production build.
+Run git diff --check.
+
+Do not deploy.
+
+Do not run any production migration.
+
+Final report
+
+Report:
+
+files changed during this blocker-closing pass
+whether production validation was weakened in any way
+full Stage 1 results
+full Stage 2 results
+full Stage 2B results
+real restart recovery result
+TypeScript baseline comparison
+build result
+
+End with exactly one:
+
+STAGE 2B READY FOR MANUAL TESTING
+
+or
+
+STAGE 2B STILL HAS BLOCKING GAPS

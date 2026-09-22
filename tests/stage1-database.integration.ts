@@ -235,6 +235,50 @@ async function scorerRequest(
   return { status: response.status, body: responseBody };
 }
 
+async function persistCheckoutReadyLeg(
+  accessToken: string,
+  matchId: number,
+  winner: "A" | "B" = "A",
+  scoringVersion?: number,
+) {
+  const current = await getMatch(matchId);
+  const version = scoringVersion ?? current.scoring_version;
+  const completed = leg(winner, 1);
+  const visitsA = completed.visits.filter(visit => visit.player === "A");
+  const visitsB = completed.visits.filter(visit => visit.player === "B");
+  return scorerRequest(accessToken, matchId, {
+    scoringVersion: version,
+    remainingA: winner === "A" ? 0 : 501,
+    remainingB: winner === "B" ? 0 : 501,
+    currentThrower: winner,
+    legStartingThrower: winner,
+    visits: completed.visits,
+    checkoutStats: {
+      attemptsA: 0, attemptsB: 0, successA: 0, successB: 0, finishA: 0, finishB: 0,
+      first9PointsA: 0, first9DartsA: 0, first9PointsB: 0, first9DartsB: 0,
+      totalCheckoutDartsUsedA: 0, totalCheckoutDartsUsedB: 0,
+    },
+    pendingCheckout: {
+      player: winner,
+      newLegsA: current.score_a + (winner === "A" ? 1 : 0),
+      newLegsB: current.score_b + (winner === "B" ? 1 : 0),
+      checkoutScore: 141,
+    },
+    swapPlayers: false,
+    legsWonA: current.score_a,
+    legsWonB: current.score_b,
+    playerAName: "A",
+    playerBName: "B",
+    bestOf: current.best_of,
+    avgA: visitsA.length ? "167.00" : "0.00",
+    avgB: visitsB.length ? "167.00" : "0.00",
+    dartsA: visitsA.length * 3,
+    dartsB: visitsB.length * 3,
+    lastScoreA: visitsA.at(-1)?.score ?? null,
+    lastScoreB: visitsB.at(-1)?.score ?? null,
+  }, "POST", "/leg-scoring");
+}
+
 async function runCase(
   report: Omit<CaseReport, "actual" | "databaseState" | "result">,
   action: () => Promise<{ actual: string; databaseState: string }>,
