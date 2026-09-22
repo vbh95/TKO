@@ -1,4 +1,4 @@
-import { isExactlyOneLegAdvance } from "@shared/scoring-integrity";
+import { canonicalJson, isExactlyOneLegAdvance } from "@shared/scoring-integrity";
 
 export class ScoringConflictError extends Error {
   constructor(
@@ -37,11 +37,34 @@ export function assertIdempotentReplayMatches(
   requestPayload: unknown,
   currentMatch: unknown,
 ): void {
-  if (JSON.stringify(existingPayload) !== JSON.stringify(requestPayload)) {
+  if (canonicalJson(existingPayload) !== canonicalJson(requestPayload)) {
     throw new ScoringConflictError(
       "This leg submission ID was already used with different data",
       currentMatch,
       "SUBMISSION_ID_REUSED",
+    );
+  }
+}
+
+export function assertCompletedLegMatchesTransition(
+  previousScoreA: number,
+  previousScoreB: number,
+  requestedScoreA: number,
+  requestedScoreB: number,
+  winner: "A" | "B",
+): void {
+  const advancedSide =
+    requestedScoreA === previousScoreA + 1 && requestedScoreB === previousScoreB
+      ? "A"
+      : requestedScoreB === previousScoreB + 1 && requestedScoreA === previousScoreA
+        ? "B"
+        : null;
+
+  if (!advancedSide || advancedSide !== winner) {
+    throw new ScoringConflictError(
+      "Completed-leg winner does not match the score transition",
+      null,
+      "LEG_WINNER_MISMATCH",
     );
   }
 }

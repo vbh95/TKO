@@ -6,6 +6,7 @@ export type AuthoritativeMatchIdentity = {
   scoreA: number | null;
   scoreB: number | null;
   scoringVersion: number;
+  status: string;
 };
 
 export type SavedScorerIdentity = {
@@ -18,6 +19,7 @@ export type SavedScorerIdentity = {
   legsWonA: number;
   legsWonB: number;
   scoringVersion: number;
+  status: string;
 };
 
 export function isSavedStateCompatible(
@@ -33,7 +35,8 @@ export function isSavedStateCompatible(
     saved.serverScoreB === (match.scoreB || 0) &&
     saved.legsWonA === (match.scoreA || 0) &&
     saved.legsWonB === (match.scoreB || 0) &&
-    saved.scoringVersion === (match.scoringVersion || 0)
+    saved.scoringVersion === (match.scoringVersion || 0) &&
+    saved.status === match.status
   );
 }
 
@@ -46,4 +49,22 @@ export function isExactlyOneLegAdvance(
   const deltaA = requestedScoreA - previousScoreA;
   const deltaB = requestedScoreB - previousScoreB;
   return (deltaA === 1 && deltaB === 0) || (deltaA === 0 && deltaB === 1);
+}
+
+export function canonicalizeForComparison(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalizeForComparison);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, nested]) => [key, canonicalizeForComparison(nested)]),
+    );
+  }
+  return value;
+}
+
+export function canonicalJson(value: unknown): string {
+  return JSON.stringify(canonicalizeForComparison(value));
 }
