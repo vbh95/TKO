@@ -1,0 +1,99 @@
+Stage 2 Production Smoke-Test Bug — INVESTIGATE ONLY
+
+Do not change code yet.
+
+Do not deploy anything.
+
+Reproduce this against tko-development.
+
+Production smoke testing revealed this sequence:
+
+Device A owns and scores the match.
+During an unfinished leg, remaining scores reach:
+
+141 - 141
+
+Device B scans the same board QR.
+Device B is offered Continue scoring on this device.
+Device B takes over.
+Device B displays:
+
+501 - 501
+
+rather than the existing unfinished leg 141 - 141.
+
+Device B then scores until its local state is:
+
+324 - 446
+
+Device A scans/reopens the board again.
+Device A still displays its previous local state:
+
+141 - 141
+
+This means different devices can have different unfinished-leg state even though scorer ownership changes correctly.
+
+Do not fix this yet.
+
+Trace exactly where current unfinished-leg state is stored:
+
+React state
+localStorage
+/leg-scoring endpoint
+liveScoringCache
+match_notes
+database
+Socket.IO
+
+Determine:
+
+Whether ordinary visits are persisted anywhere durable.
+Whether the server live-scoring cache contains the authoritative current remaining scores and visit history.
+Whether Device B requests/hydrates that current live state when taking over.
+Why Device B initializes at the starting score instead.
+Why Device A can still restore/display its old localStorage state after losing ownership.
+Whether a device that has lost its lease can continue entering local visits even if server submissions will later be rejected.
+Whether Device A receives the ownership lost Socket.IO event and what the UI does with it.
+Whether Device B's new live visits overwrite the server's in-memory live cache.
+What happens if Device B subsequently completes the leg after taking over from Device A.
+Whether statistics/visit history from Device A's portion of the leg would be lost.
+
+Reproduce this exact sequence with two independent scorer sessions.
+
+Record at each point:
+
+lease owner
+database match score/version
+server live-scoring cache
+Device A local state/localStorage
+Device B local state/localStorage
+
+Also test:
+
+Takeover before any darts
+
+Confirm whether 501-501 is correct.
+
+Takeover after several visits
+
+Confirm whether unfinished current-leg state transfers.
+
+Old owner after takeover
+
+Confirm it becomes visibly read-only/blocked rather than continuing to present stale scoring state as if authoritative.
+
+Takeover after server restart
+
+Determine what happens because liveScoringCache is process-local.
+
+End with:
+
+TAKEOVER PRESERVES UNFINISHED LEG: YES / NO
+
+OLD DEVICE SHOWS STALE AUTHORITATIVE-LOOKING STATE: YES / NO
+
+VISITS/STATS CAN BE LOST DURING TAKEOVER: YES / NO
+
+ROOT CAUSE: <exact explanation>
+
+Do not implement a fix.
