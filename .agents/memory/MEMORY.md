@@ -1,0 +1,1 @@
+- [Scoring side-effect recovery](scoring-side-effect-recovery.md) — accepted leg submissions durably track whether post-commit tournament processing finished.

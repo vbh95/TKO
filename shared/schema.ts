@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, primaryKey, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -166,6 +166,7 @@ export const matches = pgTable("matches", {
   boardNumber: integer("board_number"), // Board assignment for knockout matches
   scorerId: integer("scorer_id").references(() => players.id, { onDelete: "set null" }), // Assigned scorer for group matches
   scorerName: text("scorer_name"), // Display name for scorer (editable, independent per match)
+  scoringVersion: integer("scoring_version").notNull().default(0),
 });
 
 export const insertMatchSchema = createInsertSchema(matches).omit({ id: true });
@@ -201,6 +202,24 @@ export const matchNotes = pgTable("match_notes", {
   first9DartsB: integer("first9_darts_b"),
   legHistory: jsonb("leg_history"),
 });
+
+export const matchLegSubmissions = pgTable("match_leg_submissions", {
+  id: serial("id").primaryKey(),
+  matchId: integer("match_id").notNull().references(() => matches.id, { onDelete: "cascade" }),
+  submissionId: text("submission_id").notNull(),
+  expectedVersion: integer("expected_version").notNull(),
+  resultingVersion: integer("resulting_version").notNull(),
+  resultingScoreA: integer("resulting_score_a").notNull(),
+  resultingScoreB: integer("resulting_score_b").notNull(),
+  resultingStatus: text("resulting_status"),
+  resultingWinnerId: integer("resulting_winner_id").references(() => players.id, { onDelete: "set null" }),
+  sideEffectsCompleted: boolean("side_effects_completed").notNull().default(false),
+  requestPayload: jsonb("request_payload").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  matchSubmissionUnique: uniqueIndex("match_leg_submissions_match_submission_uidx")
+    .on(table.matchId, table.submissionId),
+}));
 
 export const insertMatchNoteSchema = createInsertSchema(matchNotes).omit({ id: true });
 

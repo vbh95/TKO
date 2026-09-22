@@ -1,4 +1,4 @@
-import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, boardSessions, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications, adminSettings, adminLogs } from "@shared/schema";
+import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, matchLegSubmissions, boardSessions, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications, adminSettings, adminLogs } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -19,7 +19,8 @@ import type {
 } from "@shared/schema";
 import { db } from "./db";
 import { pool } from "./db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { assertCompletedLegMatchesTransition, assertExpectedScoringVersion, assertIdempotentReplayMatches, assertLegHistoryMatchesScore, ScoringConflictError, ScoringValidationError, validateOneLegAdvance } from "./scoring-integrity";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 
@@ -72,6 +73,16 @@ export interface IStorage {
   getMatchNotesByMatchIds(matchIds: number[]): Promise<MatchNote[]>;
   createMatchNote(note: InsertMatchNote): Promise<MatchNote>;
   updateMatchNote(matchId: number, note: Partial<InsertMatchNote>): Promise<MatchNote>;
+  submitCompletedLeg(input: {
+    matchId: number;
+    expectedVersion: number;
+    submissionId: string;
+    scoreA: number;
+    scoreB: number;
+    completedLeg: unknown;
+    notes: Partial<InsertMatchNote>;
+  }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }>;
+  markCompletedLegSideEffectsComplete(matchId: number, submissionId: string): Promise<void>;
   
   // Board Sessions
   createBoardSession(session: InsertBoardSession): Promise<BoardSession>;
@@ -318,7 +329,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateMatch(id: number, match: Partial<InsertMatch>): Promise<Match> {
-    const [updated] = await db.update(matches).set(match).where(eq(matches.id, id)).returning();
+    const authoritativeFields = [
+      "playerAId",
+      "playerBId",
+      "scoreA",
+      "scoreB",
+      "bestOf",
+      "status",
+      "winnerId",
+    ] as const;
+    const changesAuthoritativeState = authoritativeFields.some(
+      field => Object.prototype.hasOwnProperty.call(match, field),
+    );
+    const values = { ...match } as Record<string, unknown>;
+    if (changesAuthoritativeState && !Object.prototype.hasOwnProperty.call(match, "scoringVersion")) {
+      values.scoringVersion = sql`${matches.scoringVersion} + 1`;
+    }
+    const [updated] = await db.update(matches).set(values as any).where(eq(matches.id, id)).returning();
     return updated;
   }
   
@@ -352,6 +379,177 @@ export class DatabaseStorage implements IStorage {
     } else {
         return this.createMatchNote({ ...note, matchId } as InsertMatchNote);
     }
+  }
+
+  async submitCompletedLeg(input: {
+    matchId: number;
+    expectedVersion: number;
+    submissionId: string;
+    scoreA: number;
+    scoreB: number;
+    completedLeg: unknown;
+    notes: Partial<InsertMatchNote>;
+  }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }> {
+    return db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM matches WHERE id = ${input.matchId} FOR UPDATE`);
+
+      const [current] = await tx.select().from(matches).where(eq(matches.id, input.matchId));
+      if (!current) {
+        throw new ScoringValidationError("Match not found", "MATCH_NOT_FOUND");
+      }
+
+      const [existingSubmission] = await tx
+        .select()
+        .from(matchLegSubmissions)
+        .where(and(
+          eq(matchLegSubmissions.matchId, input.matchId),
+          eq(matchLegSubmissions.submissionId, input.submissionId),
+        ));
+
+      const requestPayload = {
+        scoreA: input.scoreA,
+        scoreB: input.scoreB,
+        expectedVersion: input.expectedVersion,
+        completedLeg: input.completedLeg,
+        notes: input.notes,
+      };
+
+      if (existingSubmission) {
+        assertIdempotentReplayMatches(existingSubmission.requestPayload, requestPayload, current);
+        const replayStatus = existingSubmission.resultingStatus
+          ?? (existingSubmission.resultingScoreA >= Math.ceil(current.bestOf / 2)
+            || existingSubmission.resultingScoreB >= Math.ceil(current.bestOf / 2)
+            ? "COMPLETED"
+            : "IN_PROGRESS");
+        const replayWinnerId = existingSubmission.resultingWinnerId
+          ?? (replayStatus === "COMPLETED"
+            ? (existingSubmission.resultingScoreA > existingSubmission.resultingScoreB
+              ? current.playerAId
+              : current.playerBId)
+            : null);
+        return {
+          match: {
+            ...current,
+            scoreA: existingSubmission.resultingScoreA,
+            scoreB: existingSubmission.resultingScoreB,
+            status: replayStatus,
+            winnerId: replayWinnerId,
+            scoringVersion: existingSubmission.resultingVersion,
+          },
+          replayed: true,
+          sideEffectsCompleted: existingSubmission.sideEffectsCompleted,
+        };
+      }
+
+      if (current.status !== "IN_PROGRESS") {
+        throw new ScoringConflictError(
+          "Match is no longer in progress",
+          current,
+          "MATCH_NOT_IN_PROGRESS",
+        );
+      }
+      assertExpectedScoringVersion(current.scoringVersion, input.expectedVersion, current);
+
+      try {
+        validateOneLegAdvance(
+          current.scoreA ?? 0,
+          current.scoreB ?? 0,
+          input.scoreA,
+          input.scoreB,
+          current.bestOf,
+        );
+      } catch (error) {
+        if (error instanceof ScoringConflictError) {
+          throw new ScoringConflictError(error.message, current, error.code);
+        }
+        throw error;
+      }
+
+      const [existingNote] = await tx
+        .select()
+        .from(matchNotes)
+        .where(eq(matchNotes.matchId, input.matchId));
+      const existingHistory = Array.isArray(existingNote?.legHistory)
+        ? existingNote.legHistory
+        : [];
+      assertLegHistoryMatchesScore(
+        existingHistory,
+        current.scoreA ?? 0,
+        current.scoreB ?? 0,
+        current,
+      );
+      assertCompletedLegMatchesTransition(
+        current.scoreA ?? 0,
+        current.scoreB ?? 0,
+        input.scoreA,
+        input.scoreB,
+        (input.completedLeg as { winner?: "A" | "B" } | null)?.winner as "A" | "B",
+      );
+      const nextHistory = [...existingHistory, input.completedLeg];
+
+      const legsToWin = Math.ceil(current.bestOf / 2);
+      const isFinished = input.scoreA >= legsToWin || input.scoreB >= legsToWin;
+      const winnerId = isFinished
+        ? (input.scoreA > input.scoreB ? current.playerAId : current.playerBId)
+        : null;
+      const nextVersion = current.scoringVersion + 1;
+
+      const noteValues = { ...input.notes, legHistory: nextHistory };
+      await tx
+        .insert(matchNotes)
+        .values({ ...noteValues, matchId: input.matchId } as InsertMatchNote)
+        .onConflictDoUpdate({
+          target: matchNotes.matchId,
+          set: noteValues,
+        });
+
+      const [updatedMatch] = await tx
+        .update(matches)
+        .set({
+          scoreA: input.scoreA,
+          scoreB: input.scoreB,
+          winnerId,
+          status: isFinished ? "COMPLETED" : "IN_PROGRESS",
+          scoringVersion: nextVersion,
+        })
+        .where(and(
+          eq(matches.id, input.matchId),
+          eq(matches.scoringVersion, input.expectedVersion),
+        ))
+        .returning();
+
+      if (!updatedMatch) {
+        throw new ScoringConflictError(
+          "The match was updated by another request",
+          current,
+          "STALE_SCORING_VERSION",
+        );
+      }
+
+      await tx.insert(matchLegSubmissions).values({
+        matchId: input.matchId,
+        submissionId: input.submissionId,
+        expectedVersion: input.expectedVersion,
+        resultingVersion: nextVersion,
+        resultingScoreA: input.scoreA,
+        resultingScoreB: input.scoreB,
+        resultingStatus: updatedMatch.status,
+        resultingWinnerId: updatedMatch.winnerId,
+        requestPayload,
+      });
+
+      return { match: updatedMatch, replayed: false, sideEffectsCompleted: false };
+    });
+  }
+
+  async markCompletedLegSideEffectsComplete(matchId: number, submissionId: string): Promise<void> {
+    await db
+      .update(matchLegSubmissions)
+      .set({ sideEffectsCompleted: true })
+      .where(and(
+        eq(matchLegSubmissions.matchId, matchId),
+        eq(matchLegSubmissions.submissionId, submissionId),
+      ));
   }
 
   // Board Sessions

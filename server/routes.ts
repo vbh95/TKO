@@ -12,6 +12,7 @@ import { generateMatches, regenerateGroupMatchesFromMemberships } from "./match-
 import type { TournamentSettings } from "@shared/schema";
 import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament, liveScoringCache } from "./socket";
 import rateLimit from "express-rate-limit";
+import { ScoringConflictError, ScoringValidationError } from "./scoring-integrity";
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -2033,7 +2034,8 @@ export async function registerRoutes(
       scoreA: input.scoreA,
       scoreB: input.scoreB,
       winnerId,
-      status: isReset ? "PENDING" : "COMPLETED"
+      status: isReset ? "PENDING" : "COMPLETED",
+      scoringVersion: (match.scoringVersion ?? 0) + 1,
     });
     clearLiveScoringCache(id);
 
@@ -2500,7 +2502,13 @@ export async function registerRoutes(
           : sortedGroups.length;
       }
 
-      const boardMatches = [...groupMatches, ...guestGroupMatches, ...knockoutBoardMatches];
+      const boardMatchesBase = [...groupMatches, ...guestGroupMatches, ...knockoutBoardMatches];
+      const boardMatchNotes = await storage.getMatchNotesByMatchIds(boardMatchesBase.map(m => m.id));
+      const notesByMatchId = new Map(boardMatchNotes.map(note => [note.matchId, note]));
+      const boardMatches = boardMatchesBase.map(match => ({
+        ...match,
+        notes: notesByMatchId.get(match.id) || null,
+      }));
 
       let groupMembershipPlayerIds: number[];
       if (isBoardRotation) {
@@ -2697,6 +2705,8 @@ export async function registerRoutes(
         status: "PENDING",
         scoreA: 0,
         scoreB: 0,
+        winnerId: null,
+        scoringVersion: (match.scoringVersion ?? 0) + 1,
       });
 
       const tournament = await storage.getTournament(tournamentId);
@@ -2721,69 +2731,48 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Match does not belong to this tournament" });
       }
 
-      const { scoreA, scoreB } = req.body;
-      if (typeof scoreA !== 'number' || typeof scoreB !== 'number') {
-        return res.status(400).json({ message: "scoreA and scoreB are required" });
+      const scorerSubmissionSchema = z.object({
+        scoreA: z.number().int().nonnegative(),
+        scoreB: z.number().int().nonnegative(),
+        expectedVersion: z.number().int().nonnegative(),
+        legSubmissionId: z.string().min(8).max(128),
+        completedLeg: z.object({
+          startingThrower: z.enum(["A", "B"]),
+          visits: z.array(z.object({
+            player: z.enum(["A", "B"]),
+            score: z.number().int().min(0).max(180),
+          })),
+          winner: z.enum(["A", "B"]),
+          checkoutDartsUsed: z.number().int().positive().optional(),
+        }),
+        notes: z.record(z.any()),
+      });
+      const parsed = scorerSubmissionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "Invalid completed-leg submission",
+          details: parsed.error.flatten(),
+        });
       }
 
-      if (scoreA < (match.scoreA ?? 0) || scoreB < (match.scoreB ?? 0)) {
-        return res.json(match);
-      }
-
-      if (match.status !== 'IN_PROGRESS') {
-        if (match.status === 'COMPLETED' && match.scoreA === scoreA && match.scoreB === scoreB) {
-          if (req.body.notes) {
-            try {
-              const noteValues = Object.fromEntries(
-                Object.entries(req.body.notes).filter(([, v]: [string, any]) => v !== undefined)
-              );
-              if (Object.keys(noteValues).length > 0) {
-                await storage.updateMatchNote(matchId, noteValues);
-                console.log(`[NOTES] Saved notes for already-completed match ${matchId} on idempotent retry`);
-              }
-            } catch (noteError) {
-              console.error(`[NOTES ERROR] Failed to save notes for match ${matchId} on idempotent retry:`, noteError);
-            }
-          }
-          return res.json(match);
-        }
-        return res.status(400).json({ message: "Match must be IN_PROGRESS to update scores" });
-      }
-
-      const matchBestOf = match.bestOf || 3;
-      const legsToWin = Math.ceil(matchBestOf / 2);
-      const isFinished = scoreA >= legsToWin || scoreB >= legsToWin;
-
-      let winnerId: number | null = null;
-      let status: string = "IN_PROGRESS";
-      if (isFinished) {
-        status = "COMPLETED";
-        if (scoreA > scoreB && match.playerAId) winnerId = match.playerAId;
-        else if (scoreB > scoreA && match.playerBId) winnerId = match.playerBId;
-      }
-
-      const updatedMatch = await storage.updateMatch(matchId, {
+      const { scoreA, scoreB, expectedVersion, legSubmissionId, completedLeg, notes } = parsed.data;
+      const atomicResult = await storage.submitCompletedLeg({
+        matchId,
+        expectedVersion,
+        submissionId: legSubmissionId,
         scoreA,
         scoreB,
-        winnerId,
-        status,
+        completedLeg,
+        notes,
       });
+      const updatedMatch = atomicResult.match;
+      const status = updatedMatch.status;
+      const winnerId = updatedMatch.winnerId;
+      if (atomicResult.replayed && atomicResult.sideEffectsCompleted) {
+        return res.json({ ...updatedMatch, idempotentReplay: true });
+      }
       if (status === "COMPLETED") {
         clearLiveScoringCache(matchId);
-      }
-
-      if (req.body.notes) {
-        try {
-          const noteValues = Object.fromEntries(
-            Object.entries(req.body.notes).filter(([, v]: [string, any]) => v !== undefined)
-          );
-          if (Object.keys(noteValues).length > 0) {
-            await storage.updateMatchNote(matchId, noteValues);
-            console.log(`[NOTES] Saved notes for match ${matchId} (status: ${status})`);
-          }
-        } catch (noteError) {
-          console.error(`[NOTES ERROR] Failed to save notes for match ${matchId}:`, noteError);
-        }
       }
 
       const tournament = await storage.getTournament(tournamentId);
@@ -2880,6 +2869,7 @@ export async function registerRoutes(
           await deduplicateRoundScorers(tournamentId, tournament?.shareToken || null);
         } catch (progressionError) {
           console.error("Progression error:", progressionError);
+          throw progressionError;
         }
       }
 
@@ -2899,7 +2889,8 @@ export async function registerRoutes(
             await storage.updateTournament(tournamentId, { status: "COMPLETED" });
           }
         } catch (completeError) {
-          console.error("Scorer auto-complete error (non-fatal):", completeError);
+          console.error("Scorer auto-complete error:", completeError);
+          throw completeError;
         }
       }
 
@@ -2914,8 +2905,20 @@ export async function registerRoutes(
         emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
       }
 
-      res.json(updatedMatch);
+      await storage.markCompletedLegSideEffectsComplete(matchId, legSubmissionId);
+      res.json({ ...updatedMatch, idempotentReplay: atomicResult.replayed });
     } catch (err) {
+      if (err instanceof ScoringConflictError) {
+        return res.status(409).json({
+          message: err.message,
+          code: err.code,
+          currentMatch: err.currentMatch,
+        });
+      }
+      if (err instanceof ScoringValidationError) {
+        const status = err.code === "MATCH_NOT_FOUND" ? 404 : 400;
+        return res.status(status).json({ message: err.message, code: err.code });
+      }
       console.error("Scorer match update error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
