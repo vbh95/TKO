@@ -1,0 +1,236 @@
+Stage 2B — Preserve unfinished leg during scorer takeover
+
+Fix only the confirmed Stage 2 takeover-state bug.
+
+Do not begin Stage 3.
+
+Do not weaken scorer lease enforcement or any Stage 1 protection.
+
+Do not deploy.
+
+Use only tko-development for destructive testing.
+
+Confirmed root cause:
+
+scorer ownership transfers correctly
+unfinished leg data is not shared authoritatively
+old owner keeps local state
+new owner starts at 501
+prior visits/statistics can be lost
+Required design
+
+Introduce durable server-side state for the CURRENT unfinished leg.
+
+The new owner must be able to reconstruct the unfinished leg exactly enough to continue scoring without losing:
+
+remainingA
+remainingB
+current thrower
+leg starter
+raw visit history for the current leg
+darts used where needed
+statistics needed to complete the leg correctly
+any checkout-related state that is required for persistence
+
+Do not rely on liveScoringCache as the source of truth.
+
+liveScoringCache may remain as presentation/cache state, but takeover/recovery must not depend on process memory.
+
+The durable state must survive:
+
+page refresh
+scorer takeover
+Socket.IO disconnect
+application restart
+Suggested implementation
+
+Use an additive PostgreSQL-backed current-leg state model appropriate to the existing schema.
+
+For example, a dedicated table keyed by match ID containing:
+
+match ID
+scoring version it belongs to
+current remaining scores
+current thrower
+leg starter
+raw current-leg visits JSONB
+relevant current-leg stats
+updated timestamp
+
+Choose the smallest robust design.
+
+Do not modify completed historical leg data unnecessarily.
+
+Persistence behavior
+
+After each accepted ordinary visit:
+
+verify board authorization
+verify scorer lease ownership
+persist the updated unfinished-leg state
+then broadcast/update presentation state
+
+A visit accepted by the server must not exist only in browser localStorage.
+
+Takeover behavior
+
+If Device B takes over a match with an unfinished leg:
+
+Transfer lease to B.
+Return or fetch the persisted unfinished-leg state.
+Hydrate B from that state.
+B must continue from the exact same remaining scores and visit history.
+
+Example:
+
+Device A at:
+
+141 - 141
+
+Device B takes over.
+
+Device B must show:
+
+141 - 141
+
+with the same current thrower and visit history.
+
+It must NOT reset to 501.
+
+Old-owner behavior
+
+When Device A loses ownership:
+
+immediately stop treating its local unfinished state as authoritative
+prevent further local scoring interaction
+invalidate or mark its saved state as non-authoritative
+do not allow stale localStorage to be restored as an active scorer later
+
+If the old device reconnects after takeover, it should hydrate from the current server state or remain read-only.
+
+Server restart behavior
+
+Restart the server during an unfinished leg.
+
+After restart:
+
+the active lease may remain if still valid
+the unfinished leg must still be recoverable from PostgreSQL
+a new scorer/takeover must not reset to 501
+Completed-leg integration
+
+When the leg is completed:
+
+build the completed leg from the authoritative persisted current-leg state
+persist the completed leg transactionally with Stage 1 match/history updates
+clear/archive the unfinished-leg state only after successful completion
+
+A failed leg-completion transaction must not destroy the unfinished-leg state.
+
+An idempotent retry must not duplicate the completed leg.
+
+Version consistency
+
+Associate unfinished-leg state with the authoritative scoring_version / completed-leg state.
+
+If an admin reset/restart/authoritative correction invalidates the match:
+
+stale current-leg state must be rejected/cleared
+it must not resurrect after refresh or takeover
+Tests required
+1. Takeover mid-leg
+
+A scores to 141–141.
+B takes over.
+B must hydrate 141–141 with full current-leg visit history.
+
+2. Continue after takeover
+
+B adds visits and completes the same leg.
+Persisted completed leg must contain visits from BOTH A and B in correct order.
+
+3. Statistics continuity
+
+Verify averages, dart counts, 180/140/100 counts, first-nine data, and checkout statistics are correct across the ownership change.
+
+4. Old owner after takeover
+
+A must not continue scoring and must not later restore its stale 141–141 snapshot as authoritative.
+
+5. Server restart mid-leg
+
+A creates unfinished state.
+Restart server.
+Recover scorer.
+Exact unfinished state must return.
+
+6. Takeover after server restart
+
+A creates unfinished state.
+Restart server.
+B takes over.
+B must hydrate exact unfinished state.
+
+7. Refresh same device
+
+Refresh while active.
+Recover from server-authoritative unfinished state.
+
+8. Failed visit write
+
+Simulate DB failure during ordinary visit persistence.
+Visit must not be treated as accepted locally.
+
+9. Failed leg completion
+
+Persisted unfinished state must remain available for retry.
+
+10. Admin reset/restart
+
+Any persisted unfinished state must be invalidated safely.
+
+11. Stage 1 regressions
+
+Re-run full Stage 1 DB suite.
+
+12. Stage 2 lease regressions
+
+Re-run full Stage 2 ownership suite.
+
+Migration safety
+
+Any new migration must be:
+
+additive
+backwards-compatible with Stage 1/Stage 2 production code
+safe if applied before new code
+
+Do not apply it to production.
+
+Final report
+
+Report:
+
+Files changed
+Migration added
+Durable unfinished-leg data model
+Exact visit persistence flow
+Takeover hydration flow
+Old-owner invalidation behavior
+Server restart recovery
+Completed-leg transaction interaction
+Reset/admin invalidation behavior
+Unit tests
+Stage 1 regressions
+Stage 2 regressions
+New takeover/restart tests
+Build result
+Typecheck compared to baseline
+
+End with:
+
+STAGE 2B READY FOR MANUAL TESTING
+
+or
+
+STAGE 2B HAS BLOCKING GAPS
