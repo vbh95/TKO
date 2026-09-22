@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { pool } from "../server/db";
 import { storage } from "../server/storage";
-import { isSavedStateCompatible, type SavedScorerIdentity } from "../shared/scoring-integrity";
+import { isSavedStateCompatible, savedScorerIdentityFromMatch, type SavedScorerIdentity } from "../shared/scoring-integrity";
 import { ScoringConflictError } from "../server/scoring-integrity";
 
 const EXPECTED_BRANCH_ID = "br-weathered-feather-abr2c9zx";
@@ -486,10 +486,14 @@ async function main() {
     });
 
     await runCase({
-      name: "Scorer start invalidating stale saved state",
+      name: "Scorer start adopts returned version and accepts multiple legs",
       setup: "Disposable pending knockout-only tournament with one board-authenticated match and a saved pending snapshot.",
-      sequence: ["POST the real scorer start endpoint.", "Compare the old snapshot to the returned authoritative match."],
-      expected: "Start changes status to IN_PROGRESS and increments scoring_version once; old snapshot is incompatible.",
+      sequence: [
+        "POST the real scorer start endpoint.",
+        "Build the saved scorer identity from the returned match.",
+        "Submit two completed legs using each most recently returned version.",
+      ],
+      expected: "Start returns version 1, saved state is refresh-compatible, and both legs succeed at versions 2 and 3 without a false conflict.",
     }, async () => {
       const tournamentId = await createTournament("start-invalidates");
       const a = await createPlayer(tournamentId, "a");
@@ -520,7 +524,80 @@ async function main() {
       assert.equal(response.body.status, "IN_PROGRESS");
       assert.equal(response.body.scoringVersion, 1);
       assert.equal(isSavedStateCompatible(saved, response.body), false);
-      return { actual: "Start returned IN_PROGRESS/version 1; saved-state compatibility=false.", databaseState: "score=0-0; status=IN_PROGRESS; version=1" };
+      const adopted = savedScorerIdentityFromMatch(response.body);
+      assert.equal(adopted.scoringVersion, 1);
+      assert.equal(adopted.status, "IN_PROGRESS");
+      assert.equal(isSavedStateCompatible(adopted, response.body), true);
+
+      const firstLeg = await scorerRequest(token, matchId, {
+        scoreA: 1,
+        scoreB: 0,
+        expectedVersion: adopted.scoringVersion,
+        legSubmissionId: randomUUID(),
+        completedLeg: leg("A", 17),
+        notes: notes(17),
+      });
+      assert.equal(firstLeg.status, 200);
+      assert.equal(firstLeg.body.scoringVersion, 2);
+
+      const secondLeg = await scorerRequest(token, matchId, {
+        scoreA: 1,
+        scoreB: 1,
+        expectedVersion: firstLeg.body.scoringVersion,
+        legSubmissionId: randomUUID(),
+        completedLeg: leg("B", 18),
+        notes: notes(18),
+      });
+      assert.equal(secondLeg.status, 200);
+      assert.equal(secondLeg.body.scoringVersion, 3);
+      const current = await getMatch(matchId);
+      assert.deepEqual([current.score_a, current.score_b, current.scoring_version], [1, 1, 3]);
+      return {
+        actual: "Start returned version 1; saved identity was compatible; Leg 1 returned version 2 and Leg 2 returned version 3.",
+        databaseState: "score=1-1; status=IN_PROGRESS; version=3; no HTTP 409",
+      };
+    });
+
+    await runCase({
+      name: "Scorer start adopts a non-zero returned version",
+      setup: "Disposable pending knockout-only match at version 7.",
+      sequence: ["POST the real scorer start endpoint.", "Build saved scorer identity from the version 8 response.", "Submit the first leg with expected version 8."],
+      expected: "Start returns version 8, saved state stores 8, and the first leg succeeds at version 9.",
+    }, async () => {
+      const tournamentId = await createTournament("start-nonzero-version");
+      const a = await createPlayer(tournamentId, "a");
+      const b = await createPlayer(tournamentId, "b");
+      const matchId = await createMatch({
+        tournamentId,
+        playerAId: a,
+        playerBId: b,
+        status: "PENDING",
+        scoringVersion: 7,
+        roundKey: "R1",
+        order: 0,
+      });
+      const token = await createBoardAccess(tournamentId, 1);
+      const response = await scorerRequest(token, matchId, {}, "POST", "/start");
+      assert.equal(response.status, 200);
+      assert.equal(response.body.scoringVersion, 8);
+      const adopted = savedScorerIdentityFromMatch(response.body);
+      assert.equal(adopted.scoringVersion, 8);
+      assert.equal(isSavedStateCompatible(adopted, response.body), true);
+
+      const firstLeg = await scorerRequest(token, matchId, {
+        scoreA: 1,
+        scoreB: 0,
+        expectedVersion: adopted.scoringVersion,
+        legSubmissionId: randomUUID(),
+        completedLeg: leg("A", 19),
+        notes: notes(19),
+      });
+      assert.equal(firstLeg.status, 200);
+      assert.equal(firstLeg.body.scoringVersion, 9);
+      return {
+        actual: "Start returned/stored version 8; first leg returned version 9.",
+        databaseState: "score=1-0; status=IN_PROGRESS; version=9; no HTTP 409",
+      };
     });
 
     await runCase({

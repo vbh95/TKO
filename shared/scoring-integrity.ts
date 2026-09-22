@@ -22,6 +22,25 @@ export type SavedScorerIdentity = {
   status: string;
 };
 
+export function savedScorerIdentityFromMatch(
+  match: AuthoritativeMatchIdentity,
+): SavedScorerIdentity {
+  const scoreA = match.scoreA || 0;
+  const scoreB = match.scoreB || 0;
+  return {
+    matchId: match.id,
+    playerAId: match.playerAId,
+    playerBId: match.playerBId,
+    bestOf: match.bestOf || 3,
+    serverScoreA: scoreA,
+    serverScoreB: scoreB,
+    legsWonA: scoreA,
+    legsWonB: scoreB,
+    scoringVersion: match.scoringVersion || 0,
+    status: match.status,
+  };
+}
+
 export function isSavedStateCompatible(
   saved: SavedScorerIdentity,
   match: AuthoritativeMatchIdentity,

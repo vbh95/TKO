@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/hooks/use-socket";
 import { useToast } from "@/hooks/use-toast";
-import { isSavedStateCompatible } from "@shared/scoring-integrity";
+import { isSavedStateCompatible, savedScorerIdentityFromMatch } from "@shared/scoring-integrity";
 
 interface BoardData {
   tournament: {
@@ -77,6 +77,7 @@ interface BoardData {
 }
 
 type Visit = { player: 'A' | 'B'; score: number };
+type ScorerMatch = BoardData["matches"][number];
 
 interface MatchStats {
   totalVisitsA: number;
@@ -746,11 +747,12 @@ export default function ScorerPage() {
       }
       return res.json();
     },
-    onSuccess: (_, matchId) => {
+    onSuccess: (startedMatch, matchId) => {
       userNavigatedBackRef.current = false;
-      setActiveMatchId(matchId);
-      setLegsWonA(0);
-      setLegsWonB(0);
+      setActiveMatchId(startedMatch.id ?? matchId);
+      setLegsWonA(startedMatch.scoreA || 0);
+      setLegsWonB(startedMatch.scoreB || 0);
+      setScoringVersion(startedMatch.scoringVersion || 0);
       setAllMatchVisits([]);
       setCheckoutAttemptsA(0);
       setCheckoutAttemptsB(0);
@@ -1463,12 +1465,14 @@ export default function ScorerPage() {
     const matchBestOf = activeMatch.bestOf || bestOf;
 
     const handleFirstThrower = (thrower: 'A' | 'B') => {
-      const applyThrower = () => {
+      const applyThrower = (authoritativeMatch: ScorerMatch) => {
         userNavigatedBackRef.current = false;
-        const initLegsA = activeMatch.scoreA || 0;
-        const initLegsB = activeMatch.scoreB || 0;
+        const scorerIdentity = savedScorerIdentityFromMatch(authoritativeMatch);
+        const initLegsA = scorerIdentity.legsWonA;
+        const initLegsB = scorerIdentity.legsWonB;
         setLegsWonA(initLegsA);
         setLegsWonB(initLegsB);
+        setScoringVersion(scorerIdentity.scoringVersion);
         setAllMatchVisits([]);
         setCheckoutAttemptsA(0);
         setCheckoutAttemptsB(0);
@@ -1483,14 +1487,7 @@ export default function ScorerPage() {
         setSwapPlayers(thrower === 'B');
         setView("scoring");
         saveScorerState({
-          matchId: activeMatch.id,
-          playerAId: activeMatch.playerAId,
-          playerBId: activeMatch.playerBId,
-          bestOf: activeMatch.bestOf || 3,
-          serverScoreA: initLegsA,
-          serverScoreB: initLegsB,
-          scoringVersion: activeMatch.scoringVersion || 0,
-          status: "IN_PROGRESS",
+          ...scorerIdentity,
           remainingA: STARTING_SCORE,
           remainingB: STARTING_SCORE,
           currentThrower: thrower,
@@ -1507,11 +1504,11 @@ export default function ScorerPage() {
       };
 
       if (activeMatch.status === 'IN_PROGRESS') {
-        applyThrower();
+        applyThrower(activeMatch);
       } else {
         startMatchMutation.mutate(activeMatch.id, {
-          onSuccess: () => {
-            applyThrower();
+          onSuccess: (startedMatch) => {
+            applyThrower(startedMatch);
             refetch();
           }
         });

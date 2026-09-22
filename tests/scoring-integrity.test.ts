@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   isExactlyOneLegAdvance,
   isSavedStateCompatible,
+  savedScorerIdentityFromMatch,
 } from "../shared/scoring-integrity";
 import {
   assertExpectedScoringVersion,
@@ -129,4 +130,50 @@ test("stale local scorer state is rejected but matching unfinished-leg state res
   assert.equal(isSavedStateCompatible(saved, { ...match, playerBId: 3 }), false);
   assert.equal(isSavedStateCompatible(saved, { ...match, bestOf: 5 }), false);
   assert.equal(isSavedStateCompatible(saved, { ...match, status: "COMPLETED" }), false);
+});
+
+test("scorer start identity adopts the authoritative returned version and score", () => {
+  const started = {
+    id: 10,
+    playerAId: 1,
+    playerBId: 2,
+    bestOf: 5,
+    scoreA: 0,
+    scoreB: 0,
+    scoringVersion: 1,
+    status: "IN_PROGRESS",
+  };
+  const saved = savedScorerIdentityFromMatch(started);
+
+  assert.deepEqual(saved, {
+    matchId: 10,
+    playerAId: 1,
+    playerBId: 2,
+    bestOf: 5,
+    serverScoreA: 0,
+    serverScoreB: 0,
+    legsWonA: 0,
+    legsWonB: 0,
+    scoringVersion: 1,
+    status: "IN_PROGRESS",
+  });
+  assert.equal(isSavedStateCompatible(saved, started), true);
+});
+
+test("scorer start identity uses a non-zero authoritative returned version", () => {
+  const started = {
+    id: 11,
+    playerAId: 3,
+    playerBId: 4,
+    bestOf: 7,
+    scoreA: 0,
+    scoreB: 0,
+    scoringVersion: 8,
+    status: "IN_PROGRESS",
+  };
+  const saved = savedScorerIdentityFromMatch(started);
+
+  assert.equal(saved.scoringVersion, 8);
+  assert.equal(saved.status, "IN_PROGRESS");
+  assert.equal(isSavedStateCompatible(saved, started), true);
 });
