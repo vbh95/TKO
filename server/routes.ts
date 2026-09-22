@@ -10,9 +10,11 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { generateMatches, regenerateGroupMatchesFromMemberships } from "./match-generator";
 import type { TournamentSettings } from "@shared/schema";
-import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament, liveScoringCache } from "./socket";
+import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament, liveScoringCache, emitScorerOwnershipAcquired, emitScorerOwnershipLost } from "./socket";
 import rateLimit from "express-rate-limit";
 import { ScoringConflictError, ScoringValidationError } from "./scoring-integrity";
+import { ScorerLeaseConflictError, ScorerMatchStartConflictError } from "./storage";
+import { getScorerBoardAssignment, assertScorerMatchAssignedToBoard, ScorerBoardAuthorizationError } from "./scorer-board-authorization";
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -2407,107 +2409,48 @@ export async function registerRoutes(
       }
 
       const sortedGroups = groupsList.sort((a, b) => a.name.localeCompare(b.name));
-      const isKnockoutOnly = sortedGroups.length === 0;
-      const boardSettings = (tournament.settings as any) || {};
-      const isBoardRotation = !isKnockoutOnly && boardSettings.groupScheduleMode === 'board_rotation';
-
-      // Determine the primary group for this board.
-      // Board rotation: two groups per board, Board K → groups[2K-2] and groups[2K-1].
-      // Standard / knockout-only: one group per board (or synthetic group for KO-only).
-      let group: { id: number; name: string };
-      if (isKnockoutOnly) {
-        group = { id: 0, name: `Board ${boardNumber}` };
-      } else if (isBoardRotation) {
-        const firstIdx = (boardNumber - 1) * 2;
-        const g = sortedGroups[firstIdx];
-        if (!g) return res.status(404).json({ message: "Board not found" });
-        group = g;
-      } else {
-        const g = sortedGroups[boardNumber - 1];
-        if (!g) return res.status(404).json({ message: "Board not found" });
-        group = g;
-      }
-
-      // Determine which group-stage matches belong to this board.
-      // Board rotation: all GROUP matches explicitly assigned boardNumber K.
-      // Standard: matches for the primary group (with optional boardNumber override).
-      let groupMatches: typeof allMatches;
-      let guestGroupMatches: typeof allMatches;
-
-      if (isBoardRotation) {
-        groupMatches = allMatches.filter(m => m.stage === 'GROUP' && m.boardNumber === boardNumber);
-        guestGroupMatches = [];
-      } else {
-        groupMatches = group.id !== 0
-          ? allMatches.filter(m => m.groupId === group.id && (m.boardNumber === null || m.boardNumber === boardNumber))
-          : [];
-        guestGroupMatches = group.id !== 0
-          ? allMatches.filter(m => m.stage === 'GROUP' && m.groupId !== group.id && m.boardNumber === boardNumber)
-          : [];
-      }
-
-      let knockoutBoardMatches: typeof allMatches;
-      let totalBoards: number;
-
-      if (isKnockoutOnly) {
-        const settings = (tournament.settings as any) || {};
-        const configuredBoards: number | undefined = settings.numBoards;
-
-        const sortedKO = allMatches
-          .filter(m => m.stage === 'KNOCKOUT')
-          .sort((a: any, b: any) => a.order - b.order);
-
-        // Group matches by round (Map preserves insertion order: QF → SF → F)
-        const roundGroups = new Map<string, typeof allMatches>();
-        for (const m of sortedKO) {
-          if (!roundGroups.has(m.roundKey)) roundGroups.set(m.roundKey, []);
-          roundGroups.get(m.roundKey)!.push(m);
-        }
-
-        if (configuredBoards && configuredBoards > 0) {
-          // Per-round modular assignment:
-          //   Within each round, board N owns positions (N-1), (N-1+numBoards), (N-1+2*numBoards), …
-          // Examples with 4 QF, 2 SF, 1 F:
-          //   numBoards=4 → Board1: QF1,SF1,F  Board2: QF2,SF2  Board3: QF3  Board4: QF4
-          //   numBoards=2 → Board1: QF1,QF3,SF1,F  Board2: QF2,QF4,SF2
-          //   numBoards=1 → Board1: all matches
-          knockoutBoardMatches = [];
-          for (const roundMatches of roundGroups.values()) {
-            for (let i = 0; i < roundMatches.length; i++) {
-              if ((i % configuredBoards) + 1 === boardNumber) {
-                knockoutBoardMatches.push(roundMatches[i]);
-              }
-            }
-          }
-          totalBoards = configuredBoards;
-        } else {
-          // Default: Board N = the Nth match (0-indexed) within each round.
-          knockoutBoardMatches = [];
-          for (const roundMatches of roundGroups.values()) {
-            const match = roundMatches[boardNumber - 1];
-            if (match) knockoutBoardMatches.push(match);
-          }
-
-          const currentRoundMatches = Array.from(roundGroups.values()).find(
-            rms => rms.some(m => m.status !== 'COMPLETED')
-          ) || Array.from(roundGroups.values())[0] || [];
-          totalBoards = currentRoundMatches.length || boardNumber;
-        }
-      } else {
-        knockoutBoardMatches = allMatches.filter(
-          m => m.stage === 'KNOCKOUT' && (m as any).boardNumber === boardNumber
+      let assignment;
+      try {
+        assignment = getScorerBoardAssignment(
+          (tournament.settings || {}) as any,
+          sortedGroups,
+          allMatches,
+          boardNumber,
         );
-        totalBoards = isBoardRotation
-          ? (boardSettings.numberOfBoards || Math.floor(sortedGroups.length / 2))
-          : sortedGroups.length;
+      } catch (err) {
+        if (err instanceof ScorerBoardAuthorizationError) {
+          return res.status(404).json({ message: err.message });
+        }
+        throw err;
       }
+      const {
+        primaryGroup: group,
+        groupMatches,
+        guestGroupMatches,
+        knockoutMatches: knockoutBoardMatches,
+        totalBoards,
+        isBoardRotation,
+      } = assignment;
+      const isKnockoutOnly = assignment.isKnockoutOnly;
 
       const boardMatchesBase = [...groupMatches, ...guestGroupMatches, ...knockoutBoardMatches];
       const boardMatchNotes = await storage.getMatchNotesByMatchIds(boardMatchesBase.map(m => m.id));
       const notesByMatchId = new Map(boardMatchNotes.map(note => [note.matchId, note]));
-      const boardMatches = boardMatchesBase.map(match => ({
-        ...match,
-        notes: notesByMatchId.get(match.id) || null,
+      const boardMatches = await Promise.all(boardMatchesBase.map(async match => {
+        const lease = match.status === "IN_PROGRESS"
+          ? await storage.getScorerLease(match.id)
+          : undefined;
+        return {
+          ...match,
+          notes: notesByMatchId.get(match.id) || null,
+          ownership: match.status === "IN_PROGRESS"
+            ? {
+                ownedByCurrentSession: lease?.boardSessionId === req.boardSession.id,
+                active: !!lease && (!lease.expiresAt || new Date() <= lease.expiresAt),
+                expiresAt: lease?.expiresAt || null,
+              }
+            : null,
+        };
       }));
 
       let groupMembershipPlayerIds: number[];
@@ -2537,7 +2480,6 @@ export async function registerRoutes(
         totalBoards,
         players: boardPlayers,
         matches: boardMatches,
-        accessToken: req.cookies?.boardAccessToken,
       });
     } catch (err) {
       res.status(500).json({ message: "Internal server error" });
@@ -2554,99 +2496,47 @@ export async function registerRoutes(
       if (match.tournamentId !== tournamentId) {
         return res.status(403).json({ message: "Match does not belong to this tournament" });
       }
-
-      if (match.status !== 'PENDING') {
-        return res.status(400).json({ message: "Match is not in PENDING status" });
-      }
-
       const [allMatches, boardGroups, startTournament] = await Promise.all([
         storage.getMatchesByTournamentId(tournamentId),
         storage.getGroupsByTournamentId(tournamentId),
         storage.getTournament(tournamentId),
       ]);
-      const sortedGroups = boardGroups.sort((a, b) => a.name.localeCompare(b.name));
-      const boardGroup = sortedGroups.length > 0 ? sortedGroups[boardNumber - 1] : null;
-
-      const isKnockoutOnly = sortedGroups.length === 0;
-      const isReassignedAway = match.stage === 'GROUP' && match.boardNumber !== null && match.boardNumber !== boardNumber;
-      const isGroupMatch = boardGroup ? (match.groupId === boardGroup.id && !isReassignedAway) : false;
-      const isGuestGroupMatch = match.stage === 'GROUP' && !isGroupMatch && match.boardNumber === boardNumber;
-      const configuredBoards: number | undefined = (startTournament?.settings as any)?.numBoards;
-
-      let isKnockoutOnBoard: boolean;
-      if (isKnockoutOnly && match.stage === 'KNOCKOUT') {
-        const sortedKO = allMatches
-          .filter(m => m.stage === 'KNOCKOUT')
-          .sort((a: any, b: any) => a.order - b.order);
-        const matchesInRound = sortedKO.filter(m => m.roundKey === match.roundKey);
-        const matchIdxInRound = matchesInRound.findIndex(m => m.id === matchId);
-        if (configuredBoards && configuredBoards > 0) {
-          isKnockoutOnBoard = (matchIdxInRound % configuredBoards) + 1 === boardNumber;
-        } else {
-          isKnockoutOnBoard = matchIdxInRound === boardNumber - 1;
-        }
-      } else {
-        isKnockoutOnBoard = match.stage === 'KNOCKOUT' && (match as any).boardNumber === boardNumber;
-      }
-
-      if (!isGroupMatch && !isGuestGroupMatch && !isKnockoutOnBoard) {
-        return res.status(403).json({ message: "Match is not assigned to this board" });
-      }
-
-      // Build list of all matches on this board to check for concurrent in-progress matches
-      let boardKOMatches: typeof allMatches;
-      if (isKnockoutOnly) {
-        const sortedKO2 = allMatches
-          .filter(m => m.stage === 'KNOCKOUT')
-          .sort((a: any, b: any) => a.order - b.order);
-        const roundGroups2 = new Map<string, typeof allMatches>();
-        for (const m of sortedKO2) {
-          if (!roundGroups2.has(m.roundKey)) roundGroups2.set(m.roundKey, []);
-          roundGroups2.get(m.roundKey)!.push(m);
-        }
-        boardKOMatches = [];
-        for (const roundMatches of roundGroups2.values()) {
-          for (let i = 0; i < roundMatches.length; i++) {
-            const numB = configuredBoards && configuredBoards > 0 ? configuredBoards : roundMatches.length;
-            if ((i % numB) + 1 === boardNumber) {
-              boardKOMatches.push(roundMatches[i]);
-            }
-          }
-        }
-      } else {
-        boardKOMatches = allMatches.filter(
-          m => m.stage === 'KNOCKOUT' && (m as any).boardNumber === boardNumber
-        );
-      }
-
-      const guestOnBoard = allMatches.filter(
-        m => m.stage === 'GROUP' && m.groupId !== (boardGroup?.id ?? 0) && m.boardNumber === boardNumber
+      const assignment = getScorerBoardAssignment(
+        (startTournament?.settings || {}) as any,
+        boardGroups.sort((a, b) => a.name.localeCompare(b.name)),
+        allMatches,
+        boardNumber,
       );
-      const naturalGroupMatches = boardGroup
-        ? allMatches.filter(m => m.groupId === boardGroup.id && (m.boardNumber === null || m.boardNumber === boardNumber))
-        : [];
-      const boardMatches = [
-        ...naturalGroupMatches,
-        ...guestOnBoard,
-        ...boardKOMatches,
-      ];
-      const existingInProgress = boardMatches.find(m => m.status === 'IN_PROGRESS' && m.id !== matchId);
-      if (existingInProgress) {
-        return res.status(400).json({ message: "Another match is already in progress on this board" });
-      }
-
-      const updatedMatch = await storage.updateMatch(matchId, {
-        status: "IN_PROGRESS",
-        scoreA: 0,
-        scoreB: 0,
+      assertScorerMatchAssignedToBoard(match, assignment);
+      const result = await storage.startMatchWithLease({
+        matchId,
+        tournamentId,
+        boardNumber,
+        boardSessionId: req.boardSession.id,
+        authorizedMatchIds: assignment.assignedMatchIds,
       });
+      const updatedMatch = result.match;
 
       const tournament = await storage.getTournament(tournamentId);
+      if (result.priorOwner) {
+        emitScorerOwnershipLost(result.priorOwner.boardSessionId, { matchId, reason: "takeover" });
+      }
+      emitScorerOwnershipAcquired(req.boardSession.id, { matchId });
       emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
       emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
 
       res.json(updatedMatch);
     } catch (err) {
+      if (err instanceof ScorerBoardAuthorizationError) {
+        return res.status(403).json({ message: err.message, code: err.code });
+      }
+      if (err instanceof ScorerLeaseConflictError || err instanceof ScorerMatchStartConflictError) {
+        return res.status(err.code === "MATCH_NOT_FOUND" ? 404 : 409).json({
+          message: err.message,
+          code: err.code,
+          ...(err instanceof ScorerMatchStartConflictError && err.currentMatch ? { currentMatch: err.currentMatch } : {}),
+        });
+      }
       console.error("Scorer match start error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
@@ -2663,59 +2553,150 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Match does not belong to this tournament" });
       }
 
-      if (match.status !== 'IN_PROGRESS') {
-        return res.status(400).json({ message: "Only IN_PROGRESS matches can be restarted" });
-      }
-
-      const [allMatches, boardGroups, startTournament] = await Promise.all([
+      const [allMatches, boardGroups, restartTournament] = await Promise.all([
         storage.getMatchesByTournamentId(tournamentId),
         storage.getGroupsByTournamentId(tournamentId),
         storage.getTournament(tournamentId),
       ]);
-      const sortedGroups = boardGroups.sort((a, b) => a.name.localeCompare(b.name));
-      const boardGroup = sortedGroups.length > 0 ? sortedGroups[boardNumber - 1] : null;
-
-      const isKnockoutOnly = sortedGroups.length === 0;
-      const isReassignedAway = match.stage === 'GROUP' && match.boardNumber !== null && match.boardNumber !== boardNumber;
-      const isGroupMatch = boardGroup ? (match.groupId === boardGroup.id && !isReassignedAway) : false;
-      const isGuestGroupMatch = match.stage === 'GROUP' && !isGroupMatch && match.boardNumber === boardNumber;
-      const configuredBoards: number | undefined = (startTournament?.settings as any)?.numBoards;
-
-      let isKnockoutOnBoard: boolean;
-      if (isKnockoutOnly && match.stage === 'KNOCKOUT') {
-        const sortedKO = allMatches
-          .filter(m => m.stage === 'KNOCKOUT')
-          .sort((a: any, b: any) => a.order - b.order);
-        const matchesInRound = sortedKO.filter(m => m.roundKey === match.roundKey);
-        const matchIdxInRound = matchesInRound.findIndex(m => m.id === matchId);
-        if (configuredBoards && configuredBoards > 0) {
-          isKnockoutOnBoard = (matchIdxInRound % configuredBoards) + 1 === boardNumber;
-        } else {
-          isKnockoutOnBoard = matchIdxInRound === boardNumber - 1;
-        }
-      } else {
-        isKnockoutOnBoard = match.stage === 'KNOCKOUT' && (match as any).boardNumber === boardNumber;
-      }
-
-      if (!isGroupMatch && !isGuestGroupMatch && !isKnockoutOnBoard) {
-        return res.status(403).json({ message: "Match is not assigned to this board" });
-      }
-
-      const updatedMatch = await storage.updateMatch(matchId, {
-        status: "PENDING",
-        scoreA: 0,
-        scoreB: 0,
-        winnerId: null,
-        scoringVersion: (match.scoringVersion ?? 0) + 1,
+      const assignment = getScorerBoardAssignment(
+        (restartTournament?.settings || {}) as any,
+        boardGroups.sort((a, b) => a.name.localeCompare(b.name)),
+        allMatches,
+        boardNumber,
+      );
+      assertScorerMatchAssignedToBoard(match, assignment);
+      const result = await storage.restartMatchWithLease({
+        matchId,
+        tournamentId,
+        boardNumber,
+        boardSessionId: req.boardSession.id,
+        authorizedMatchIds: assignment.assignedMatchIds,
       });
+      const updatedMatch = result.match;
 
       const tournament = await storage.getTournament(tournamentId);
+      emitScorerOwnershipLost(req.boardSession.id, { matchId, reason: "restart" });
       emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
       emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
 
       res.json(updatedMatch);
     } catch (err) {
+      if (err instanceof ScorerBoardAuthorizationError) {
+        return res.status(403).json({ message: err.message, code: err.code });
+      }
+      if (err instanceof ScorerLeaseConflictError || err instanceof ScorerMatchStartConflictError) {
+        return res.status(err.code === "MATCH_NOT_FOUND" ? 404 : 409).json({ message: err.message, code: err.code });
+      }
       console.error("Scorer match restart error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  const getScorerMatchAssignment = async (req: any, matchId: number) => {
+    const { tournamentId, boardNumber } = req.boardSession;
+    const [match, groups, allMatches, tournament] = await Promise.all([
+      storage.getMatch(matchId),
+      storage.getGroupsByTournamentId(tournamentId),
+      storage.getMatchesByTournamentId(tournamentId),
+      storage.getTournament(tournamentId),
+    ]);
+    if (!match) throw new ScorerBoardAuthorizationError("Match not found");
+    if (match.tournamentId !== tournamentId) {
+      throw new ScorerBoardAuthorizationError("Match does not belong to this tournament");
+    }
+    const assignment = getScorerBoardAssignment(
+      (tournament?.settings || {}) as any,
+      groups.sort((a, b) => a.name.localeCompare(b.name)),
+      allMatches,
+      boardNumber,
+    );
+    assertScorerMatchAssignedToBoard(match, assignment);
+    return { match, assignment, tournament };
+  };
+
+  app.get('/api/scorer/matches/:matchId/ownership', isBoardAuthenticated, async (req: any, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      const { match } = await getScorerMatchAssignment(req, matchId);
+      if (match.status !== "IN_PROGRESS") {
+        return res.json({ ownedByCurrentSession: false, active: false, expiresAt: null });
+      }
+      const lease = await storage.getScorerLease(matchId);
+      const active = !!lease && (!lease.expiresAt || new Date() <= lease.expiresAt);
+      res.json({
+        ownedByCurrentSession: lease?.boardSessionId === req.boardSession.id && active,
+        active,
+        expiresAt: lease?.expiresAt || null,
+      });
+    } catch (err) {
+      if (err instanceof ScorerBoardAuthorizationError) {
+        return res.status(err.message === "Match not found" ? 404 : 403).json({ message: err.message, code: err.code });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  const acquireOwnership = async (req: any, res: any, takeover: boolean) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      const { match, assignment } = await getScorerMatchAssignment(req, matchId);
+      if (match.status !== "IN_PROGRESS") {
+        return res.status(409).json({ message: "Only IN_PROGRESS matches may have scorer ownership", code: "MATCH_NOT_IN_PROGRESS" });
+      }
+      const result = takeover
+        ? await storage.takeoverScorerLease({
+            matchId,
+            tournamentId: req.boardSession.tournamentId,
+            boardNumber: req.boardSession.boardNumber,
+            boardSessionId: req.boardSession.id,
+          })
+        : await storage.acquireScorerLease({
+            matchId,
+            tournamentId: req.boardSession.tournamentId,
+            boardNumber: req.boardSession.boardNumber,
+            boardSessionId: req.boardSession.id,
+          });
+      if (result.priorOwner) {
+        emitScorerOwnershipLost(result.priorOwner.boardSessionId, { matchId, reason: "takeover" });
+      }
+      emitScorerOwnershipAcquired(req.boardSession.id, { matchId });
+      res.json({
+        ownedByCurrentSession: true,
+        active: true,
+        expiresAt: result.lease.expiresAt,
+      });
+    } catch (err) {
+      if (err instanceof ScorerBoardAuthorizationError) {
+        return res.status(err.message === "Match not found" ? 404 : 403).json({ message: err.message, code: err.code });
+      }
+      if (err instanceof ScorerLeaseConflictError) {
+        return res.status(409).json({ message: err.message, code: err.code });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  };
+
+  app.post('/api/scorer/matches/:matchId/ownership/acquire', isBoardAuthenticated, (req: any, res) => acquireOwnership(req, res, false));
+  app.post('/api/scorer/matches/:matchId/ownership/takeover', isBoardAuthenticated, (req: any, res) => {
+    if (req.body?.confirm !== true) {
+      return res.status(400).json({ message: "Explicit takeover confirmation is required", code: "TAKEOVER_CONFIRMATION_REQUIRED" });
+    }
+    return acquireOwnership(req, res, true);
+  });
+
+  app.post('/api/scorer/matches/:matchId/ownership/heartbeat', isBoardAuthenticated, async (req: any, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      await getScorerMatchAssignment(req, matchId);
+      const lease = await storage.heartbeatScorerLease(matchId, req.boardSession.id);
+      res.json({ ownedByCurrentSession: true, active: true, expiresAt: lease.expiresAt });
+    } catch (err) {
+      if (err instanceof ScorerBoardAuthorizationError) {
+        return res.status(err.message === "Match not found" ? 404 : 403).json({ message: err.message, code: err.code });
+      }
+      if (err instanceof ScorerLeaseConflictError) {
+        return res.status(409).json({ message: err.message, code: err.code });
+      }
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -2730,6 +2711,19 @@ export async function registerRoutes(
       if (match.tournamentId !== tournamentId) {
         return res.status(403).json({ message: "Match does not belong to this tournament" });
       }
+
+      const [authorizationMatches, authorizationGroups, authorizationTournament] = await Promise.all([
+        storage.getMatchesByTournamentId(tournamentId),
+        storage.getGroupsByTournamentId(tournamentId),
+        storage.getTournament(tournamentId),
+      ]);
+      const authorization = getScorerBoardAssignment(
+        (authorizationTournament?.settings || {}) as any,
+        authorizationGroups.sort((a, b) => a.name.localeCompare(b.name)),
+        authorizationMatches,
+        boardNumber,
+      );
+      assertScorerMatchAssignedToBoard(match, authorization);
 
       const scorerSubmissionSchema = z.object({
         scoreA: z.number().int().nonnegative(),
@@ -2756,7 +2750,7 @@ export async function registerRoutes(
       }
 
       const { scoreA, scoreB, expectedVersion, legSubmissionId, completedLeg, notes } = parsed.data;
-      const atomicResult = await storage.submitCompletedLeg({
+      const atomicResult = await storage.submitCompletedLegWithLease({
         matchId,
         expectedVersion,
         submissionId: legSubmissionId,
@@ -2764,6 +2758,7 @@ export async function registerRoutes(
         scoreB,
         completedLeg,
         notes,
+        boardSessionId: req.boardSession.id,
       });
       const updatedMatch = atomicResult.match;
       const status = updatedMatch.status;
@@ -2908,6 +2903,12 @@ export async function registerRoutes(
       await storage.markCompletedLegSideEffectsComplete(matchId, legSubmissionId);
       res.json({ ...updatedMatch, idempotentReplay: atomicResult.replayed });
     } catch (err) {
+      if (err instanceof ScorerBoardAuthorizationError) {
+        return res.status(403).json({ message: err.message, code: err.code });
+      }
+      if (err instanceof ScorerLeaseConflictError) {
+        return res.status(409).json({ message: err.message, code: err.code });
+      }
       if (err instanceof ScoringConflictError) {
         return res.status(409).json({
           message: err.message,
@@ -2934,15 +2935,33 @@ export async function registerRoutes(
       if (match.tournamentId !== tournamentId) {
         return res.status(403).json({ message: "Match does not belong to this tournament" });
       }
+      const [liveMatches, liveGroups, liveTournament] = await Promise.all([
+        storage.getMatchesByTournamentId(tournamentId),
+        storage.getGroupsByTournamentId(tournamentId),
+        storage.getTournament(tournamentId),
+      ]);
+      const liveAssignment = getScorerBoardAssignment(
+        (liveTournament?.settings || {}) as any,
+        liveGroups.sort((a, b) => a.name.localeCompare(b.name)),
+        liveMatches,
+        boardNumber,
+      );
+      assertScorerMatchAssignedToBoard(match, liveAssignment);
+      await storage.assertActiveScorerLease(matchId, req.boardSession.id);
 
-      const tournament = await storage.getTournament(tournamentId);
-      emitLegScoring(tournamentId, boardNumber, tournament?.shareToken || null, {
+      emitLegScoring(tournamentId, boardNumber, liveTournament?.shareToken || null, {
         matchId,
         ...req.body,
       });
 
       res.json({ success: true });
     } catch (err) {
+      if (err instanceof ScorerBoardAuthorizationError) {
+        return res.status(403).json({ message: err.message, code: err.code });
+      }
+      if (err instanceof ScorerLeaseConflictError) {
+        return res.status(409).json({ message: err.message, code: err.code });
+      }
       console.error("Scorer leg scoring error:", err);
       res.status(500).json({ message: "Internal server error" });
     }

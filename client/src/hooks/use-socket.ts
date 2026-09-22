@@ -37,8 +37,10 @@ export function useSocket() {
     socketRef.current.emit("join:public", shareToken);
   }, []);
 
-  const joinScorer = useCallback((accessToken: string) => {
-    socketRef.current.emit("join:scorer", { accessToken });
+  const joinScorer = useCallback(() => {
+    // The server authenticates the scorer socket from the HTTP-only board
+    // session cookie. Never copy the access token into JavaScript/socket data.
+    socketRef.current.emit("join:scorer");
   }, []);
 
   const on = useCallback((event: string, handler: (...args: any[]) => void) => {

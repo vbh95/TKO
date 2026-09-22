@@ -654,7 +654,9 @@ async function main() {
       const b = await createPlayer(tournamentId, "b");
       const matchId = await createMatch({ tournamentId, playerAId: a, playerBId: b });
       const token1 = await createBoardAccess(tournamentId, 1);
-      const token2 = await createBoardAccess(tournamentId, 2);
+      const token2 = await createBoardAccess(tournamentId, 1);
+      const ownership = await scorerRequest(token1, matchId, {}, "POST", "/ownership/acquire");
+      assert.equal(ownership.status, 200);
       const before = await getMatch(matchId);
       const id1 = randomUUID();
       const id2 = randomUUID();
@@ -723,6 +725,8 @@ async function main() {
         order: 1,
       });
       const token = await createBoardAccess(tournamentId, 1);
+      const ownership = await scorerRequest(token, currentId, {}, "POST", "/ownership/acquire");
+      assert.equal(ownership.status, 200);
       const submissionId = randomUUID();
       const before = await getMatch(currentId);
       const body = {
@@ -788,6 +792,8 @@ async function main() {
         order: 1,
       });
       const token = await createBoardAccess(tournamentId, 1);
+      const ownership = await scorerRequest(token, currentId, {}, "POST", "/ownership/acquire");
+      assert.equal(ownership.status, 200);
       const submissionId = randomUUID();
       const before = await getMatch(currentId);
       const body = {

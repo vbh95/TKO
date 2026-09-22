@@ -18,6 +18,11 @@ interface ConnectedUserInfo {
 
 const connectedUsers = new Map<string, ConnectedUserInfo>();
 
+function boardAccessTokenFromCookie(cookieHeader?: string): string | undefined {
+  const value = cookieHeader?.split(";").map(part => part.trim()).find(part => part.startsWith("boardAccessToken="));
+  return value?.slice("boardAccessToken=".length);
+}
+
 export function getConnectedCount(): number {
   return connectedSocketCount;
 }
@@ -91,9 +96,11 @@ export function setupSocketIO(httpServer: Server): SocketIOServer {
       }
     });
 
-    socket.on("join:scorer", async (data: { accessToken: string }) => {
+    socket.on("join:scorer", async () => {
       try {
-        const session = await storage.getBoardSessionByAccessToken(data.accessToken);
+        const accessToken = boardAccessTokenFromCookie(socket.handshake.headers.cookie);
+        if (!accessToken) return;
+        const session = await storage.getBoardSessionByAccessToken(accessToken);
         if (session && session.pairedAt) {
           if (session.expiresAt && new Date() > session.expiresAt) {
             return;
@@ -102,6 +109,7 @@ export function setupSocketIO(httpServer: Server): SocketIOServer {
           const roomName = `board:${session.tournamentId}:${session.boardNumber}`;
           socket.join(roomName);
           socket.join(`tournament:${session.tournamentId}`);
+           socket.join(`scorer-session:${session.id}`);
           (socket as any).boardSession = session;
 
           const key = `${session.tournamentId}:${session.boardNumber}`;
@@ -161,6 +169,16 @@ export function emitTournamentUpdate(tournamentId: number, shareToken: string | 
 export function emitBoardMatchUpdate(tournamentId: number, boardNumber: number, matchData: any) {
   if (!io) return;
   io.to(`board:${tournamentId}:${boardNumber}`).emit("match:updated", matchData);
+}
+
+export function emitScorerOwnershipAcquired(boardSessionId: number, data: { matchId: number }) {
+  if (!io) return;
+  io.to(`scorer-session:${boardSessionId}`).emit("scorer:ownership-acquired", data);
+}
+
+export function emitScorerOwnershipLost(boardSessionId: number, data: { matchId: number; reason: string }) {
+  if (!io) return;
+  io.to(`scorer-session:${boardSessionId}`).emit("scorer:ownership-lost", data);
 }
 
 export function emitLegScoring(tournamentId: number, boardNumber: number, shareToken: string | null, scoringData: any) {

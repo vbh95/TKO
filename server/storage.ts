@@ -1,4 +1,4 @@
-import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, matchLegSubmissions, boardSessions, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications, adminSettings, adminLogs } from "@shared/schema";
+import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, matchLegSubmissions, boardSessions, scorerLeases, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications, adminSettings, adminLogs, SCORER_LEASE_TTL_MS } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -9,6 +9,7 @@ import type {
   Match, InsertMatch,
   MatchNote, InsertMatchNote,
   BoardSession, InsertBoardSession,
+  ScorerLease,
   BoardOverlaySettings,
   League, InsertLeague,
   LeagueManualResult, InsertLeagueManualResult,
@@ -25,6 +26,67 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 
 const PgStore = connectPgSimple(session);
+
+export { SCORER_LEASE_TTL_MS };
+
+export type ScorerLeaseOwner = Pick<
+  ScorerLease,
+  "boardSessionId" | "acquiredAt" | "lastActivityAt" | "expiresAt"
+>;
+
+export class ScorerLeaseConflictError extends Error {
+  constructor(
+    message: string,
+    public readonly code:
+      | "SCORER_LEASE_ACTIVE"
+      | "SCORER_LEASE_MISSING"
+      | "SCORER_LEASE_EXPIRED"
+      | "SCORER_LEASE_SESSION_MISMATCH",
+    public readonly currentLease?: ScorerLeaseOwner,
+  ) {
+    super(message);
+    this.name = "ScorerLeaseConflictError";
+  }
+}
+
+export class ScorerBoardAuthorizationError extends Error {
+  constructor(
+    message = "Match is not assigned to this board",
+    public readonly code = "MATCH_NOT_ASSIGNED_TO_BOARD",
+  ) {
+    super(message);
+    this.name = "ScorerBoardAuthorizationError";
+  }
+}
+
+export class ScorerMatchStartConflictError extends Error {
+  constructor(
+    message: string,
+    public readonly code:
+      | "MATCH_NOT_FOUND"
+      | "MATCH_NOT_PENDING"
+      | "MATCH_NOT_IN_PROGRESS"
+      | "BOARD_MATCH_ALREADY_IN_PROGRESS",
+    public readonly currentMatch?: Match,
+  ) {
+    super(message);
+    this.name = "ScorerMatchStartConflictError";
+  }
+}
+
+export type AcquireScorerLeaseInput = {
+  matchId: number;
+  tournamentId: number;
+  boardNumber: number;
+  boardSessionId: number;
+  takeover?: boolean;
+};
+
+export type AcquireScorerLeaseResult = {
+  lease: ScorerLease;
+  priorOwner?: ScorerLeaseOwner;
+  tookOver: boolean;
+};
 
 export interface IStorage {
   // Users
@@ -67,6 +129,26 @@ export interface IStorage {
   createMatch(match: InsertMatch): Promise<Match>;
   updateMatch(id: number, match: Partial<InsertMatch>): Promise<Match>;
   getMatch(id: number): Promise<Match | undefined>;
+  getScorerLease(matchId: number): Promise<ScorerLease | undefined>;
+  acquireScorerLease(input: AcquireScorerLeaseInput): Promise<AcquireScorerLeaseResult>;
+  takeoverScorerLease(input: Omit<AcquireScorerLeaseInput, "takeover">): Promise<AcquireScorerLeaseResult>;
+  heartbeatScorerLease(matchId: number, boardSessionId: number): Promise<ScorerLease>;
+  assertActiveScorerLease(matchId: number, boardSessionId: number): Promise<ScorerLease>;
+  startMatchWithLease(input: {
+    matchId: number;
+    tournamentId: number;
+    boardNumber: number;
+    boardSessionId: number;
+    authorizedMatchIds: number[];
+    takeover?: boolean;
+  }): Promise<AcquireScorerLeaseResult & { match: Match }>;
+  restartMatchWithLease(input: {
+    matchId: number;
+    tournamentId: number;
+    boardNumber: number;
+    boardSessionId: number;
+    authorizedMatchIds: number[];
+  }): Promise<{ match: Match; priorOwner: ScorerLeaseOwner }>;
   
   // Match Notes
   getMatchNote(matchId: number): Promise<MatchNote | undefined>;
@@ -81,6 +163,17 @@ export interface IStorage {
     scoreB: number;
     completedLeg: unknown;
     notes: Partial<InsertMatchNote>;
+    boardSessionId?: number;
+  }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }>;
+  submitCompletedLegWithLease(input: {
+    matchId: number;
+    expectedVersion: number;
+    submissionId: string;
+    scoreA: number;
+    scoreB: number;
+    completedLeg: unknown;
+    notes: Partial<InsertMatchNote>;
+    boardSessionId: number;
   }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }>;
   markCompletedLegSideEffectsComplete(matchId: number, submissionId: string): Promise<void>;
   
@@ -145,6 +238,19 @@ export interface IStorage {
   
   // Session Store
   sessionStore: session.Store;
+}
+
+function leaseOwner(lease: ScorerLease): ScorerLeaseOwner {
+  return {
+    boardSessionId: lease.boardSessionId,
+    acquiredAt: lease.acquiredAt,
+    lastActivityAt: lease.lastActivityAt,
+    expiresAt: lease.expiresAt,
+  };
+}
+
+function leaseIsExpired(lease: ScorerLease, now = new Date()): boolean {
+  return lease.expiresAt.getTime() <= now.getTime();
 }
 
 export class DatabaseStorage implements IStorage {
@@ -353,6 +459,304 @@ export class DatabaseStorage implements IStorage {
     const [match] = await db.select().from(matches).where(eq(matches.id, id));
     return match;
   }
+
+  private async acquireScorerLeaseInTransaction(
+    tx: any,
+    input: AcquireScorerLeaseInput,
+    match: Match,
+  ): Promise<AcquireScorerLeaseResult> {
+    if (match.tournamentId !== input.tournamentId) {
+      throw new ScorerBoardAuthorizationError("Match does not belong to this tournament", "MATCH_TOURNAMENT_MISMATCH");
+    }
+
+    const [currentLease] = await tx
+      .select()
+      .from(scorerLeases)
+      .where(eq(scorerLeases.matchId, input.matchId));
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + SCORER_LEASE_TTL_MS);
+
+    if (currentLease && !leaseIsExpired(currentLease, now)) {
+      if (currentLease.boardSessionId !== input.boardSessionId) {
+        if (!input.takeover) {
+          throw new ScorerLeaseConflictError(
+            "This match is currently being scored on another device",
+            "SCORER_LEASE_ACTIVE",
+            leaseOwner(currentLease),
+          );
+        }
+
+        const [takenOverLease] = await tx
+          .update(scorerLeases)
+          .set({
+            tournamentId: input.tournamentId,
+            boardNumber: input.boardNumber,
+            boardSessionId: input.boardSessionId,
+            acquiredAt: now,
+            lastActivityAt: now,
+            expiresAt,
+          })
+          .where(eq(scorerLeases.matchId, input.matchId))
+          .returning();
+        return {
+          lease: takenOverLease,
+          priorOwner: leaseOwner(currentLease),
+          tookOver: true,
+        };
+      }
+
+      const [renewedLease] = await tx
+        .update(scorerLeases)
+        .set({ lastActivityAt: now, expiresAt })
+        .where(eq(scorerLeases.matchId, input.matchId))
+        .returning();
+      return { lease: renewedLease, tookOver: false };
+    }
+
+    const priorOwner = currentLease ? leaseOwner(currentLease) : undefined;
+    const [lease] = await tx
+      .insert(scorerLeases)
+      .values({
+        matchId: input.matchId,
+        tournamentId: input.tournamentId,
+        boardNumber: input.boardNumber,
+        boardSessionId: input.boardSessionId,
+        acquiredAt: now,
+        lastActivityAt: now,
+        expiresAt,
+      })
+      .onConflictDoUpdate({
+        target: scorerLeases.matchId,
+        set: {
+          tournamentId: input.tournamentId,
+          boardNumber: input.boardNumber,
+          boardSessionId: input.boardSessionId,
+          acquiredAt: now,
+          lastActivityAt: now,
+          expiresAt,
+        },
+      })
+      .returning();
+
+    return {
+      lease,
+      priorOwner,
+      tookOver: false,
+    };
+  }
+
+  private async lockMatchInTransaction(tx: any, matchId: number): Promise<Match | undefined> {
+    await tx.execute(sql`SELECT id FROM matches WHERE id = ${matchId} FOR UPDATE`);
+    const [match] = await tx.select().from(matches).where(eq(matches.id, matchId));
+    return match;
+  }
+
+  private async assertActiveScorerLeaseInTransaction(
+    tx: any,
+    matchId: number,
+    boardSessionId: number,
+  ): Promise<ScorerLease> {
+    const [lease] = await tx
+      .select()
+      .from(scorerLeases)
+      .where(eq(scorerLeases.matchId, matchId));
+    if (!lease) {
+      throw new ScorerLeaseConflictError(
+        "This match has no active scorer lease",
+        "SCORER_LEASE_MISSING",
+      );
+    }
+    if (lease.boardSessionId !== boardSessionId) {
+      throw new ScorerLeaseConflictError(
+        "This scorer session no longer owns the match",
+        "SCORER_LEASE_SESSION_MISMATCH",
+        leaseOwner(lease),
+      );
+    }
+    if (leaseIsExpired(lease)) {
+      throw new ScorerLeaseConflictError(
+        "This scorer lease has expired",
+        "SCORER_LEASE_EXPIRED",
+        leaseOwner(lease),
+      );
+    }
+
+    const now = new Date();
+    const [renewedLease] = await tx
+      .update(scorerLeases)
+      .set({
+        lastActivityAt: now,
+        expiresAt: new Date(now.getTime() + SCORER_LEASE_TTL_MS),
+      })
+      .where(eq(scorerLeases.matchId, matchId))
+      .returning();
+    return renewedLease;
+  }
+
+  async getScorerLease(matchId: number): Promise<ScorerLease | undefined> {
+    const [lease] = await db.select().from(scorerLeases).where(eq(scorerLeases.matchId, matchId));
+    return lease;
+  }
+
+  async acquireScorerLease(input: AcquireScorerLeaseInput): Promise<AcquireScorerLeaseResult> {
+    return db.transaction(async (tx) => {
+      const match = await this.lockMatchInTransaction(tx, input.matchId);
+      if (!match) {
+        throw new ScorerBoardAuthorizationError("Match not found", "MATCH_NOT_FOUND");
+      }
+      return this.acquireScorerLeaseInTransaction(tx, input, match);
+    });
+  }
+
+  async takeoverScorerLease(
+    input: Omit<AcquireScorerLeaseInput, "takeover">,
+  ): Promise<AcquireScorerLeaseResult> {
+    return this.acquireScorerLease({ ...input, takeover: true });
+  }
+
+  async heartbeatScorerLease(matchId: number, boardSessionId: number): Promise<ScorerLease> {
+    return db.transaction(async (tx) => {
+      const match = await this.lockMatchInTransaction(tx, matchId);
+      if (!match) {
+        throw new ScorerLeaseConflictError("Match not found", "SCORER_LEASE_MISSING");
+      }
+      return this.assertActiveScorerLeaseInTransaction(tx, matchId, boardSessionId);
+    });
+  }
+
+  async assertActiveScorerLease(matchId: number, boardSessionId: number): Promise<ScorerLease> {
+    return this.heartbeatScorerLease(matchId, boardSessionId);
+  }
+
+  async startMatchWithLease(input: {
+    matchId: number;
+    tournamentId: number;
+    boardNumber: number;
+    boardSessionId: number;
+    authorizedMatchIds: number[];
+    takeover?: boolean;
+  }): Promise<AcquireScorerLeaseResult & { match: Match }> {
+    return db.transaction(async (tx) => {
+      // Serialize all starts that target the same tournament board, including
+      // starts for different matches in that board's authorized set.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${input.tournamentId}, ${input.boardNumber})`);
+
+      const authorizedMatchIds = Array.from(new Set(input.authorizedMatchIds));
+      if (!authorizedMatchIds.includes(input.matchId)) {
+        throw new ScorerBoardAuthorizationError();
+      }
+
+      const match = await this.lockMatchInTransaction(tx, input.matchId);
+      if (!match) {
+        throw new ScorerMatchStartConflictError("Match not found", "MATCH_NOT_FOUND");
+      }
+      if (match.tournamentId !== input.tournamentId) {
+        throw new ScorerBoardAuthorizationError("Match does not belong to this tournament", "MATCH_TOURNAMENT_MISMATCH");
+      }
+
+      const boardMatches = await tx
+        .select()
+        .from(matches)
+        .where(and(
+          eq(matches.tournamentId, input.tournamentId),
+          inArray(matches.id, authorizedMatchIds),
+        ));
+      const existingInProgress = boardMatches.find(
+        candidate => candidate.status === "IN_PROGRESS" && candidate.id !== input.matchId,
+      );
+      if (existingInProgress) {
+        throw new ScorerMatchStartConflictError(
+          "Another match is already in progress on this board",
+          "BOARD_MATCH_ALREADY_IN_PROGRESS",
+          existingInProgress,
+        );
+      }
+      if (match.status !== "PENDING") {
+        throw new ScorerMatchStartConflictError(
+          "Match is not in PENDING status",
+          "MATCH_NOT_PENDING",
+          match,
+        );
+      }
+
+      const leaseResult = await this.acquireScorerLeaseInTransaction(tx, {
+        matchId: input.matchId,
+        tournamentId: input.tournamentId,
+        boardNumber: input.boardNumber,
+        boardSessionId: input.boardSessionId,
+        takeover: input.takeover,
+      }, match);
+
+      const [updatedMatch] = await tx
+        .update(matches)
+        .set({
+          status: "IN_PROGRESS",
+          scoreA: 0,
+          scoreB: 0,
+          scoringVersion: sql`${matches.scoringVersion} + 1`,
+        })
+        .where(and(eq(matches.id, input.matchId), eq(matches.status, "PENDING")))
+        .returning();
+      if (!updatedMatch) {
+        throw new ScorerMatchStartConflictError(
+          "Match is not in PENDING status",
+          "MATCH_NOT_PENDING",
+          match,
+        );
+      }
+
+      return { ...leaseResult, match: updatedMatch };
+    });
+  }
+
+  async restartMatchWithLease(input: {
+    matchId: number;
+    tournamentId: number;
+    boardNumber: number;
+    boardSessionId: number;
+    authorizedMatchIds: number[];
+  }): Promise<{ match: Match; priorOwner: ScorerLeaseOwner }> {
+    return db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${input.tournamentId}, ${input.boardNumber})`);
+      if (!new Set(input.authorizedMatchIds).has(input.matchId)) {
+        throw new ScorerBoardAuthorizationError();
+      }
+
+      const match = await this.lockMatchInTransaction(tx, input.matchId);
+      if (!match) {
+        throw new ScorerMatchStartConflictError("Match not found", "MATCH_NOT_FOUND");
+      }
+      if (match.tournamentId !== input.tournamentId) {
+        throw new ScorerBoardAuthorizationError("Match does not belong to this tournament", "MATCH_TOURNAMENT_MISMATCH");
+      }
+      if (match.status !== "IN_PROGRESS") {
+        throw new ScorerMatchStartConflictError(
+          "Only IN_PROGRESS matches can be restarted",
+          "MATCH_NOT_IN_PROGRESS",
+          match,
+        );
+      }
+
+      const lease = await this.assertActiveScorerLeaseInTransaction(
+        tx,
+        input.matchId,
+        input.boardSessionId,
+      );
+      const [updatedMatch] = await tx
+        .update(matches)
+        .set({
+          status: "PENDING",
+          scoreA: 0,
+          scoreB: 0,
+          winnerId: null,
+          scoringVersion: sql`${matches.scoringVersion} + 1`,
+        })
+        .where(eq(matches.id, input.matchId))
+        .returning();
+      await tx.delete(scorerLeases).where(eq(scorerLeases.matchId, input.matchId));
+      return { match: updatedMatch, priorOwner: leaseOwner(lease) };
+    });
+  }
   
   // Match Notes
   async getMatchNote(matchId: number): Promise<MatchNote | undefined> {
@@ -389,6 +793,7 @@ export class DatabaseStorage implements IStorage {
     scoreB: number;
     completedLeg: unknown;
     notes: Partial<InsertMatchNote>;
+    boardSessionId?: number;
   }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }> {
     return db.transaction(async (tx) => {
       await tx.execute(sql`SELECT id FROM matches WHERE id = ${input.matchId} FOR UPDATE`);
@@ -396,6 +801,17 @@ export class DatabaseStorage implements IStorage {
       const [current] = await tx.select().from(matches).where(eq(matches.id, input.matchId));
       if (!current) {
         throw new ScoringValidationError("Match not found", "MATCH_NOT_FOUND");
+      }
+
+      // The match row is already locked above.  Validate and renew ownership
+      // before even considering an idempotent replay so a displaced/stale
+      // scorer cannot replay or submit authoritative work after takeover.
+      if (input.boardSessionId !== undefined) {
+        await this.assertActiveScorerLeaseInTransaction(
+          tx,
+          input.matchId,
+          input.boardSessionId,
+        );
       }
 
       const [existingSubmission] = await tx
@@ -540,6 +956,19 @@ export class DatabaseStorage implements IStorage {
 
       return { match: updatedMatch, replayed: false, sideEffectsCompleted: false };
     });
+  }
+
+  async submitCompletedLegWithLease(input: {
+    matchId: number;
+    expectedVersion: number;
+    submissionId: string;
+    scoreA: number;
+    scoreB: number;
+    completedLeg: unknown;
+    notes: Partial<InsertMatchNote>;
+    boardSessionId: number;
+  }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }> {
+    return this.submitCompletedLeg(input);
   }
 
   async markCompletedLegSideEffectsComplete(matchId: number, submissionId: string): Promise<void> {

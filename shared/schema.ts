@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, primaryKey, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, primaryKey, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -247,6 +247,24 @@ export const boardSessions = pgTable("board_sessions", {
 
 export const insertBoardSessionSchema = createInsertSchema(boardSessions).omit({ id: true, createdAt: true });
 
+// === SCORER LEASES ===
+// A match has at most one authoritative scorer lease at a time.  The lease
+// belongs to a paired board session rather than to spoofable client metadata.
+export const scorerLeases = pgTable("scorer_leases", {
+  matchId: integer("match_id").primaryKey().references(() => matches.id, { onDelete: "cascade" }),
+  tournamentId: integer("tournament_id").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+  boardNumber: integer("board_number").notNull(),
+  boardSessionId: integer("board_session_id").notNull().references(() => boardSessions.id, { onDelete: "cascade" }),
+  acquiredAt: timestamp("acquired_at").notNull().defaultNow(),
+  lastActivityAt: timestamp("last_activity_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+}, (table) => ({
+  tournamentBoardIdx: index("scorer_leases_tournament_board_idx")
+    .on(table.tournamentId, table.boardNumber, table.matchId),
+}));
+
+export const SCORER_LEASE_TTL_MS = 2 * 60 * 1000;
+
 // === RELATIONS ===
 export const usersRelations = relations(users, ({ many }) => ({
   tournaments: many(tournaments),
@@ -265,6 +283,7 @@ export const tournamentsRelations = relations(tournaments, ({ one, many }) => ({
   groups: many(groups),
   matches: many(matches),
   boardSessions: many(boardSessions),
+  scorerLeases: many(scorerLeases),
   collaborators: many(tournamentCollaborators),
 }));
 
@@ -300,14 +319,22 @@ export const matchesRelations = relations(matches, ({ one }) => ({
   playerB: one(players, { fields: [matches.playerBId], references: [players.id], relationName: "playerB" }),
   winner: one(players, { fields: [matches.winnerId], references: [players.id], relationName: "winner" }),
   notes: one(matchNotes, { fields: [matches.id], references: [matchNotes.matchId] }),
+  scorerLease: one(scorerLeases, { fields: [matches.id], references: [scorerLeases.matchId] }),
 }));
 
 export const matchNotesRelations = relations(matchNotes, ({ one }) => ({
   match: one(matches, { fields: [matchNotes.matchId], references: [matches.id] }),
 }));
 
-export const boardSessionsRelations = relations(boardSessions, ({ one }) => ({
+export const boardSessionsRelations = relations(boardSessions, ({ one, many }) => ({
   tournament: one(tournaments, { fields: [boardSessions.tournamentId], references: [tournaments.id] }),
+  scorerLeases: many(scorerLeases),
+}));
+
+export const scorerLeasesRelations = relations(scorerLeases, ({ one }) => ({
+  match: one(matches, { fields: [scorerLeases.matchId], references: [matches.id] }),
+  tournament: one(tournaments, { fields: [scorerLeases.tournamentId], references: [tournaments.id] }),
+  boardSession: one(boardSessions, { fields: [scorerLeases.boardSessionId], references: [boardSessions.id] }),
 }));
 
 // === TYPES ===
@@ -340,6 +367,7 @@ export type InsertMatchNote = z.infer<typeof insertMatchNoteSchema>;
 
 export type BoardSession = typeof boardSessions.$inferSelect;
 export type InsertBoardSession = z.infer<typeof insertBoardSessionSchema>;
+export type ScorerLease = typeof scorerLeases.$inferSelect;
 
 // === API DTOs ===
 export type TournamentSettings = {
