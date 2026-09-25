@@ -1,0 +1,68 @@
+Investigate an intermittent HTTP 500 occurring on the live tablet scorer.
+
+I now have a screenshot showing the exact state when it occurs:
+
+Live site: tko-ockl.onrender.com
+The scorer page loads successfully.
+The match is still at “Throw for the Bull – Select player to start”.
+Player buttons are visible and the scorer UI itself has rendered.
+A red notification appears at the top saying:
+Error
+Internal server error
+This has happened on at least two tablets.
+
+Do not change production code yet.
+
+Trace the server logs and client network/API calls for this specific scorer startup state.
+
+Focus especially on requests that run automatically when the scorer loads or reaches the Throw for the Bull screen, including:
+
+scorer ownership acquisition;
+scorer ownership refresh/heartbeat;
+match/scorer session loading;
+current scorer version retrieval/adoption;
+current-leg snapshot loading;
+match notes/state loading;
+tablet/board pairing validation;
+any Socket.IO-related initialization that also invokes HTTP endpoints.
+
+For every recent HTTP 500 related to these routes, identify:
+
+Exact endpoint and HTTP method.
+Timestamp.
+Match ID / tournament ID / board ID if available.
+Request body or relevant parameters, excluding secrets.
+Exact exception and stack trace.
+Whether the database transaction had started or committed.
+Whether scorer ownership was acquired before the error.
+Whether the response should actually have been a controlled 409/4xx/recovery response rather than 500.
+
+Specifically check for recent Stage 2 scorer-ownership issues such as:
+
+duplicate ownership acquisition;
+stale ownership rows;
+null/missing session IDs;
+missing scorer version;
+old tablets using stale cached client code;
+ownership heartbeat happening before initial acquisition finishes;
+race between scorer initialization requests;
+two tablets attempting to acquire or refresh ownership at the same time;
+database constraint violations;
+unexpected null fields in existing matches created before the ownership changes.
+
+Also determine whether both reported tablet incidents share the same stack trace/root cause.
+
+Do not weaken or bypass any scorer integrity, ownership, version, concurrency, or recovery checks.
+
+Report back only with:
+
+failing request;
+exact exception;
+root cause;
+whether data was committed/changed;
+whether either match is at risk;
+whether this is specific to older matches/tablets or affects all scorers;
+recommended fix;
+recommended regression test.
+
+Do not implement the fix until you have reported the evidence.
