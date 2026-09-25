@@ -1,0 +1,52 @@
+We now have the actual Render production error.
+
+POST /api/scorer/matches/8003/start returns HTTP 500.
+
+Render reports:
+
+Scorer match start error: error: relation "scorer_current_legs" does not exist
+
+PostgreSQL code:
+
+42P01
+
+The match remained PENDING after the failed request.
+
+This confirms that the deployed application expects scorer_current_legs, but the database used by the live Render deployment does not contain that relation.
+
+Do not modify production application behaviour yet.
+
+Investigate the database/migration state and report exactly what needs to happen.
+
+Specifically:
+
+Locate the schema definition and migration that creates scorer_current_legs.
+Identify every database migration/schema change required by the Stage 2 scorer ownership/current-leg/recovery implementation — not just this one table.
+Compare those requirements against the production schema expected by the currently deployed application.
+Check for all potentially missing:
+tables;
+columns;
+indexes;
+constraints;
+foreign keys;
+unique constraints;
+defaults.
+Also inspect the scorer ownership/lease tables and schema introduced by Stage 2. I do not want to fix scorer_current_legs and then discover the next missing production relation.
+Determine why the migration was not applied to the database used by Render. Check the deployment/migration workflow and whether the Render production service and the development environment are using different Neon branches/databases.
+Confirm which database/Neon branch the Render production service is configured to use, without exposing credentials.
+Determine the correct existing migration command/process for bringing that database to the schema expected by the deployed application.
+Do not use drizzle-kit push or make ad-hoc production schema changes unless that is already the project's established safe production migration mechanism.
+Do not drop, recreate, truncate, reset, or modify existing tournament/match/scoring data.
+Do not weaken or remove any Stage 1/Stage 2 scorer ownership, versioning, current-leg persistence, concurrency, or recovery protections.
+
+Report back with:
+
+migration/schema file that creates scorer_current_legs;
+all Stage 2 database changes production requires;
+which appear to be missing;
+likely reason production missed them;
+exact safe migration procedure you recommend;
+whether it can be applied without affecting existing tournament data;
+verification steps to perform immediately after migration.
+
+Do not execute the production migration yet. I want to review the proposed procedure first.
