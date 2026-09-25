@@ -1,0 +1,280 @@
+Continue the TKO scoring audit with:
+
+STAGE 3B.1 — Prevent Same-Session Stale Snapshot Overwrite
+
+This is the first production fix from the completed Stage 3A verification.
+
+Stage 3A confirmed that two tabs sharing the SAME valid board/scorer session can race within the same unfinished leg, and an older snapshot can overwrite newer persisted visit state.
+
+This Stage 3B.1 task must fix ONLY that defect.
+
+==================================================
+CONFIRMED STAGE 3A DEFECT
+==================================================
+
+Confirmed behaviour:
+
+1. Two tabs share the same valid board/scorer session identity.
+2. Both load the same unfinished-leg state.
+3. Tab A advances the leg and persists a newer valid snapshot.
+4. Tab B still holds the older snapshot.
+5. Tab B persists its older snapshot.
+6. The older snapshot replaces the newer durable unfinished-leg state.
+
+Existing scorer ownership checks do not prevent this because both tabs share the same valid session/lease.
+
+Stage 1 completed-leg version/idempotency protections are not the issue.
+
+Stage 2 ownership protections are not the issue.
+
+The defect is specifically:
+STALE WITHIN-LEG CURRENT-SNAPSHOT WRITE
+from the SAME scorer session.
+
+==================================================
+CRITICAL REQUIREMENT
+==================================================
+
+Prevent an older/stale unfinished-leg snapshot from replacing a newer persisted snapshot.
+
+BUT:
+
+A legitimate intentional UNDO must still be possible.
+
+Do NOT solve this by simply rejecting every snapshot containing fewer visits.
+
+The system must be able to distinguish:
+
+- stale/out-of-date write
+from
+- intentional undo/reset of the current unfinished leg
+
+==================================================
+IMPLEMENTATION APPROACH
+==================================================
+
+First inspect the Stage 3A same-session test and the existing current-leg persistence path.
+
+Likely relevant files include:
+
+- server/storage.ts
+- server/routes.ts
+- shared/schema.ts only if strictly necessary
+- client/src/pages/scorer.tsx only if a request token/version must be supplied
+- Stage 3A test files
+
+Prefer the smallest concurrency-control mechanism that fits the existing architecture.
+
+Potential acceptable approaches include a per-current-leg revision/version/generation value, compare-and-swap style protection, or another explicit stale-write token.
+
+Do NOT choose an implementation merely because it is convenient.
+
+The fix must provide these properties:
+
+1. When a current-leg snapshot is read/recovered, the client/request has an identity for the revision it is based on.
+
+2. Persisting a normal forward scoring change succeeds only if the stored current-leg revision still matches the revision the write was based on.
+
+3. On successful persistence, the durable revision advances.
+
+4. A stale same-session writer using the previous revision is rejected and cannot replace newer state.
+
+5. The client can obtain/recover the new authoritative state after the rejection.
+
+6. Intentional undo remains supported through an explicit valid path rather than looking identical to an accidental stale overwrite.
+
+7. Ownership validation remains required.
+
+8. Match scoringVersion protections remain required.
+
+Do not remove or weaken any existing ownership/version/idempotency validation.
+
+==================================================
+UNDO REQUIREMENT
+==================================================
+
+Inspect how Undo currently persists state.
+
+The fix must explicitly prove:
+
+- normal forward update with current revision: accepted
+- stale normal update with old revision: rejected
+- deliberate undo from the current authoritative revision: accepted
+- stale tab cannot masquerade as a legitimate undo
+
+If Undo currently uses the same snapshot route, make the smallest change necessary to distinguish an intentional undo operation safely.
+
+Do NOT redesign the scorer UI.
+
+==================================================
+ERROR HANDLING
+==================================================
+
+When rejecting a stale unfinished-leg write:
+
+- return a clear conflict response, preferably HTTP 409 if consistent with the existing API
+- include enough authoritative state or recovery information for the scorer to refetch/reconcile safely
+- do not silently overwrite
+- do not convert it into a generic server error
+
+Use existing error conventions where possible.
+
+==================================================
+TEST-FIRST / REGRESSION REQUIREMENTS
+==================================================
+
+Use the Stage 3A same-session reproduction as the primary proof.
+
+Do not delete or weaken the expected-red test.
+
+Convert it to green only by fixing production behaviour.
+
+Add or retain tests proving:
+
+A. SAME-SESSION FORWARD RACE
+- Tab A saves newer state
+- Tab B submits older revision
+- B is rejected
+- A's newer durable state remains intact
+
+B. LEGITIMATE UNDO
+- latest valid scorer performs intentional undo
+- undo persists successfully
+- resulting durable state is correct
+
+C. STALE TAB CANNOT UNDO
+- stale tab with an old revision attempts an undo-like older snapshot
+- request is rejected
+- current authoritative state remains unchanged
+
+D. CURRENT WRITER CONTINUES
+- after a successful write, client uses returned/new revision
+- next valid write succeeds
+
+E. RECOVERY
+- stale writer can refetch/recover the authoritative current leg and continue only from the new revision
+
+==================================================
+DO NOT TOUCH
+==================================================
+
+Do not fix these Stage 3 defects yet:
+
+- socket reconnect / room rejoin
+- stale query-cache/remount reconciliation
+- post-commit progression recovery after refresh
+
+They belong to later Stage 3B tasks.
+
+Do not:
+- modify deployment
+- modify .replit
+- modify Nix
+- modify environment variables
+- touch live Neon
+- perform destructive migrations
+- make broad scorer refactors
+- redesign Stage 1
+- redesign Stage 2
+- change completed-leg idempotency semantics
+
+==================================================
+DATABASE / SCHEMA
+==================================================
+
+Avoid a schema migration if the protection can be safely implemented using existing persisted current-leg data.
+
+If a schema change is genuinely required:
+- explain why before applying it
+- keep it minimal
+- do not run destructive migration against live data
+
+Prefer a solution compatible with existing durable current-leg records.
+
+==================================================
+RUN TESTS
+==================================================
+
+After implementing the smallest fix, run:
+
+1. Stage 3B.1 / Stage 3A same-session tests
+2. tests/scoring-integrity.test.ts
+3. complete tests/stage1-database.integration.ts
+4. complete tests/stage2-database.integration.ts
+5. any other Stage 3A tests affected by this change
+
+All previously green Stage 1 and Stage 2 tests must remain green.
+
+Do not start another Stage 3B fix merely because unrelated expected-red Stage 3A tests remain red.
+
+==================================================
+FINAL REPORT
+==================================================
+
+Provide:
+
+# STAGE 3B.1 RESULTS
+
+## Confirmed defect
+Briefly restate the reproduced issue.
+
+## Production files changed
+For each:
+- file
+- change
+- why required
+
+## Concurrency mechanism
+Explain:
+- what revision/token is used
+- where it comes from
+- when it advances
+- how stale writes are identified
+
+## Undo handling
+Explain how a legitimate undo differs from a stale overwrite.
+
+## API behaviour
+Include:
+- accepted update behaviour
+- stale update response/status
+- recovery/refetch behaviour
+
+## Test results
+
+### Stage 3B.1
+- passed
+- failed
+- total
+
+### Scoring integrity
+- passed
+- failed
+- total
+
+### Stage 1
+- passed
+- failed
+- total
+
+### Stage 2 / 2B
+- passed
+- failed
+- total
+
+### Other Stage 3A tests
+List remaining EXPECTED RED failures separately.
+Do not classify them as regressions if they relate to intentionally unfixed Stage 3 tasks.
+
+## Regression check
+Confirm whether any previously green behaviour regressed.
+
+## Remaining Stage 3 work
+List only:
+- reconnect/room rejoin
+- cache/remount reconciliation
+- post-commit progression recovery
+
+STOP after Stage 3B.1.
+
+Do not begin Stage 3B.2.
