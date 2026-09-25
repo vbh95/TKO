@@ -1,0 +1,233 @@
+REVISION TO TASK #105 — Private League Playoffs Workspace
+
+Please incorporate the following clarifications into the existing Task #105 specification. These are clarifications only and must not expand the task into unrelated work.
+
+IMPORTANT:
+Continue following all existing Task #105 scope, privacy, security, low-risk and regression-safety requirements. Do not change anything else on the site.
+
+1. NORMALIZED PLAYER IDENTITY
+
+For playoff shortlist selections, reuse the EXACT same normalized player identity/helper already used by the existing league standings / Task #103 league player membership/profile system wherever possible.
+
+Do NOT create a second or slightly different player-name normalization system specifically for Playoffs.
+
+Before adding or removing a shortlist selection, validate server-side that the requested normalized player identity actually exists in the current league standings.
+
+This must work for:
+- normal roster-backed players
+- manual-results-only standings players
+
+A manual-results-only player may be selected for the playoff shortlist even though they do not have a private Player Profile.
+
+Do NOT create or backfill a private Player Profile for a manual-results-only player simply because they have been selected.
+
+2. MEMBERSHIP FILTER SEMANTICS
+
+Treat membership as three possible states:
+
+- Member
+- Non-member
+- Unknown
+
+The filter must behave as follows:
+
+ALL
+= Member + Non-member + Unknown
+
+MEMBERS
+= explicitly confirmed club members only
+
+NON-MEMBERS
+= explicitly known non-members only
+
+Unknown membership must NOT automatically be treated as "Non-member".
+
+This is particularly important for manual-results-only players where no private membership/profile information exists.
+
+Their membership should display as:
+
+—
+
+or another existing-theme representation of unavailable/unknown information.
+
+3. ATTENDANCE FILTER SEMANTICS
+
+The attendance slider is a MINIMUM attendance filter.
+
+Range:
+0% to 100%
+
+Step:
+10%
+
+Example:
+
+Minimum attendance = 60%
+
+means:
+
+show players with KNOWN attendance >= 60%.
+
+Players with unknown attendance must NOT pass a positive minimum attendance filter.
+
+At:
+
+Minimum attendance = 0%
+
+players with unknown attendance may remain visible unless another active filter excludes them.
+
+Do not interpret missing attendance as 0%.
+
+4. MISSING STATISTICS
+
+For all Playoffs filters and sorting:
+
+Missing/unknown statistics must remain genuinely unknown.
+
+Do NOT convert missing values to:
+- 0
+- false
+- 0%
+- no membership
+- no tournament wins
+- any other inferred value
+
+Display unavailable values as:
+
+—
+
+When sorting a numeric statistic, players with unknown/missing values must appear BELOW players with known values regardless of ascending/descending direction, unless an existing shared sorting convention already safely handles this.
+
+For Best Leg:
+fewer darts is better.
+
+5. SHORTLIST ORDER
+
+The selected Playoff Field must have a stable and predictable order after refresh.
+
+Prefer displaying selected players in their CURRENT LEAGUE STANDINGS ORDER unless the existing data model already contains an intentional selection/order field.
+
+Do not rely on undefined database row order.
+
+If standings positions change later, displaying the shortlist in current standings order is acceptable because selection itself is still persisted independently.
+
+6. MANUAL-RESULTS-ONLY PLAYERS
+
+Manual-results-only players must:
+
+- appear in the Playoffs player list if they appear in league standings
+- show their existing standings position and points
+- be searchable
+- be filterable/sortable using only statistics genuinely available for them
+- display — for unavailable profile statistics
+- NOT show a broken View Profile action
+- remain selectable for the Playoff Field
+- persist correctly in the shortlist
+- be removable from the shortlist
+
+Do NOT attempt to infer attendance, membership, tournament history or detailed statistics from free-text/manual result labels.
+
+Do NOT create a private profile for them as part of this task.
+
+7. SHORTLIST WRITE VALIDATION
+
+For every shortlist ADD or REMOVE request:
+
+- authenticate the user
+- load the league
+- confirm the authenticated user is the league creator
+- validate that the requested normalized player identity belongs to the current league standings
+- then perform the requested operation
+
+Do not trust a player identity supplied by the browser without server-side league validation.
+
+The database must prevent duplicate shortlist selections for the same:
+
+league + normalized player identity
+
+8. FILTER STATE
+
+Continue storing Playoffs search/filter/sort state in URL parameters.
+
+Opening a valid private Player Profile from the Playoffs page and returning should restore:
+
+- search text
+- minimum attendance
+- membership filter
+- qualification filter
+- minimum tournaments
+- tournament winner filter
+- selected sort
+- sort direction where applicable
+
+Do not persist these UI filters to the database.
+
+Reset Filters should restore the intended defaults:
+
+If automatic promotion/qualification places are configured:
+- Qualification = Not automatically qualified
+
+If they are NOT configured:
+- Qualification = All
+
+Other filters return to their neutral/default values.
+
+9. ADDITIONAL TESTS
+
+In addition to the existing Task #105 tests, explicitly verify:
+
+- A manual-results-only player can be selected.
+- The manual-results-only selection persists after refresh.
+- Selecting that player does NOT create a private Player Profile.
+- The manual-results-only player does not receive a broken View Profile link.
+- Unknown membership does not pass Members.
+- Unknown membership does not pass Non-members.
+- Unknown membership remains visible under All.
+- Unknown attendance does not pass a positive minimum attendance filter.
+- Unknown attendance can remain visible when minimum attendance is 0%.
+- Missing numeric statistics sort below known statistics.
+- Best Leg sorts fewer darts as better.
+- Shortlist ordering remains stable after reload.
+- Duplicate shortlist rows cannot be created.
+- A player identity from another league cannot be added by manually calling the API.
+- An arbitrary/non-existent player identity cannot be added by manually calling the API.
+- Existing league standings positions and points remain identical before and after this feature.
+- No private membership, profile or shortlist information appears in existing public league responses.
+
+10. FINAL SAFETY REQUIREMENT
+
+This remains an ADDITIVE administrative feature.
+
+Do NOT modify:
+- scoring
+- scorer ownership
+- visit submission
+- leg completion
+- match completion
+- duplicate submission protections
+- match versioning
+- tournament progression
+- byes
+- standings calculations
+- ranking/tie-break rules
+- league points
+- existing promotion/qualification rules
+- Charity Mode
+- OBS overlays
+- public league behaviour
+
+Do not perform unrelated cleanup or refactoring.
+
+Reuse the functionality already completed in Task #103 wherever possible.
+
+When Task #105 and this revision are complete, STOP and provide the originally requested completion report, also confirming:
+
+1. The same normalized identity logic is reused.
+2. Manual-results-only players can be shortlisted without creating profiles.
+3. Unknown membership/attendance/statistics are not incorrectly converted to false/zero.
+4. Shortlist order is deterministic.
+5. Shortlist writes validate league membership server-side.
+6. No existing scoring, standings, points or qualification logic was changed.
+7. No private data was exposed publicly.
+
+Do not begin any additional improvements after completing and verifying this revision.
