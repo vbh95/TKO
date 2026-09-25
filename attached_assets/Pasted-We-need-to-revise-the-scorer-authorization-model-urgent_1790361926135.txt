@@ -1,0 +1,81 @@
+We need to revise the scorer authorization model urgently.
+
+The current scorer_leases / per-match ownership system is causing legitimate tournament tablets to lose access with:
+
+This device no longer owns the match.
+
+This ownership model is not required for our operational setup.
+
+Tablet scorers are already protected because:
+
+only an admin can access/generate the exact board scorer QR code / URL;
+each tablet is paired through a private board_session;
+the board session has its own private access token;
+a scorer should only operate matches assigned to its paired board.
+
+I therefore want board-session authorization instead of exclusive per-match ownership.
+
+Required behaviour
+
+A valid, unexpired board session should be allowed to start, resume and score a match when:
+
+its tournament matches the tournament;
+its board number matches the match's assigned board;
+its board-session access token is valid.
+
+Refreshing the browser, reopening the scorer, navigating away/back, or temporary connection loss must NOT make the legitimate tablet lose access to the match.
+
+Remove scorer_leases as a requirement for normal scorer authorization.
+
+Do NOT weaken the actual scoring-integrity protections:
+
+keep matches.scoring_version;
+keep expected-version checks;
+keep idempotent submission IDs;
+keep match_leg_submissions;
+keep duplicate/lost-response protection;
+keep completed-leg validation;
+keep scorer_current_legs durable recovery;
+keep transaction/rollback behaviour.
+
+Those protections prevent stale or duplicate scoring writes and must remain intact.
+
+Important
+
+Do not delete scorer_leases from the database during this emergency fix. It may remain unused for now so the change is reversible.
+
+Modify application logic so normal scorer start/resume/score requests do not fail solely because:
+
+no scorer lease exists;
+a scorer lease expired;
+the lease belongs to an older board session for the same authorized board.
+
+Authorization should instead be based on the valid board session and board assignment.
+
+Security
+
+A scorer from Board 2 must NOT be able to score a Board 1 match.
+
+A scorer from another tournament must NOT be able to score this tournament.
+
+An invalid or expired board-session token must still be rejected.
+
+Recovery
+
+Existing in-progress matches must be resumable from the authorized board tablet using scorer_current_legs and existing match state.
+
+Testing
+
+Add regression tests for:
+
+valid Board 1 session starts Board 1 match;
+same tablet refreshes and resumes;
+new valid Board 1 session can resume the same Board 1 match;
+expired old scorer lease does not block legitimate Board 1 scorer;
+Board 2 cannot score Board 1 match;
+invalid/expired board session is rejected;
+stale scoring version is still rejected;
+duplicate leg submission is still idempotent;
+unfinished leg still restores from scorer_current_legs.
+
+This is an emergency live-tournament fix. Make the smallest targeted change necessary and report exactly which files/routes changed before deployment.

@@ -107,7 +107,6 @@ export type AcquireScorerLeaseResult = {
 
 export type PersistCurrentLegInput = {
   matchId: number;
-  boardSessionId: number;
   scoringVersion: number;
   remainingA: number;
   remainingB: number;
@@ -166,22 +165,19 @@ export interface IStorage {
   heartbeatScorerLease(matchId: number, boardSessionId: number): Promise<ScorerLease>;
   assertActiveScorerLease(matchId: number, boardSessionId: number): Promise<ScorerLease>;
   getCurrentLegState(matchId: number): Promise<DurableCurrentLegState | undefined>;
-  persistCurrentLegStateWithLease(input: PersistCurrentLegInput): Promise<DurableCurrentLegState>;
-  startMatchWithLease(input: {
+  persistCurrentLegStateForBoard(input: PersistCurrentLegInput): Promise<DurableCurrentLegState>;
+  startMatchForBoard(input: {
     matchId: number;
     tournamentId: number;
     boardNumber: number;
-    boardSessionId: number;
     authorizedMatchIds: number[];
-    takeover?: boolean;
-  }): Promise<AcquireScorerLeaseResult & { match: Match }>;
-  restartMatchWithLease(input: {
+  }): Promise<Match>;
+  restartMatchForBoard(input: {
     matchId: number;
     tournamentId: number;
     boardNumber: number;
-    boardSessionId: number;
     authorizedMatchIds: number[];
-  }): Promise<{ match: Match; priorOwner: ScorerLeaseOwner }>;
+  }): Promise<Match>;
   
   // Match Notes
   getMatchNote(matchId: number): Promise<MatchNote | undefined>;
@@ -199,7 +195,7 @@ export interface IStorage {
     boardSessionId?: number;
     checkout?: { dartsAtDouble: number; checkoutDartsUsed: number };
   }): Promise<{ match: Match; replayed: boolean; sideEffectsCompleted: boolean }>;
-  submitCompletedLegWithLease(input: {
+  submitCompletedLegForBoard(input: {
     matchId: number;
     expectedVersion: number;
     submissionId: string;
@@ -742,13 +738,12 @@ export class DatabaseStorage implements IStorage {
     return row ? durableCurrentLeg(row) : undefined;
   }
 
-  async persistCurrentLegStateWithLease(input: PersistCurrentLegInput): Promise<DurableCurrentLegState> {
+  async persistCurrentLegStateForBoard(input: PersistCurrentLegInput): Promise<DurableCurrentLegState> {
     return db.transaction(async (tx) => {
       const match = await this.lockMatchInTransaction(tx, input.matchId);
       if (!match) {
         throw new ScoringValidationError("Match not found", "MATCH_NOT_FOUND");
       }
-      await this.assertActiveScorerLeaseInTransaction(tx, input.matchId, input.boardSessionId);
       if (match.status !== "IN_PROGRESS") {
         throw new ScoringConflictError(
           "Match is no longer in progress",
@@ -794,14 +789,12 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async startMatchWithLease(input: {
+  async startMatchForBoard(input: {
     matchId: number;
     tournamentId: number;
     boardNumber: number;
-    boardSessionId: number;
     authorizedMatchIds: number[];
-    takeover?: boolean;
-  }): Promise<AcquireScorerLeaseResult & { match: Match }> {
+  }): Promise<Match> {
     return db.transaction(async (tx) => {
       // Serialize all starts that target the same tournament board, including
       // starts for different matches in that board's authorized set.
@@ -845,14 +838,6 @@ export class DatabaseStorage implements IStorage {
         );
       }
 
-      const leaseResult = await this.acquireScorerLeaseInTransaction(tx, {
-        matchId: input.matchId,
-        tournamentId: input.tournamentId,
-        boardNumber: input.boardNumber,
-        boardSessionId: input.boardSessionId,
-        takeover: input.takeover,
-      }, match);
-
       await tx.delete(scorerCurrentLegs).where(eq(scorerCurrentLegs.matchId, input.matchId));
 
       const [updatedMatch] = await tx
@@ -873,17 +858,16 @@ export class DatabaseStorage implements IStorage {
         );
       }
 
-      return { ...leaseResult, match: updatedMatch };
+      return updatedMatch;
     });
   }
 
-  async restartMatchWithLease(input: {
+  async restartMatchForBoard(input: {
     matchId: number;
     tournamentId: number;
     boardNumber: number;
-    boardSessionId: number;
     authorizedMatchIds: number[];
-  }): Promise<{ match: Match; priorOwner: ScorerLeaseOwner }> {
+  }): Promise<Match> {
     return db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${input.tournamentId}, ${input.boardNumber})`);
       if (!new Set(input.authorizedMatchIds).has(input.matchId)) {
@@ -905,11 +889,6 @@ export class DatabaseStorage implements IStorage {
         );
       }
 
-      const lease = await this.assertActiveScorerLeaseInTransaction(
-        tx,
-        input.matchId,
-        input.boardSessionId,
-      );
       const [updatedMatch] = await tx
         .update(matches)
         .set({
@@ -921,9 +900,8 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(matches.id, input.matchId))
         .returning();
-      await tx.delete(scorerLeases).where(eq(scorerLeases.matchId, input.matchId));
       await tx.delete(scorerCurrentLegs).where(eq(scorerCurrentLegs.matchId, input.matchId));
-      return { match: updatedMatch, priorOwner: leaseOwner(lease) };
+      return updatedMatch;
     });
   }
   
@@ -973,16 +951,9 @@ export class DatabaseStorage implements IStorage {
         throw new ScoringValidationError("Match not found", "MATCH_NOT_FOUND");
       }
 
-      // The match row is already locked above.  Validate and renew ownership
-      // before even considering an idempotent replay so a displaced/stale
-      // scorer cannot replay or submit authoritative work after takeover.
-      if (input.boardSessionId !== undefined) {
-        await this.assertActiveScorerLeaseInTransaction(
-          tx,
-          input.matchId,
-          input.boardSessionId,
-        );
-      }
+      // The board-authenticated route validates the current assignment before
+      // calling this transaction. Keep the match lock, version check and
+      // submission ID protection for competing authorized board sessions.
 
       const [existingSubmission] = await tx
         .select()
@@ -1274,7 +1245,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async submitCompletedLegWithLease(input: {
+  async submitCompletedLegForBoard(input: {
     matchId: number;
     expectedVersion: number;
     submissionId: string;

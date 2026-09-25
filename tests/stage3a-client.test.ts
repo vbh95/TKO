@@ -20,6 +20,7 @@ test("scorer remount fetches fresh board-data before hydrating from a cached unf
     queryKey: key,
     queryFn: async () => { serverReads++; return authoritative; },
     refetchInterval: 10000,
+    refetchOnMount: "always",
   });
   const unsubscribe = observer.subscribe(() => {});
   try {

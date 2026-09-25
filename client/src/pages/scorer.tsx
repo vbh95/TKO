@@ -723,7 +723,7 @@ export default function ScorerPage() {
     };
   }, []);
 
-  const { data, isLoading, error, refetch } = useQuery<BoardData>({
+  const { data, isLoading, isFetching, error, refetch } = useQuery<BoardData>({
     queryKey: ['/api/scorer/board-data'],
     queryFn: async () => {
       const res = await fetch('/api/scorer/board-data', { credentials: 'include' });
@@ -734,6 +734,7 @@ export default function ScorerPage() {
       return res.json();
     },
     refetchInterval: 10000,
+    refetchOnMount: "always",
   });
 
   const hydrateAuthoritativeScorerState = useCallback((match: ScorerMatch) => {
@@ -817,18 +818,6 @@ export default function ScorerPage() {
   }, [data, tournamentId, boardNumber, joinScorer, joinBoard]);
 
   useEffect(() => {
-    const cleanup = on("scorer:ownership-lost", (event: { matchId?: number; message?: string }) => {
-      if (event?.matchId && (ownershipMatchId === null || event.matchId === ownershipMatchId)) {
-        enterOwnershipConflict(
-          event.matchId,
-          event.message || "Another scorer took over this match. This device is now read-only.",
-        );
-      }
-    });
-    return cleanup;
-  }, [on, ownershipMatchId, enterOwnershipConflict]);
-
-  useEffect(() => {
     if (ownershipState !== "owned" || ownershipMatchId === null || view !== "scoring") return;
     const heartbeat = window.setInterval(async () => {
       const res = await fetch(`/api/scorer/matches/${ownershipMatchId}/ownership/heartbeat`, {
@@ -846,17 +835,17 @@ export default function ScorerPage() {
   }, [ownershipState, ownershipMatchId, view, enterOwnershipConflict]);
 
   useEffect(() => {
-    if (!data || view !== "matchList" || activeMatchId !== null) return;
+    if (!data || isFetching || view !== "matchList" || activeMatchId !== null) return;
     const inProgress = data.matches.find(m => m.status === "IN_PROGRESS");
     if (!inProgress || ownershipMatchId === inProgress.id || ownershipAttemptRef.current === inProgress.id) return;
     ownershipAttemptRef.current = inProgress.id;
     void requestOwnership(inProgress.id).finally(() => {
       ownershipAttemptRef.current = null;
     });
-  }, [data, view, activeMatchId, ownershipMatchId, requestOwnership]);
+  }, [data, isFetching, view, activeMatchId, ownershipMatchId, requestOwnership]);
 
   useEffect(() => {
-    if (data && view === "matchList" && activeMatchId === null) {
+    if (data && !isFetching && view === "matchList" && activeMatchId === null) {
       if (userNavigatedBackRef.current) {
         userNavigatedBackRef.current = false;
         return;
@@ -866,7 +855,7 @@ export default function ScorerPage() {
         hydrateAuthoritativeScorerState(inProgress);
       }
     }
-  }, [data, view, activeMatchId, ownershipMatchId, ownershipState, hydrateAuthoritativeScorerState]);
+  }, [data, isFetching, view, activeMatchId, ownershipMatchId, ownershipState, hydrateAuthoritativeScorerState]);
 
   useEffect(() => {
     const cleanup1 = on("connect", () => setIsConnected(true));
@@ -1088,9 +1077,8 @@ export default function ScorerPage() {
     versionOverride?: number,
     swapPlayersOverride?: boolean,
   ) => {
-    if (ownershipState !== "owned" || ownershipMatchId !== activeMatchId) {
-      throw new Error("This device no longer owns the match.");
-    }
+    // The server validates the paired session and current board assignment.
+    // Local ownership state can lag immediately after a successful start.
     const activeM = data?.matches.find(m => m.id === activeMatchId);
     if (!activeM) throw new Error("Match is not available.");
     const pA = activeM ? data?.players.find(p => p.id === activeM.playerAId) : null;
@@ -1120,15 +1108,11 @@ export default function ScorerPage() {
       lastScoreB: vB.length > 0 ? vB[vB.length - 1].score : null,
       legStartingThrower: lstOverride ?? legStartingThrower,
     });
-  }, [activeMatchId, data, legVisits, legStartingThrower, ownershipState, ownershipMatchId, scoringVersion, swapPlayers]);
+  }, [activeMatchId, data, legVisits, legStartingThrower, scoringVersion, swapPlayers]);
 
   const handleScoreSubmit = async (score: number) => {
     if (activeMatchId === null) return;
     if (isPersistingVisitRef.current) return;
-    if (ownershipState !== "owned" || ownershipMatchId !== activeMatchId) {
-      toast({ title: "Read-only scorer", description: "Take over scoring before recording authoritative work.", variant: "destructive" });
-      return;
-    }
     const activeM = data?.matches.find(m => m.id === activeMatchId);
     if (!activeM) return;
 
@@ -1235,10 +1219,6 @@ export default function ScorerPage() {
   };
 
   const confirmCheckout = async (dartsAtDouble: number, checkoutDartsUsed: number) => {
-    if (ownershipState !== "owned" || ownershipMatchId !== activeMatchId) {
-      if (activeMatchId !== null) enterOwnershipConflict(activeMatchId, "This device no longer owns the match.");
-      return;
-    }
     if (isSubmittingLegRef.current) return;
     if (checkoutDartsUsed < dartsAtDouble) return;
     if (!pendingCheckout || !activeMatchId) return;
@@ -1624,7 +1604,8 @@ export default function ScorerPage() {
 
 
   const handleTapMatch = async (matchId: number) => {
-    const match = matches.find(m => m.id === matchId);
+    const currentData = isFetching ? (await refetch()).data : data;
+    const match = currentData?.matches.find(m => m.id === matchId);
     if (!match) return;
 
     if (match.status === 'IN_PROGRESS') {
@@ -1715,10 +1696,7 @@ export default function ScorerPage() {
       };
 
       if (activeMatch.status === 'IN_PROGRESS') {
-        if (ownershipState !== "owned" || ownershipMatchId !== activeMatch.id) {
-          enterOwnershipConflict(activeMatch.id, "This device does not own the active match.");
-          return;
-        }
+        if (!(await requestOwnership(activeMatch.id))) return;
         await applyThrower(activeMatch);
       } else {
         startMatchMutation.mutate(activeMatch.id, {

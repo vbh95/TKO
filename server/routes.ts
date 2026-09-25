@@ -10,10 +10,10 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { generateMatches, regenerateGroupMatchesFromMemberships } from "./match-generator";
 import type { TournamentSettings } from "@shared/schema";
-import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament, liveScoringCache, emitScorerOwnershipAcquired, emitScorerOwnershipLost } from "./socket";
+import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament, liveScoringCache } from "./socket";
 import rateLimit from "express-rate-limit";
 import { ScoringConflictError, ScoringValidationError } from "./scoring-integrity";
-import { ScorerLeaseConflictError, ScorerMatchStartConflictError } from "./storage";
+import { ScorerMatchStartConflictError } from "./storage";
 import { getScorerBoardAssignment, assertScorerMatchAssignedToBoard, ScorerBoardAuthorizationError } from "./scorer-board-authorization";
 import { calculateLeagueStandings, normalizeLeaguePlayerIdentity, type LeagueTournamentResults } from "./league-standings";
 import { buildLeaguePlayerProfile } from "./league-player-profile";
@@ -2440,12 +2440,9 @@ export async function registerRoutes(
       const boardMatchNotes = await storage.getMatchNotesByMatchIds(boardMatchesBase.map(m => m.id));
       const notesByMatchId = new Map(boardMatchNotes.map(note => [note.matchId, note]));
       const boardMatches = await Promise.all(boardMatchesBase.map(async match => {
-        const [lease, currentLegState] = match.status === "IN_PROGRESS"
-          ? await Promise.all([
-              storage.getScorerLease(match.id),
-              storage.getCurrentLegState(match.id),
-            ])
-          : [undefined, undefined];
+        const currentLegState = match.status === "IN_PROGRESS"
+          ? await storage.getCurrentLegState(match.id)
+          : undefined;
         return {
           ...match,
           notes: notesByMatchId.get(match.id) || null,
@@ -2454,9 +2451,9 @@ export async function registerRoutes(
             : null,
           ownership: match.status === "IN_PROGRESS"
             ? {
-                ownedByCurrentSession: lease?.boardSessionId === req.boardSession.id,
-                active: !!lease && (!lease.expiresAt || new Date() <= lease.expiresAt),
-                expiresAt: lease?.expiresAt || null,
+                ownedByCurrentSession: true,
+                active: true,
+                expiresAt: null,
               }
             : null,
         };
@@ -2517,20 +2514,14 @@ export async function registerRoutes(
         boardNumber,
       );
       assertScorerMatchAssignedToBoard(match, assignment);
-      const result = await storage.startMatchWithLease({
+      const updatedMatch = await storage.startMatchForBoard({
         matchId,
         tournamentId,
         boardNumber,
-        boardSessionId: req.boardSession.id,
         authorizedMatchIds: assignment.assignedMatchIds,
       });
-      const updatedMatch = result.match;
 
       const tournament = await storage.getTournament(tournamentId);
-      if (result.priorOwner) {
-        emitScorerOwnershipLost(result.priorOwner.boardSessionId, { matchId, reason: "takeover" });
-      }
-      emitScorerOwnershipAcquired(req.boardSession.id, { matchId });
       emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
       emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
 
@@ -2539,7 +2530,7 @@ export async function registerRoutes(
       if (err instanceof ScorerBoardAuthorizationError) {
         return res.status(403).json({ message: err.message, code: err.code });
       }
-      if (err instanceof ScorerLeaseConflictError || err instanceof ScorerMatchStartConflictError) {
+      if (err instanceof ScorerMatchStartConflictError) {
         return res.status(err.code === "MATCH_NOT_FOUND" ? 404 : 409).json({
           message: err.message,
           code: err.code,
@@ -2574,17 +2565,14 @@ export async function registerRoutes(
         boardNumber,
       );
       assertScorerMatchAssignedToBoard(match, assignment);
-      const result = await storage.restartMatchWithLease({
+      const updatedMatch = await storage.restartMatchForBoard({
         matchId,
         tournamentId,
         boardNumber,
-        boardSessionId: req.boardSession.id,
         authorizedMatchIds: assignment.assignedMatchIds,
       });
-      const updatedMatch = result.match;
 
       const tournament = await storage.getTournament(tournamentId);
-      emitScorerOwnershipLost(req.boardSession.id, { matchId, reason: "restart" });
       emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedMatch);
       emitBoardMatchUpdate(tournamentId, boardNumber, updatedMatch);
 
@@ -2593,7 +2581,7 @@ export async function registerRoutes(
       if (err instanceof ScorerBoardAuthorizationError) {
         return res.status(403).json({ message: err.message, code: err.code });
       }
-      if (err instanceof ScorerLeaseConflictError || err instanceof ScorerMatchStartConflictError) {
+      if (err instanceof ScorerMatchStartConflictError) {
         return res.status(err.code === "MATCH_NOT_FOUND" ? 404 : 409).json({ message: err.message, code: err.code });
       }
       console.error("Scorer match restart error:", err);
@@ -2630,13 +2618,7 @@ export async function registerRoutes(
       if (match.status !== "IN_PROGRESS") {
         return res.json({ ownedByCurrentSession: false, active: false, expiresAt: null });
       }
-      const lease = await storage.getScorerLease(matchId);
-      const active = !!lease && (!lease.expiresAt || new Date() <= lease.expiresAt);
-      res.json({
-        ownedByCurrentSession: lease?.boardSessionId === req.boardSession.id && active,
-        active,
-        expiresAt: lease?.expiresAt || null,
-      });
+      res.json({ ownedByCurrentSession: true, active: true, expiresAt: null });
     } catch (err) {
       if (err instanceof ScorerBoardAuthorizationError) {
         return res.status(err.message === "Match not found" ? 404 : 403).json({ message: err.message, code: err.code });
@@ -2645,66 +2627,43 @@ export async function registerRoutes(
     }
   });
 
-  const acquireOwnership = async (req: any, res: any, takeover: boolean) => {
+  const authorizeBoardScorer = async (req: any, res: any) => {
     try {
       const matchId = parseInt(req.params.matchId);
-      const { match, assignment } = await getScorerMatchAssignment(req, matchId);
+      const { match } = await getScorerMatchAssignment(req, matchId);
       if (match.status !== "IN_PROGRESS") {
-        return res.status(409).json({ message: "Only IN_PROGRESS matches may have scorer ownership", code: "MATCH_NOT_IN_PROGRESS" });
+        return res.status(409).json({ message: "Match is not in progress", code: "MATCH_NOT_IN_PROGRESS" });
       }
-      const result = takeover
-        ? await storage.takeoverScorerLease({
-            matchId,
-            tournamentId: req.boardSession.tournamentId,
-            boardNumber: req.boardSession.boardNumber,
-            boardSessionId: req.boardSession.id,
-          })
-        : await storage.acquireScorerLease({
-            matchId,
-            tournamentId: req.boardSession.tournamentId,
-            boardNumber: req.boardSession.boardNumber,
-            boardSessionId: req.boardSession.id,
-          });
-      if (result.priorOwner) {
-        emitScorerOwnershipLost(result.priorOwner.boardSessionId, { matchId, reason: "takeover" });
-      }
-      emitScorerOwnershipAcquired(req.boardSession.id, { matchId });
-      res.json({
-        ownedByCurrentSession: true,
-        active: true,
-        expiresAt: result.lease.expiresAt,
-      });
+      res.json({ ownedByCurrentSession: true, active: true, expiresAt: null });
     } catch (err) {
       if (err instanceof ScorerBoardAuthorizationError) {
         return res.status(err.message === "Match not found" ? 404 : 403).json({ message: err.message, code: err.code });
-      }
-      if (err instanceof ScorerLeaseConflictError) {
-        return res.status(409).json({ message: err.message, code: err.code });
       }
       res.status(500).json({ message: "Internal server error" });
     }
   };
 
-  app.post('/api/scorer/matches/:matchId/ownership/acquire', isBoardAuthenticated, (req: any, res) => acquireOwnership(req, res, false));
+  // Keep the old endpoint names for paired tablets with cached client code.
+  // These now check the current board assignment; they never create a lease.
+  app.post('/api/scorer/matches/:matchId/ownership/acquire', isBoardAuthenticated, authorizeBoardScorer);
   app.post('/api/scorer/matches/:matchId/ownership/takeover', isBoardAuthenticated, (req: any, res) => {
     if (req.body?.confirm !== true) {
       return res.status(400).json({ message: "Explicit takeover confirmation is required", code: "TAKEOVER_CONFIRMATION_REQUIRED" });
     }
-    return acquireOwnership(req, res, true);
+    return authorizeBoardScorer(req, res);
   });
 
   app.post('/api/scorer/matches/:matchId/ownership/heartbeat', isBoardAuthenticated, async (req: any, res) => {
     try {
       const matchId = parseInt(req.params.matchId);
-      await getScorerMatchAssignment(req, matchId);
-      const lease = await storage.heartbeatScorerLease(matchId, req.boardSession.id);
-      res.json({ ownedByCurrentSession: true, active: true, expiresAt: lease.expiresAt });
+      const { match } = await getScorerMatchAssignment(req, matchId);
+      if (match.status !== "IN_PROGRESS") {
+        return res.status(409).json({ message: "Match is not in progress", code: "MATCH_NOT_IN_PROGRESS" });
+      }
+      res.json({ ownedByCurrentSession: true, active: true, expiresAt: null });
     } catch (err) {
       if (err instanceof ScorerBoardAuthorizationError) {
         return res.status(err.message === "Match not found" ? 404 : 403).json({ message: err.message, code: err.code });
-      }
-      if (err instanceof ScorerLeaseConflictError) {
-        return res.status(409).json({ message: err.message, code: err.code });
       }
       res.status(500).json({ message: "Internal server error" });
     }
@@ -2763,7 +2722,7 @@ export async function registerRoutes(
       }
 
       const { scoreA, scoreB, expectedVersion, legSubmissionId, completedLeg, notes, checkout } = parsed.data;
-      const atomicResult = await storage.submitCompletedLegWithLease({
+      const atomicResult = await storage.submitCompletedLegForBoard({
         matchId,
         expectedVersion,
         submissionId: legSubmissionId,
@@ -2918,9 +2877,6 @@ export async function registerRoutes(
       if (err instanceof ScorerBoardAuthorizationError) {
         return res.status(403).json({ message: err.message, code: err.code });
       }
-      if (err instanceof ScorerLeaseConflictError) {
-        return res.status(409).json({ message: err.message, code: err.code });
-      }
       if (err instanceof ScoringConflictError) {
         return res.status(409).json({
           message: err.message,
@@ -3049,9 +3005,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Current thrower or checkout state is invalid", code: "INVALID_CURRENT_LEG_STATE" });
       }
 
-      const persisted = await storage.persistCurrentLegStateWithLease({
+      const persisted = await storage.persistCurrentLegStateForBoard({
         matchId,
-        boardSessionId: req.boardSession.id,
         scoringVersion: state.scoringVersion,
         remainingA: state.remainingA,
         remainingB: state.remainingB,
@@ -3072,9 +3027,6 @@ export async function registerRoutes(
     } catch (err) {
       if (err instanceof ScorerBoardAuthorizationError) {
         return res.status(403).json({ message: err.message, code: err.code });
-      }
-      if (err instanceof ScorerLeaseConflictError) {
-        return res.status(409).json({ message: err.message, code: err.code });
       }
       if (err instanceof ScoringConflictError) {
         return res.status(409).json({ message: err.message, code: err.code, currentMatch: err.currentMatch });

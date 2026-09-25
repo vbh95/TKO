@@ -246,6 +246,10 @@ async function acquire(access: BoardAccess, matchId: number, takeover = false) {
   );
 }
 
+async function heartbeat(access: BoardAccess, matchId: number) {
+  return scorerRequest(access, matchId, "/ownership/heartbeat");
+}
+
 async function submit(
   access: BoardAccess,
   matchId: number,
@@ -326,7 +330,7 @@ async function main() {
     );
     disposableUserId = user.id;
 
-    await pass("A one scorer normal flow", async () => {
+    await pass("A valid Board1 session starts its assigned pending match", async () => {
       const tournamentId = await createTournament("a");
       const matchId = await createMatch({ tournamentId, status: "PENDING" });
       const a = await createBoardAccess(tournamentId, 1);
@@ -339,19 +343,18 @@ async function main() {
       assert.deepEqual([second.body.scoreA, second.body.scoreB], [1, 1]);
     });
 
-    await pass("B second scorer blocked without mutation", async () => {
+    await pass("B another valid session on the assigned board can score", async () => {
       const tournamentId = await createTournament("b");
       const matchId = await createMatch({ tournamentId, status: "PENDING" });
       const a = await createBoardAccess(tournamentId, 1);
       const b = await createBoardAccess(tournamentId, 1);
       assert.equal((await start(a, matchId)).status, 200);
-      const before = await getMatch(matchId);
-      const response = await submit(b, matchId, before.scoring_version);
-      assert.equal(response.status, 409);
-      assert.deepEqual(await getMatch(matchId), before);
+      const response = await submit(b, matchId, (await getMatch(matchId)).scoring_version);
+      assert.equal(response.status, 200);
+      assert.deepEqual([response.body.scoreA, response.body.scoreB], [1, 0]);
     });
 
-    await pass("C explicit takeover transfers authority", async () => {
+    await pass("C acquire and takeover are assignment checks, not exclusive ownership", async () => {
       const tournamentId = await createTournament("c");
       const matchId = await createMatch({ tournamentId });
       const a = await createBoardAccess(tournamentId, 1);
@@ -359,18 +362,19 @@ async function main() {
       assert.equal((await acquire(a, matchId)).status, 200);
       assert.equal((await acquire(b, matchId, true)).status, 200);
       assert.equal((await submit(b, matchId, 0)).status, 200);
-      assert.equal((await submit(a, matchId, 0)).status, 409);
+      assert.equal((await submit(a, matchId, 1)).status, 200);
     });
 
-    await pass("D stale device with valid version is rejected by ownership", async () => {
+    await pass("D stale scorer version is rejected regardless of session", async () => {
       const tournamentId = await createTournament("d");
       const matchId = await createMatch({ tournamentId });
       const a = await createBoardAccess(tournamentId, 1);
       const b = await createBoardAccess(tournamentId, 1);
       assert.equal((await acquire(a, matchId)).status, 200);
       assert.equal((await acquire(b, matchId, true)).status, 200);
+      assert.equal((await submit(b, matchId, 0)).status, 200);
       const before = await getMatch(matchId);
-      assert.equal((await submit(a, matchId, before.scoring_version)).status, 409);
+      assert.equal((await submit(a, matchId, 0)).status, 409);
       assert.deepEqual(await getMatch(matchId), before);
     });
 
@@ -379,22 +383,40 @@ async function main() {
       const matchId = await createMatch({ tournamentId });
       const a = await createBoardAccess(tournamentId, 1);
       assert.equal((await acquire(a, matchId)).status, 200);
-      const firstLeg = await submit(a, matchId, 0);
-      assert.equal(firstLeg.status, 200);
-      const before = await getMatch(matchId);
+      const visits = [
+        { player: "A" as const, score: 180 },
+        { player: "B" as const, score: 140 },
+      ];
+      assert.equal((await postCurrentLeg(a, matchId, {
+        scoringVersion: 0,
+        remainingA: 321,
+        remainingB: 361,
+        currentThrower: "A",
+        legStartingThrower: "A",
+        visits,
+        checkoutStats: emptyCheckoutStats(),
+        pendingCheckout: null,
+      })).status, 200);
       assert.equal((await acquire(a, matchId)).status, 200);
-      assert.deepEqual(await getMatch(matchId), before);
-      assert.deepEqual([before.score_a, before.score_b], [1, 0]);
+      const refreshed = await boardData(a);
+      const match = refreshed.body.matches.find((item: any) => item.id === matchId);
+      assert.equal(match.currentLegState.remainingA, 321);
+      assert.deepEqual(match.currentLegState.visits, visits);
     });
 
-    await pass("F expired lease can be recovered", async () => {
+    await pass("F expired stale lease does not block assigned board session", async () => {
       const tournamentId = await createTournament("f");
       const matchId = await createMatch({ tournamentId });
       const a = await createBoardAccess(tournamentId, 1);
       const b = await createBoardAccess(tournamentId, 1);
-      assert.equal((await acquire(a, matchId)).status, 200);
-      await query(`UPDATE scorer_leases SET expires_at = now() - interval '1 second' WHERE match_id = $1`, [matchId]);
+      await query(
+        `INSERT INTO scorer_leases (
+           match_id, tournament_id, board_number, board_session_id, expires_at
+         ) VALUES ($1, $2, 1, $3, now() - interval '1 second')`,
+        [matchId, tournamentId, a.id],
+      );
       assert.equal((await acquire(b, matchId)).status, 200);
+      assert.equal((await submit(b, matchId, 0)).status, 200);
     });
 
     await pass("G wrong-board start is rejected", async () => {
@@ -434,34 +456,94 @@ async function main() {
       assert.equal(states.filter(m => m.status === "IN_PROGRESS").length, 1);
     });
 
-    await pass("K concurrent free lease acquisition has one owner", async () => {
+    await pass("K concurrent assignment checks do not create scorer leases", async () => {
       const tournamentId = await createTournament("k");
       const matchId = await createMatch({ tournamentId });
       const a = await createBoardAccess(tournamentId, 1);
       const b = await createBoardAccess(tournamentId, 1);
       const responses = await Promise.all([acquire(a, matchId), acquire(b, matchId)]);
-      assert.deepEqual(responses.map(r => r.status).sort(), [200, 409]);
-      const [lease] = await query<{ board_session_id: number }>(
-        `SELECT board_session_id FROM scorer_leases WHERE match_id = $1`,
+      assert.deepEqual(responses.map(r => r.status).sort(), [200, 200]);
+      assert.equal((await acquire(b, matchId, true)).status, 200);
+      assert.equal((await heartbeat(a, matchId)).status, 200);
+      const [leases] = await query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM scorer_leases WHERE match_id = $1`,
         [matchId],
       );
-      assert.ok(lease);
-      assert.ok([a.id, b.id].includes(lease.board_session_id));
+      assert.equal(leases.count, 0);
     });
 
-    await pass("L takeover blocks pending work without an extra leg", async () => {
+    await pass("L takeover status check does not revoke assigned session", async () => {
       const tournamentId = await createTournament("l");
       const matchId = await createMatch({ tournamentId });
       const a = await createBoardAccess(tournamentId, 1);
       const b = await createBoardAccess(tournamentId, 1);
       assert.equal((await acquire(a, matchId)).status, 200);
       assert.equal((await acquire(b, matchId, true)).status, 200);
-      const beforeHistory = await getHistory(matchId);
-      assert.equal((await submit(a, matchId, 0)).status, 409);
-      assert.equal((await getHistory(matchId)).length, beforeHistory.length);
+      assert.equal((await submit(a, matchId, 0)).status, 200);
+      assert.equal((await getHistory(matchId)).length, 1);
+      assert.equal((await submit(b, matchId, 0)).status, 409);
+      assert.equal((await getHistory(matchId)).length, 1);
     });
 
-    await pass("Stage 1 replay and stale version remain protected for owner", async () => {
+    await pass("M new valid board session resumes match and restores unfinished leg", async () => {
+      const tournamentId = await createTournament("m");
+      const matchId = await createMatch({ tournamentId, status: "PENDING" });
+      const originalSession = await createBoardAccess(tournamentId, 1);
+      const resumedSession = await createBoardAccess(tournamentId, 1);
+      const started = await start(originalSession, matchId);
+      assert.equal(started.status, 200);
+
+      const visits = [
+        { player: "A" as const, score: 180 },
+        { player: "B" as const, score: 100 },
+      ];
+      assert.equal((await postCurrentLeg(originalSession, matchId, {
+        scoringVersion: started.body.scoringVersion,
+        remainingA: 321,
+        remainingB: 401,
+        currentThrower: "A",
+        legStartingThrower: "A",
+        visits,
+        checkoutStats: emptyCheckoutStats(),
+        pendingCheckout: null,
+      })).status, 200);
+
+      assert.equal((await acquire(resumedSession, matchId)).status, 200);
+      const resumed = await boardData(resumedSession);
+      assert.equal(resumed.status, 200);
+      const match = resumed.body.matches.find((item: any) => item.id === matchId);
+      assert.ok(match);
+      assert.equal(match.currentLegState.remainingA, 321);
+      assert.equal(match.currentLegState.remainingB, 401);
+      assert.deepEqual(match.currentLegState.visits, visits);
+    });
+
+    await pass("N board session must match both board and tournament", async () => {
+      const tournamentId = await createTournament("n");
+      const otherTournamentId = await createTournament("n-other");
+      const matchId = await createMatch({ tournamentId, status: "PENDING", boardNumber: 1 });
+      const boardTwo = await createBoardAccess(tournamentId, 2);
+      const otherTournamentBoardOne = await createBoardAccess(otherTournamentId, 1);
+      assert.equal((await start(boardTwo, matchId)).status, 403);
+      assert.equal((await start(otherTournamentBoardOne, matchId)).status, 403);
+      assert.equal((await getMatch(matchId)).status, "PENDING");
+    });
+
+    await pass("O invalid and expired board sessions are rejected", async () => {
+      const tournamentId = await createTournament("o");
+      const matchId = await createMatch({ tournamentId, status: "PENDING" });
+      const invalid: BoardAccess = { id: -1, token: `${runId}-invalid-${randomUUID()}`, boardNumber: 1 };
+      const expired = await createBoardAccess(tournamentId, 1);
+      await query(
+        `UPDATE board_sessions SET expires_at = now() - interval '1 second' WHERE id = $1`,
+        [expired.id],
+      );
+      assert.equal((await start(invalid, matchId)).status, 401);
+      assert.equal((await start(expired, matchId)).status, 401);
+      assert.equal((await getMatch(matchId)).status, "PENDING");
+    });
+
+    await pass("Stage 1 replay is idempotent and stale version remains protected", async () => {
       const tournamentId = await createTournament("stage1");
       const matchId = await createMatch({ tournamentId });
       const a = await createBoardAccess(tournamentId, 1);
@@ -477,7 +559,7 @@ async function main() {
       assert.equal((await getHistory(matchId)).length, 1);
     });
 
-    await pass("Stage 2B durable takeover, recovery, completion, and reset", async () => {
+    await pass("Stage 2B board-session recovery, completion, and reset", async () => {
       const tournamentId = await createTournament("stage2b");
       const matchId = await createMatch({ tournamentId });
       const a = await createBoardAccess(tournamentId, 1);
@@ -547,7 +629,7 @@ async function main() {
         visits: [...visits, { player: "A", score: 141 }],
         checkoutStats: stats,
         pendingCheckout: { player: "A", newLegsA: 1, newLegsB: 0, checkoutScore: 141 },
-      })).status, 409);
+      })).status, 200);
 
       const completedVisits = [...visits, { player: "A" as const, score: 141 }];
       assert.equal((await postCurrentLeg(b, matchId, {
