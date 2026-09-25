@@ -1,0 +1,352 @@
+Continue the TKO scoring audit with:
+
+STAGE 3A — Recovery & Concurrency Reproduction Tests
+
+This is a TEST-FIRST verification stage.
+
+IMPORTANT:
+Do not fix production code during Stage 3A.
+
+The previous Stage 3 assessment identified four potential recovery/concurrency gaps. The purpose of Stage 3A is to reproduce and precisely prove or disprove those findings before any production implementation changes are made.
+
+DO NOT:
+- modify production application behaviour
+- weaken existing tests
+- change existing assertions merely to obtain passes
+- refactor scorer architecture
+- change database schema
+- run destructive migrations
+- touch live Neon
+- modify .replit
+- modify Nix
+- modify deployment configuration
+- modify environment variables
+- start Stage 3B fixes
+- alter Stage 1 or Stage 2 protections
+
+Keep credit usage low and changes tightly scoped to tests/test infrastructure.
+
+==================================================
+BASELINE THAT MUST REMAIN INTACT
+==================================================
+
+Stage 1:
+Authoritative completed-leg database integrity, scoring versions,
+submission IDs, idempotency, transaction rollback and reset
+invalidation.
+
+Stage 2:
+Scorer ownership/leases.
+
+Stage 2B:
+Durable unfinished-leg persistence and recovery.
+
+Existing regression suites:
+
+tests/scoring-integrity.test.ts
+tests/stage1-database.integration.ts
+tests/stage2-database.integration.ts
+
+Do not duplicate tests already proving server behaviour unless
+additional setup is required to reproduce a Stage 3 client/recovery
+condition.
+
+==================================================
+STAGE 3A TEST GROUP 1
+SAME-SESSION STALE SNAPSHOT
+==================================================
+
+Highest priority.
+
+Reproduce the scenario where two tabs effectively share the SAME
+board-session identity/cookie.
+
+Required sequence:
+
+1. Start/recover the same match using the same valid scorer session.
+2. Tab/request A obtains current unfinished-leg state.
+3. Tab/request B obtains the same state.
+4. A advances the unfinished leg and successfully persists the newer
+   snapshot.
+5. B still holds its older snapshot.
+6. B attempts to persist that older but otherwise valid snapshot.
+7. Read the durable current-leg state from the server/database.
+
+The test must determine whether B can replace A's newer state.
+
+Do not simulate this using two different scorer sessions because
+Stage 2 already protects that case.
+
+We specifically need SAME SESSION / STALE STATE.
+
+Also establish the distinction between:
+
+STALE WRITE
+and
+INTENTIONAL UNDO
+
+because the eventual production protection must not prevent a valid
+undo operation.
+
+If current production behaviour allows the stale overwrite, the test
+should fail for that exact reason.
+
+Do not fix it yet.
+
+==================================================
+STAGE 3A TEST GROUP 2
+SCORER REMOUNT / AUTHORITATIVE HYDRATION
+==================================================
+
+Add focused scorer/client tests where practical.
+
+Test recovery from server state for:
+
+A. untouched active leg
+B. partially played leg
+C. checkout-ready unfinished leg
+D. just-completed leg
+E. fully completed match
+F. state after admin reset
+G. state after persisted undo
+
+Verify:
+
+- remaining scores
+- visit history
+- current thrower
+- starter where applicable
+- pending checkout state
+- match score
+- scoring version
+- completed status
+
+Most importantly:
+
+Recovery/remount itself must NOT:
+- create a visit
+- create a leg
+- resubmit a completed leg
+- revert durable state
+- reopen a completed match
+
+Where possible, explicitly reproduce the stale-query-cache condition
+identified in the Stage 3 assessment.
+
+Do not redesign query behaviour yet.
+
+==================================================
+STAGE 3A TEST GROUP 3
+SOCKET DISCONNECT / RECONNECT
+==================================================
+
+Test the active scorer behaviour across:
+
+1. scorer is connected
+2. scorer begins/continues an active match
+3. socket disconnects
+4. authoritative server state changes while disconnected
+5. socket reconnects
+
+Determine whether the scorer:
+
+- rejoins the required scorer room
+- refetches authoritative state
+- reconciles active match state
+- recognises ownership loss
+- recognises version/reset changes
+- avoids submitting stale local state
+
+Also test:
+
+disconnect
+→ ownership invalidated/taken over
+→ reconnect
+
+The stale scorer must not silently regain write authority.
+
+If room rejoining or active-state reconciliation does not happen,
+capture that as a failing reproduction.
+
+Do not fix socket behaviour yet.
+
+==================================================
+STAGE 3A TEST GROUP 4
+LOST RESPONSE + PAGE REFRESH
+==================================================
+
+Test both distinct cases.
+
+CASE A — ordinary lost HTTP response
+
+Server successfully commits the completed leg but the client does not
+receive the response.
+
+Then simulate page refresh/remount.
+
+Verify:
+- exactly one completed leg exists
+- authoritative match score is correct
+- no duplicate leg can be produced
+- scorer recovers to the correct current state
+
+CASE B — commit succeeds but post-commit progression/side-effect fails
+
+Use the existing Stage 1 failure mechanism if possible.
+
+Sequence:
+
+1. completed-leg transaction commits
+2. progression/side-effect fails
+3. client loses the useful response / refreshes
+4. original in-memory submission ID is gone
+5. scorer recovers from authoritative server state
+
+Determine whether the outstanding post-commit work can ever be
+completed after that refresh.
+
+The purpose is NOT merely to check duplicate-leg protection.
+
+We specifically need to prove or disprove the Stage 3 finding that
+the original submission ID exists only in React memory and therefore
+the recovery path may lose the ability to resume outstanding
+post-commit processing.
+
+Do not fix this yet.
+
+==================================================
+TEST QUALITY REQUIREMENTS
+==================================================
+
+Use existing test helpers and infrastructure wherever possible.
+
+Do not build a large new testing framework unless absolutely
+necessary.
+
+If browser-level testing infrastructure does not currently exist,
+do not install a large dependency automatically.
+
+Instead:
+
+1. identify the smallest practical testing boundary
+2. extract/test existing logic only if that can be done without
+   changing production behaviour
+3. explain any scenario that cannot currently be automated
+
+A test should fail because it demonstrates the suspected production
+defect — not because the test environment is incomplete.
+
+Do not change production validation to make tests easier.
+
+==================================================
+RUN EXISTING REGRESSIONS
+==================================================
+
+After adding the Stage 3A reproductions, run:
+
+tests/scoring-integrity.test.ts
+
+complete:
+tests/stage1-database.integration.ts
+
+complete:
+tests/stage2-database.integration.ts
+
+and the new Stage 3A tests.
+
+Clearly separate:
+
+EXISTING REGRESSION RESULTS
+
+from:
+
+NEW STAGE 3A RESULTS
+
+A newly added reproduction test failing because it successfully
+demonstrates a Stage 3 defect is an EXPECTED RED result.
+
+Existing Stage 1 or Stage 2 tests failing is NOT acceptable and must
+be reported separately.
+
+Do not modify production code to make the new tests green during this
+stage.
+
+==================================================
+REPORT
+==================================================
+
+At completion provide:
+
+# STAGE 3A TEST RESULTS
+
+## Files changed
+Only test/test-support files should normally appear here.
+
+## Existing regression suites
+For each:
+- command
+- passed
+- failed
+- total
+
+## Stage 3A results
+
+For each scenario:
+
+### Same-session stale snapshot
+Result:
+PASS / EXPECTED RED / COULD NOT TEST
+
+Observed behaviour:
+Exact reason:
+Relevant code path:
+
+### Remount / hydration
+Result:
+PASS / EXPECTED RED / COULD NOT TEST
+
+Observed behaviour:
+Exact reason:
+Relevant code path:
+
+### Disconnect / reconnect
+Result:
+PASS / EXPECTED RED / COULD NOT TEST
+
+Observed behaviour:
+Exact reason:
+Relevant code path:
+
+### Lost response + refresh
+Result:
+PASS / EXPECTED RED / COULD NOT TEST
+
+Observed behaviour:
+Exact reason:
+Relevant code path:
+
+## Confirmed defects
+
+List ONLY defects actually demonstrated by tests.
+
+For each include:
+- reproduction
+- expected behaviour
+- actual behaviour
+- likely production cause
+- severity
+- smallest likely fix area
+
+## Findings not reproduced
+
+List assessment concerns that the tests disproved or could not
+reproduce.
+
+## Stage 3B recommendation
+
+Based ONLY on confirmed test failures, specify the smallest set of
+production changes required for Stage 3B.
+
+DO NOT IMPLEMENT STAGE 3B.
+
+Stop after the report.
