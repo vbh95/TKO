@@ -1,0 +1,80 @@
+Continue the TKO software audit/fix work from where we left off.
+
+IMPORTANT:
+- Do not redo completed Stage 1 / Stage 2B work.
+- Do not weaken, remove, skip, or rewrite existing tests just to make them pass.
+- Do not make broad refactors.
+- Do not alter unrelated tournament functionality.
+- Keep credit usage low.
+- Make the smallest production changes necessary.
+- Preserve the existing database/session/versioning protections already implemented.
+
+CURRENT VERIFIED BASELINE:
+
+The previous blocker-closing pass was completed successfully.
+
+The complete Stage 1 database integration suite passed 15/15.
+
+That verification included:
+- concurrent leg submissions
+- duplicate identical submission IDs
+- lost-response retry using the same submission ID
+- replay of an old accepted submission
+- winner mismatch validation
+- legHistory count validation against authoritative score
+- note persistence rollback
+- match update rollback
+- scorer adoption of returned match versions
+- adoption of non-zero versions
+- multiple-leg scorer submissions
+- admin reset invalidating an active scorer session
+- durable checkout-ready current-leg snapshots
+- checkout data being included with completed-leg submissions
+- existing concurrent-submission protections remaining intact
+
+The previous instruction explicitly said:
+"Completed the three verification blockers only. No Stage 3 work was started."
+
+Therefore assume Stage 1 / the relevant Stage 2B blocker work is COMPLETE unless the repository itself proves otherwise.
+
+TASK:
+
+1. Locate the existing audit plan, audit notes, TODOs, stage documentation, test files, or previous Agent work in this repository.
+
+2. Identify exactly what the NEXT audit stage/item is after the work already completed.
+
+3. Before modifying production code, report:
+   - the next stage number/name
+   - what that stage is intended to verify/fix
+   - files likely involved
+   - existing tests covering it
+   - any missing tests
+   - risks to existing scorer/tournament behaviour
+
+4. Do NOT start changing code yet.
+
+5. Do NOT jump ahead to later stages.
+
+6. Do NOT regenerate or replace the audit plan.
+
+7. Do NOT modify .replit, Nix configuration, database configuration, environment variables, or deployment configuration as part of this audit step.
+
+8. Do NOT touch the live Neon database or perform destructive migrations.
+
+At the end, give me a concise report headed:
+
+NEXT AUDIT STAGE
+
+Include:
+- Stage:
+- Purpose:
+- Current implementation:
+- Problems found:
+- Tests already present:
+- Tests needed:
+- Files involved:
+- Recommended smallest fix:
+- Risk level:
+- Estimated scope:
+
+Stop after the assessment and wait for the next instruction.
