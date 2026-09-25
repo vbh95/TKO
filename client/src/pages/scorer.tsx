@@ -121,14 +121,6 @@ interface MatchStats {
 }
 
 type ScorerView = "matchList" | "bullThrow" | "scoring" | "matchReport";
-type OwnershipState = "unknown" | "owned" | "conflict";
-
-const OWNERSHIP_CONFLICT_CODES = new Set([
-  "SCORER_LEASE_ACTIVE",
-  "SCORER_LEASE_SESSION_MISMATCH",
-  "SCORER_LEASE_EXPIRED",
-  "SCORER_LEASE_MISSING",
-]);
 
 const STARTING_SCORE = 501;
 
@@ -575,34 +567,6 @@ function AddToHomeBanner() {
   );
 }
 
-function OwnershipConflictNotice({
-  message,
-  onTakeover,
-  overlay = false,
-}: {
-  message: string;
-  onTakeover: () => void;
-  overlay?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-xl border border-amber-500/50 bg-amber-500/10 p-4 text-center",
-        overlay && "fixed inset-0 z-[250] flex items-center justify-center rounded-none bg-black/75 p-6",
-      )}
-      data-testid="scorer-ownership-conflict"
-    >
-      <div className={cn(overlay && "w-full max-w-md rounded-xl border border-amber-500/50 bg-background p-6 shadow-2xl")}>
-        <p className="font-bold text-amber-700 dark:text-amber-300">This match is currently being scored on another device.</p>
-        <p className="mt-1 text-sm text-muted-foreground">{message}</p>
-        <Button className="mt-4" onClick={onTakeover} data-testid="button-takeover-scoring">
-          Take Over Scoring
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export default function ScorerPage() {
   const params = useParams<{ tournamentId: string; boardNumber: string }>();
   const tournamentId = parseInt(params.tournamentId || "0");
@@ -613,10 +577,6 @@ export default function ScorerPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [view, setView] = useState<ScorerView>("matchList");
   const [activeMatchId, setActiveMatchId] = useState<number | null>(null);
-  const [ownershipState, setOwnershipState] = useState<OwnershipState>("unknown");
-  const [ownershipMatchId, setOwnershipMatchId] = useState<number | null>(null);
-  const [ownershipConflictMessage, setOwnershipConflictMessage] = useState<string | null>(null);
-  const ownershipAttemptRef = useRef<number | null>(null);
   const userNavigatedBackRef = useRef(false);
 
   const [legsWonA, setLegsWonA] = useState(0);
@@ -654,47 +614,6 @@ export default function ScorerPage() {
   const [swapPlayers, setSwapPlayers] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
-
-  const enterOwnershipConflict = useCallback((matchId: number, message: string) => {
-    clearScorerState(matchId);
-    setOwnershipState("conflict");
-    setOwnershipMatchId(matchId);
-    setOwnershipConflictMessage(message || "This match is currently being scored on another device.");
-    setPendingCheckout(null);
-    setPendingDartsAtDouble(false);
-    setSelectedDartsAtDouble(null);
-    setSelectedCheckoutDartsUsed(null);
-    isSubmittingLegRef.current = false;
-  }, []);
-
-  const requestOwnership = useCallback(async (matchId: number, takeover = false): Promise<boolean> => {
-    const endpoint = takeover
-      ? `/api/scorer/matches/${matchId}/ownership/takeover`
-      : `/api/scorer/matches/${matchId}/ownership/acquire`;
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: takeover ? { "Content-Type": "application/json" } : undefined,
-      credentials: "include",
-      body: takeover ? JSON.stringify({ confirm: true }) : undefined,
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      if (res.status === 409 && OWNERSHIP_CONFLICT_CODES.has(body.code)) {
-        enterOwnershipConflict(matchId, body.message);
-      } else {
-        toast({
-          title: takeover ? "Takeover failed" : "Unable to acquire scoring",
-          description: body.message || "Please try again.",
-          variant: "destructive",
-        });
-      }
-      return false;
-    }
-    setOwnershipState("owned");
-    setOwnershipMatchId(matchId);
-    setOwnershipConflictMessage(null);
-    return true;
-  }, [enterOwnershipConflict, toast]);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -798,18 +717,6 @@ export default function ScorerPage() {
     });
   }, []);
 
-  const takeoverOwnership = useCallback(async () => {
-    if (ownershipMatchId === null) return;
-    const matchId = ownershipMatchId;
-    if (!window.confirm("Take over scoring on this device? The other scorer will become read-only.")) return;
-    const succeeded = await requestOwnership(matchId, true);
-    if (!succeeded) return;
-    clearScorerState(matchId);
-    setActiveMatchId(null);
-    setView("matchList");
-    await refetch();
-  }, [ownershipMatchId, requestOwnership, refetch]);
-
   useEffect(() => {
     if (data) {
       joinScorer();
@@ -818,44 +725,17 @@ export default function ScorerPage() {
   }, [data, tournamentId, boardNumber, joinScorer, joinBoard]);
 
   useEffect(() => {
-    if (ownershipState !== "owned" || ownershipMatchId === null || view !== "scoring") return;
-    const heartbeat = window.setInterval(async () => {
-      const res = await fetch(`/api/scorer/matches/${ownershipMatchId}/ownership/heartbeat`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        if (res.status === 409 && OWNERSHIP_CONFLICT_CODES.has(body.code)) {
-          enterOwnershipConflict(ownershipMatchId, body.message);
-        }
-      }
-    }, 30000);
-    return () => window.clearInterval(heartbeat);
-  }, [ownershipState, ownershipMatchId, view, enterOwnershipConflict]);
-
-  useEffect(() => {
-    if (!data || isFetching || view !== "matchList" || activeMatchId !== null) return;
-    const inProgress = data.matches.find(m => m.status === "IN_PROGRESS");
-    if (!inProgress || ownershipMatchId === inProgress.id || ownershipAttemptRef.current === inProgress.id) return;
-    ownershipAttemptRef.current = inProgress.id;
-    void requestOwnership(inProgress.id).finally(() => {
-      ownershipAttemptRef.current = null;
-    });
-  }, [data, isFetching, view, activeMatchId, ownershipMatchId, requestOwnership]);
-
-  useEffect(() => {
     if (data && !isFetching && view === "matchList" && activeMatchId === null) {
       if (userNavigatedBackRef.current) {
         userNavigatedBackRef.current = false;
         return;
       }
       const inProgress = data.matches.find(m => m.status === 'IN_PROGRESS');
-      if (inProgress && ownershipMatchId === inProgress.id && ownershipState === "owned") {
+      if (inProgress) {
         hydrateAuthoritativeScorerState(inProgress);
       }
     }
-  }, [data, isFetching, view, activeMatchId, ownershipMatchId, ownershipState, hydrateAuthoritativeScorerState]);
+  }, [data, isFetching, view, activeMatchId, hydrateAuthoritativeScorerState]);
 
   useEffect(() => {
     const cleanup1 = on("connect", () => setIsConnected(true));
@@ -889,9 +769,6 @@ export default function ScorerPage() {
       setLegsWonA(startedMatch.scoreA || 0);
       setLegsWonB(startedMatch.scoreB || 0);
       setScoringVersion(startedMatch.scoringVersion || 0);
-      setOwnershipState("owned");
-      setOwnershipMatchId(startedMatch.id ?? matchId);
-      setOwnershipConflictMessage(null);
       setAllMatchVisits([]);
       setCheckoutAttemptsA(0);
       setCheckoutAttemptsB(0);
@@ -905,10 +782,7 @@ export default function ScorerPage() {
       setView("scoring");
       refetch();
     },
-    onError: (err: any, matchId) => {
-      if (err?.status === 409 && OWNERSHIP_CONFLICT_CODES.has(err.code)) {
-        enterOwnershipConflict(matchId, err.message);
-      }
+    onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -933,9 +807,6 @@ export default function ScorerPage() {
     },
     onSuccess: (_data, matchId) => {
       clearScorerState(matchId);
-      setOwnershipState("unknown");
-      setOwnershipMatchId(null);
-      setOwnershipConflictMessage(null);
       userNavigatedBackRef.current = true;
       setActiveMatchId(null);
       setConfirmRestart(null);
@@ -943,10 +814,6 @@ export default function ScorerPage() {
       toast({ title: "Match restarted", description: "The match has been reset and is ready to start again." });
     },
     onError: (err: Error) => {
-      const ownershipError = err as Error & { status?: number; code?: string };
-      if (ownershipError.status === 409 && OWNERSHIP_CONFLICT_CODES.has(ownershipError.code || "")) {
-        enterOwnershipConflict(activeMatchId ?? ownershipMatchId ?? 0, ownershipError.message);
-      }
       toast({ title: "Failed to restart", description: err.message, variant: "destructive" });
     },
   });
@@ -1019,11 +886,6 @@ export default function ScorerPage() {
       }
       return res.json();
     },
-    onError: (err: any) => {
-      if (err?.status === 409 && OWNERSHIP_CONFLICT_CODES.has(err.code)) {
-        if (activeMatchId !== null) enterOwnershipConflict(activeMatchId, err.message);
-      }
-    },
   });
 
   const resetLeg = (startingThrower: 'A' | 'B') => {
@@ -1078,7 +940,6 @@ export default function ScorerPage() {
     swapPlayersOverride?: boolean,
   ) => {
     // The server validates the paired session and current board assignment.
-    // Local ownership state can lag immediately after a successful start.
     const activeM = data?.matches.find(m => m.id === activeMatchId);
     if (!activeM) throw new Error("Match is not available.");
     const pA = activeM ? data?.players.find(p => p.id === activeM.playerAId) : null;
@@ -1395,16 +1256,6 @@ export default function ScorerPage() {
       await refetch();
     } catch (err: any) {
       isSubmittingLegRef.current = false;
-      if (err?.status === 409 && OWNERSHIP_CONFLICT_CODES.has(err.code)) {
-        enterOwnershipConflict(activeMatchId, err.message);
-        pendingLegSubmissionIdRef.current = null;
-        toast({
-          title: "Scoring ownership lost",
-          description: "Your unfinished leg was not submitted. Take over scoring to continue.",
-          variant: "destructive",
-        });
-        return;
-      }
       if (err?.status === 409) {
         pendingLegSubmissionIdRef.current = null;
         clearScorerState(activeMatchId);
@@ -1609,10 +1460,6 @@ export default function ScorerPage() {
     if (!match) return;
 
     if (match.status === 'IN_PROGRESS') {
-      if (ownershipState !== "owned" || ownershipMatchId !== matchId) {
-        const acquired = await requestOwnership(matchId);
-        if (!acquired) return;
-      }
       hydrateAuthoritativeScorerState(match);
     } else if (match.status === 'PENDING') {
       setActiveMatchId(matchId);
@@ -1696,7 +1543,6 @@ export default function ScorerPage() {
       };
 
       if (activeMatch.status === 'IN_PROGRESS') {
-        if (!(await requestOwnership(activeMatch.id))) return;
         await applyThrower(activeMatch);
       } else {
         startMatchMutation.mutate(activeMatch.id, {
@@ -1710,9 +1556,6 @@ export default function ScorerPage() {
 
     return (
       <div className="min-h-[100dvh] bg-[#1a1a1a] flex flex-col" data-testid="scorer-bull-throw">
-        {ownershipState === "conflict" && ownershipConflictMessage && (
-          <OwnershipConflictNotice message={ownershipConflictMessage} onTakeover={takeoverOwnership} overlay />
-        )}
         <div className="bg-primary text-primary-foreground py-2 px-3 shadow-lg shrink-0">
           <div className="flex items-center gap-2 max-w-4xl mx-auto">
             <Button
@@ -2170,9 +2013,6 @@ export default function ScorerPage() {
 
     return (
       <div className="fixed inset-0 bg-[hsl(222.2,84%,4.9%)] flex flex-col overflow-hidden z-[100]" data-testid="scorer-match-view">
-        {ownershipState === "conflict" && ownershipConflictMessage && (
-          <OwnershipConflictNotice message={ownershipConflictMessage} onTakeover={takeoverOwnership} overlay />
-        )}
         <div className="bg-primary text-primary-foreground py-1 md:py-2 px-3 shadow-lg shrink-0">
           <div className="relative flex items-center max-w-4xl mx-auto h-8 md:h-10">
             <Button
@@ -2888,11 +2728,6 @@ export default function ScorerPage() {
 
   return (
     <div className="min-h-screen bg-background" data-testid="scorer-view">
-      {ownershipState === "conflict" && ownershipConflictMessage && ownershipMatchId !== activeMatchId && (
-        <div className="container max-w-3xl mx-auto px-4 pt-4">
-          <OwnershipConflictNotice message={ownershipConflictMessage} onTakeover={takeoverOwnership} />
-        </div>
-      )}
       <div className="bg-primary text-primary-foreground py-6 px-4 shadow-lg">
         <div className="container max-w-3xl mx-auto">
           <div className="flex items-center justify-between">

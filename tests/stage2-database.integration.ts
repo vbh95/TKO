@@ -334,6 +334,16 @@ async function main() {
       const tournamentId = await createTournament("a");
       const matchId = await createMatch({ tournamentId, status: "PENDING" });
       const a = await createBoardAccess(tournamentId, 1);
+      // Compatibility ownership URLs authorize the board even before start;
+      // none of them may acquire a lease or block a PENDING match.
+      assert.equal((await acquire(a, matchId)).status, 200);
+      assert.equal((await heartbeat(a, matchId)).status, 200);
+      assert.equal((await scorerRequest(a, matchId, "/ownership", "GET")).status, 200);
+      const [leasesBeforeStart] = await query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM scorer_leases WHERE match_id = $1`,
+        [matchId],
+      );
+      assert.equal(leasesBeforeStart.count, 0);
       const started = await start(a, matchId);
       assert.equal(started.status, 200);
       const first = await submit(a, matchId, started.body.scoringVersion);

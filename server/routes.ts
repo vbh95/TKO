@@ -2614,10 +2614,7 @@ export async function registerRoutes(
   app.get('/api/scorer/matches/:matchId/ownership', isBoardAuthenticated, async (req: any, res) => {
     try {
       const matchId = parseInt(req.params.matchId);
-      const { match } = await getScorerMatchAssignment(req, matchId);
-      if (match.status !== "IN_PROGRESS") {
-        return res.json({ ownedByCurrentSession: false, active: false, expiresAt: null });
-      }
+      await getScorerMatchAssignment(req, matchId);
       res.json({ ownedByCurrentSession: true, active: true, expiresAt: null });
     } catch (err) {
       if (err instanceof ScorerBoardAuthorizationError) {
@@ -2630,10 +2627,7 @@ export async function registerRoutes(
   const authorizeBoardScorer = async (req: any, res: any) => {
     try {
       const matchId = parseInt(req.params.matchId);
-      const { match } = await getScorerMatchAssignment(req, matchId);
-      if (match.status !== "IN_PROGRESS") {
-        return res.status(409).json({ message: "Match is not in progress", code: "MATCH_NOT_IN_PROGRESS" });
-      }
+      await getScorerMatchAssignment(req, matchId);
       res.json({ ownedByCurrentSession: true, active: true, expiresAt: null });
     } catch (err) {
       if (err instanceof ScorerBoardAuthorizationError) {
@@ -2653,21 +2647,7 @@ export async function registerRoutes(
     return authorizeBoardScorer(req, res);
   });
 
-  app.post('/api/scorer/matches/:matchId/ownership/heartbeat', isBoardAuthenticated, async (req: any, res) => {
-    try {
-      const matchId = parseInt(req.params.matchId);
-      const { match } = await getScorerMatchAssignment(req, matchId);
-      if (match.status !== "IN_PROGRESS") {
-        return res.status(409).json({ message: "Match is not in progress", code: "MATCH_NOT_IN_PROGRESS" });
-      }
-      res.json({ ownedByCurrentSession: true, active: true, expiresAt: null });
-    } catch (err) {
-      if (err instanceof ScorerBoardAuthorizationError) {
-        return res.status(err.message === "Match not found" ? 404 : 403).json({ message: err.message, code: err.code });
-      }
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
+  app.post('/api/scorer/matches/:matchId/ownership/heartbeat', isBoardAuthenticated, authorizeBoardScorer);
 
   app.put('/api/scorer/matches/:matchId', isBoardAuthenticated, async (req: any, res) => {
     try {
