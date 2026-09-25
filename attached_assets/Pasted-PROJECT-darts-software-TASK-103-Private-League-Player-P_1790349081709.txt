@@ -1,0 +1,746 @@
+PROJECT: darts-software
+
+TASK #103 — Private League Player Profiles
+
+IMPORTANT WORKING RULES — FOLLOW THESE BEFORE MAKING ANY CHANGES
+
+This task is for the existing `darts-software` project.
+
+Work inside the existing architecture only.
+
+The site is currently working and contains live tournament/scoring functionality, so make this change conservatively.
+
+DO NOT:
+- rebuild the application
+- redesign unrelated pages
+- refactor unrelated code
+- change existing scoring logic
+- change leg submission logic
+- change match completion logic
+- change tournament progression
+- change league standings calculations
+- change ranking/tie-break logic
+- change points allocation
+- change qualification logic
+- change public league behaviour
+- change Charity Mode
+- change OBS overlays
+- change unrelated database tables
+- rename or reorganise unrelated files
+- install unnecessary packages
+- replace existing working components just to make this feature easier
+- make speculative “cleanup” changes
+
+Do not change anything outside the scope of this task unless it is absolutely required for this feature to work.
+
+If existing code can be reused, reuse it.
+
+Prefer the smallest safe change.
+
+Before editing a working function, first check whether the feature can be implemented without modifying it.
+
+Do not weaken existing validation, authentication, database protections, scoring protections, version checks, transaction behaviour or duplicate-submission safeguards.
+
+If something requested cannot be implemented safely without changing core tournament/scoring behaviour, do not modify that behaviour. Omit that optional part and explain why at completion.
+
+Keep credit usage low:
+- inspect only relevant files
+- do not perform a broad project audit
+- do not repeatedly scan the whole repository
+- do not run unrelated tests
+- do not make cosmetic changes outside this feature
+
+==================================================
+WHAT & WHY
+==================================================
+
+Add an owner-only player profile for each league so league creators can review a player's:
+
+- season performance
+- tournament attendance
+- tournament history
+- match and leg statistics
+- scoring statistics
+- performance trends
+- league-specific club membership
+
+This information is intended to help the league creator review players and make future administrative decisions.
+
+This task must NOT introduce wildcard recommendations, rankings or Champions Night qualification decisions.
+
+Existing league standings, scoring, tournament results and public behaviour must remain exactly as they are.
+
+==================================================
+DONE LOOKS LIKE
+==================================================
+
+- Only the authenticated league creator can open a private player profile.
+
+- Only the league creator can read or change league-specific membership information.
+
+- Logged-out users receive the application's existing unauthenticated response.
+
+- Another authenticated user receives HTTP 403.
+
+- Security is enforced SERVER-SIDE, not just by hiding React controls.
+
+- The league administration page provides a creator-only profile entry point.
+
+- Public league pages expose no profile-management or membership information.
+
+- Existing public APIs expose no private membership fields.
+
+- Club membership is stored for this specific league only.
+
+- Membership is not a global player property.
+
+- The creator can toggle membership and see the date it was originally confirmed.
+
+- Unticking membership does not erase the original confirmation date.
+
+- Membership persists after refresh.
+
+- The profile displays reliable league, tournament, match, leg, scoring and finishing statistics.
+
+- Missing or unavailable statistics display `—`.
+
+- Tournament history covers all tournaments belonging to that league in chronological order.
+
+- Attendance history clearly shows attended and missed tournaments.
+
+- Performance trend charts use the project's EXISTING Recharts/chart implementation.
+
+- Historical league position is shown only if it can be reconstructed reliably without changing existing standings/ranking logic.
+
+- Profile data is obtained through one efficient server request rather than many per-statistic requests.
+
+- Existing standings and tournament results are unchanged after implementation.
+
+==================================================
+STEP 1 — INSPECT ONLY THE RELEVANT EXISTING CODE
+==================================================
+
+Before implementing, inspect only the relevant areas of the existing `darts-software` project.
+
+Relevant files likely include:
+
+- `shared/schema.ts`
+- `server/routes.ts`
+- `server/storage.ts`
+- `client/src/App.tsx`
+- `client/src/pages/league-detail.tsx`
+- `client/src/pages/public-league.tsx`
+- `client/src/components/ui/chart.tsx`
+- `package.json`
+
+Also inspect only directly related helpers/types if referenced by those files.
+
+Confirm:
+
+1. How league ownership is currently stored.
+2. Confirm whether `leagues.userId` is the creator/owner field.
+3. How authentication/session checks are currently performed.
+4. How league standings are currently calculated.
+5. How tournament points are currently calculated.
+6. How league tournaments are associated.
+7. How players are represented within tournaments.
+8. How normalized player identity currently works across league tournaments.
+9. Which statistics already exist in `matches` / `match_notes`.
+10. How existing charts are implemented.
+11. How public league response objects are built.
+
+DO NOT perform a broad codebase audit.
+
+==================================================
+STEP 2 — LEAGUE-SPECIFIC CLUB MEMBERSHIP
+==================================================
+
+Current tournament players should NOT receive a global membership flag.
+
+Since membership belongs to a specific Sports & Social Club league, add the smallest sensible league-scoped record.
+
+Use the existing normalized player identity approach already used by league standings.
+
+Store only what is required, such as:
+
+- id
+- leagueId
+- normalized player identity
+- isClubMember
+- membershipConfirmedAt
+
+Use the project's existing naming/database conventions.
+
+Add an appropriate unique constraint so there cannot be duplicate membership rows for the same league/player identity.
+
+Example concept:
+
+UNIQUE (league_id, normalized_player_identity)
+
+Do NOT create a new global player identity system.
+
+Do NOT add `isClubMember` to the existing global/tournament player table.
+
+When membership is changed:
+
+If ticking ON:
+- set isClubMember = true
+- if membershipConfirmedAt is null, set it to the current timestamp
+
+If ticking OFF:
+- set isClubMember = false
+- keep membershipConfirmedAt unchanged
+
+This gives us a permanent record of when membership was first confirmed.
+
+==================================================
+STEP 3 — PRIVATE PROFILE SECURITY
+==================================================
+
+Create private profile APIs/routes using the application's existing route structure.
+
+Every profile read AND membership update must:
+
+1. Require an authenticated session.
+2. Load the requested league.
+3. Check ownership SERVER-SIDE.
+
+Use the existing ownership field.
+
+Expected logic should be equivalent to:
+
+`req.user.id === league.userId`
+
+Use the actual existing types/fields.
+
+If logged out:
+return the application's existing unauthenticated response.
+
+If logged in but not league owner:
+return HTTP 403.
+
+Do not rely on the frontend hiding the button.
+
+A user manually entering the API URL must still be denied.
+
+Also validate SERVER-SIDE that the requested player identity actually appears within a tournament belonging to that league.
+
+Do not trust an arbitrary player name or identity sent from the browser.
+
+A user must not be able to change a URL/API parameter to access a player from another league.
+
+==================================================
+STEP 4 — PRIVATE PROFILE ENTRY POINT
+==================================================
+
+On the EXISTING league administration/detail page:
+
+If the current authenticated user is the league creator:
+
+allow them to open a player's private profile.
+
+This can be:
+
+- clicking the player's name
+OR
+- a small `View Profile` admin action
+
+Choose whichever fits the existing interface with the smallest change.
+
+Do NOT expose this link on:
+
+- public league page
+- public league standings
+- other public player interfaces
+
+Use the application's existing routing conventions.
+
+Example concept only:
+
+`/leagues/:leagueId/players/:playerIdentity/profile`
+
+Do not force this route if the project already uses a different convention.
+
+==================================================
+STEP 5 — PROFILE HEADER
+==================================================
+
+Use the EXISTING TKO site theme.
+
+Do not create a separate admin visual style.
+
+Show:
+
+Player name
+
+League name
+
+Season if available
+
+Club membership status:
+
+`✓ CLUB MEMBER`
+
+or
+
+`NOT A CLUB MEMBER`
+
+Summary cards:
+
+- League position
+- League points
+- Tournaments attended
+- Attendance %
+- Tournament wins
+
+If the player currently occupies an automatic league qualification position, an informational label may say:
+
+`Automatic qualification position`
+
+Do NOT show:
+
+- wildcard score
+- wildcard recommendation
+- suggested qualification
+- ranking recommendation
+
+==================================================
+STEP 6 — MEMBERSHIP CONTROL
+==================================================
+
+Add an owner-only control:
+
+`[ ] Sports & Social Club Member`
+
+Only the league creator can see or interact with it.
+
+Display:
+
+`Membership confirmed: DD/MM/YYYY`
+
+when a confirmation timestamp exists.
+
+Use the site's existing controls/buttons/checkbox styling.
+
+After update:
+- persist to database
+- update the profile cleanly
+- survive page refresh
+
+Do not expose this field to public APIs.
+
+==================================================
+STEP 7 — SEASON SUMMARY STATISTICS
+==================================================
+
+Calculate statistics from existing tournament/match/match_notes data.
+
+Do NOT create duplicated stored aggregate fields just for this page.
+
+Reuse existing calculations where available.
+
+Show the following where reliable data exists:
+
+LEAGUE
+
+- Current league position
+- Points
+- Tournaments attended
+- Total tournaments in league
+- Attendance %
+- Tournament wins
+- Runner-up finishes
+- Semi-final finishes
+- Quarter-final finishes
+- R16 finishes
+- Group-stage exits
+
+MATCHES
+
+- Matches played
+- Matches won
+- Matches lost
+- Match win %
+
+LEGS
+
+- Legs won
+- Legs lost
+- Leg difference
+- Leg win %
+
+SCORING
+
+- Overall 3-dart average
+- Overall First 9 average
+- 100+
+- 140+
+- 180s
+
+FINISHING
+
+- Checkout %
+- Highest checkout
+
+PERFORMANCE RECORDS
+
+- Best leg in darts
+- Highest visit
+- Best match average
+- Best tournament average
+- Longest match winning streak
+
+IMPORTANT:
+
+Only display statistics that can be calculated accurately from current persisted data.
+
+Do NOT estimate statistics.
+
+Do NOT infer statistics that the application does not reliably store.
+
+If unavailable:
+
+show `—`
+
+instead.
+
+==================================================
+STEP 8 — TOURNAMENT HISTORY
+==================================================
+
+Show every tournament belonging to the league in chronological order.
+
+For each tournament show, where available:
+
+- Tournament name
+- Date
+- Attended / Not attended
+- Finish
+- Points earned
+- 3-dart average
+- First 9 average
+- Best leg
+- Highest checkout
+- 180s
+
+Example:
+
+TKO #1
+QF
+10 pts
+54.21 avg
+58.10 first 9
+18 dart best leg
+96 checkout
+0 x 180
+
+For missed tournament:
+
+TKO #3
+Not attended
+—
+
+CRITICAL:
+
+Reuse the EXISTING tournament result and league points calculations.
+
+Do NOT recreate league points logic.
+
+Do NOT introduce an alternative standings calculation.
+
+==================================================
+STEP 9 — ATTENDANCE / SEASON TIMELINE
+==================================================
+
+Create a compact tournament timeline showing every league tournament.
+
+Example:
+
+TKO #1
+QF
+✓
+
+TKO #2
+WINNER
+✓
+
+TKO #3
+—
+NOT ATTENDED
+
+TKO #4
+SF
+✓
+
+Also display:
+
+`8 / 10 tournaments attended`
+
+`80% attendance`
+
+Use existing TKO cards/badges/styles.
+
+==================================================
+STEP 10 — PERFORMANCE TREND CHART
+==================================================
+
+Use the project's EXISTING chart system:
+
+`client/src/components/ui/chart.tsx`
+
+and existing Recharts dependency.
+
+DO NOT install another chart package.
+
+Chart title:
+
+`Performance Trend`
+
+X-axis:
+
+league tournaments in chronological order
+
+Series:
+
+- 3-Dart Average
+- First 9 Average
+
+Only plot tournaments where relevant data exists.
+
+Do not convert missing tournament averages into zero.
+
+Tooltip should show, where available:
+
+- tournament name
+- 3-dart average
+- First 9 average
+- best leg
+- highest checkout
+
+Make the chart responsive.
+
+==================================================
+STEP 11 — LEAGUE POSITION HISTORY
+==================================================
+
+Optional chart:
+
+`League Position`
+
+Show the player's position after each completed tournament.
+
+Position 1 should visually appear at the top.
+
+ONLY implement this if historical league standings can be calculated reliably from EXISTING completed tournament results using the EXISTING ranking/points rules.
+
+DO NOT modify ranking logic to make this chart work.
+
+DO NOT create guessed historical positions.
+
+If this requires significant changes or creates risk to the existing standings code:
+
+omit this chart.
+
+Add a short code comment explaining why.
+
+Also mention the omission in the final completion report.
+
+==================================================
+STEP 12 — SEASON BESTS
+==================================================
+
+Show compact existing-theme cards for:
+
+- Best tournament finish
+- Best leg
+- Highest checkout
+- Most 180s in one tournament
+- Best match average
+- Best tournament average
+- Longest match winning streak
+
+Where possible, show context beneath the record.
+
+Example:
+
+BEST LEG
+14 darts
+
+TKO September
+Quarter Final
+vs Lee Constable
+
+Only show context supported by existing data.
+
+==================================================
+STEP 13 — DESIGN
+==================================================
+
+This page must look like part of the EXISTING `darts-software` / TKO application.
+
+Reuse existing:
+
+- background colours
+- green accent
+- dark theme
+- cards
+- borders
+- typography
+- buttons
+- badges
+- tables
+- spacing
+- responsive layout conventions
+
+Do not hard-code a completely new design system.
+
+Do not redesign `league-detail.tsx`.
+
+Only add the minimum controls needed to access this feature.
+
+Desktop:
+use a clear dashboard layout.
+
+Tablet/mobile:
+cards and tables should stack cleanly.
+
+Avoid unnecessary animation.
+
+==================================================
+STEP 14 — DATA LOADING / PERFORMANCE
+==================================================
+
+Create one profile-data request that returns the information required for the page.
+
+Do NOT create separate browser requests for every statistic.
+
+Avoid N+1 database queries.
+
+Do not issue one query per match.
+
+Gather required tournament/match/note data in bulk and calculate profile aggregates server-side.
+
+Use existing storage/query patterns.
+
+Do not continuously recalculate these statistics in React.
+
+==================================================
+STEP 15 — PUBLIC PRIVACY
+==================================================
+
+Check existing public league APIs before and after implementation.
+
+Confirm private fields such as:
+
+- isClubMember
+- membershipConfirmedAt
+- private profile administrative data
+
+are NOT included.
+
+Do not alter the shape of existing public responses unless absolutely required.
+
+Prefer adding a completely separate private owner-only API.
+
+==================================================
+STEP 16 — REGRESSION SAFETY
+==================================================
+
+Do not alter any behaviour related to:
+
+- tournament scoring
+- visit submission
+- leg completion
+- scorer ownership
+- match versions
+- duplicate submission protection
+- match winner calculation
+- group standings
+- knockout progression
+- byes
+- league ranking
+- tie-breakers
+- league points
+- Charity scoring
+- public overlays
+
+These are working production systems and are outside this task.
+
+==================================================
+STEP 17 — TESTING
+==================================================
+
+Perform focused tests for this feature.
+
+Verify:
+
+1. League creator can access a profile.
+
+2. Logged-out user cannot access the profile API.
+
+3. Another authenticated user receives HTTP 403.
+
+4. Manually typing the private profile URL does not bypass security.
+
+5. Manually calling the private API does not bypass security.
+
+6. Player identity must belong to that league.
+
+7. A player from another league cannot be accessed by modifying the URL/API parameter.
+
+8. League creator can enable club membership.
+
+9. Membership persists after refresh.
+
+10. First confirmation sets membershipConfirmedAt.
+
+11. Disabling membership preserves membershipConfirmedAt.
+
+12. Re-enabling membership preserves the original confirmation date.
+
+13. Duplicate membership records cannot be created.
+
+14. Existing public league API contains no membership fields.
+
+15. Existing public league page behaves exactly as before.
+
+16. Existing standings produce the same positions and points as before.
+
+17. Existing tournament results remain unchanged.
+
+18. Missing stats render `—`.
+
+19. Player with zero usable statistics does not crash.
+
+20. Player with one tournament does not break charts.
+
+21. Missed tournaments do not appear as fake zero averages.
+
+Do not run unrelated large test suites unless an existing relevant test suite naturally covers the changed code.
+
+==================================================
+COMPLETION REPORT
+==================================================
+
+When finished, STOP.
+
+Do not continue making improvements.
+
+Give me a concise report containing:
+
+1. Files changed
+2. Database/schema changes
+3. Migration created/applied
+4. New private routes/endpoints
+5. Exact league-owner security check used
+6. Membership identity/uniqueness approach
+7. Statistics successfully implemented
+8. Statistics that could not safely/reliably be calculated
+9. Whether historical league-position chart was implemented
+10. Tests performed and results
+11. Confirmation that no scoring logic was changed
+12. Confirmation that no standings/ranking/points logic was changed
+13. Confirmation that no public membership information was exposed
+14. Any potential issue I should review manually
+
+Do not start another task after providing this report.
