@@ -76,6 +76,18 @@ export const leagueManualResults = pgTable("league_manual_results", {
 
 export const insertLeagueManualResultSchema = createInsertSchema(leagueManualResults).omit({ id: true, createdAt: true });
 
+// Private club membership belongs to a league and its existing normalized player identity.
+export const leaguePlayerMemberships = pgTable("league_player_memberships", {
+  id: serial("id").primaryKey(),
+  leagueId: integer("league_id").notNull().references(() => leagues.id, { onDelete: "cascade" }),
+  normalizedPlayerIdentity: text("normalized_player_identity").notNull(),
+  isClubMember: boolean("is_club_member").notNull().default(false),
+  membershipConfirmedAt: timestamp("membership_confirmed_at"),
+}, (table) => ({
+  leaguePlayerUnique: uniqueIndex("league_player_memberships_league_player_uidx")
+    .on(table.leagueId, table.normalizedPlayerIdentity),
+}));
+
 // === TOURNAMENTS ===
 export const tournaments = pgTable("tournaments", {
   id: serial("id").primaryKey(),
@@ -367,6 +379,7 @@ export type League = typeof leagues.$inferSelect;
 export type InsertLeague = z.infer<typeof insertLeagueSchema>;
 
 export type LeagueManualResult = typeof leagueManualResults.$inferSelect;
+export type LeaguePlayerMembership = typeof leaguePlayerMemberships.$inferSelect;
 export type InsertLeagueManualResult = z.infer<typeof insertLeagueManualResultSchema>;
 
 export type User = typeof users.$inferSelect;

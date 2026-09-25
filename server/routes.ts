@@ -15,6 +15,8 @@ import rateLimit from "express-rate-limit";
 import { ScoringConflictError, ScoringValidationError } from "./scoring-integrity";
 import { ScorerLeaseConflictError, ScorerMatchStartConflictError } from "./storage";
 import { getScorerBoardAssignment, assertScorerMatchAssignedToBoard, ScorerBoardAuthorizationError } from "./scorer-board-authorization";
+import { calculateLeagueStandings, normalizeLeaguePlayerIdentity, type LeagueTournamentResults } from "./league-standings";
+import { buildLeaguePlayerProfile } from "./league-player-profile";
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -3210,87 +3212,14 @@ export async function registerRoutes(
     if (!league || league.userId !== userId) return res.status(404).json({ message: "League not found" });
 
     const leagueTournaments = await storage.getTournamentsByLeagueId(leagueId);
-
-    const STAGE_POINTS: Record<string, number> = {
-      'GROUP': 5,
-      'QF': 10,
-      'SF': 20,
-      'RUNNER_UP': 30,
-      'WINNER': 40,
-    };
-
-    const playerAgg: Record<string, { name: string; points: number; legsWon: number; legsLost: number; tournaments: number; wins: number }> = {};
-
+    const tournamentResults: LeagueTournamentResults[] = [];
     for (const t of leagueTournaments) {
       const allMatches = await storage.getMatchesByTournamentId(t.id);
       const playersList = await storage.getPlayersByTournamentId(t.id);
-      const completedMatches = allMatches.filter(m => m.status === 'COMPLETED');
-
-      const eliminationMatches = completedMatches.filter(m =>
-        m.stage === 'KNOCKOUT' || m.stage === 'WINNERS_BRACKET' || m.stage === 'LOSERS_BRACKET' || m.stage === 'GRAND_FINAL'
-      );
-      const finalMatch = eliminationMatches.find(m => m.roundKey === 'F' || m.stage === 'GRAND_FINAL');
-      const sfMatches = eliminationMatches.filter(m => m.roundKey === 'SF');
-      const qfMatches = eliminationMatches.filter(m => m.roundKey === 'QF');
-
-      for (const player of playersList) {
-        const key = player.name.replace(/\s+/g, ' ').toLowerCase().trim();
-        if (!playerAgg[key]) {
-          playerAgg[key] = { name: player.name, points: 0, legsWon: 0, legsLost: 0, tournaments: 0, wins: 0 };
-        }
-
-        const playerMatches = completedMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
-
-        if (playerMatches.length === 0) continue;
-
-        playerMatches.forEach(m => {
-          const isA = m.playerAId === player.id;
-          playerAgg[key].legsWon += isA ? (m.scoreA || 0) : (m.scoreB || 0);
-          playerAgg[key].legsLost += isA ? (m.scoreB || 0) : (m.scoreA || 0);
-        });
-
-        let stage = 'GROUP';
-        if (finalMatch && finalMatch.winnerId === player.id) {
-          stage = 'WINNER';
-        } else if (finalMatch && (finalMatch.playerAId === player.id || finalMatch.playerBId === player.id)) {
-          stage = 'RUNNER_UP';
-        } else if (sfMatches.some(m => m.playerAId === player.id || m.playerBId === player.id)) {
-          stage = 'SF';
-        } else if (qfMatches.some(m => m.playerAId === player.id || m.playerBId === player.id)) {
-          stage = 'QF';
-        }
-
-        playerAgg[key].points += STAGE_POINTS[stage] || 0;
-        playerAgg[key].tournaments += 1;
-        if (stage === 'WINNER') playerAgg[key].wins += 1;
-      }
+      tournamentResults.push({ tournament: t, matches: allMatches, players: playersList });
     }
-
     const manualResults = await storage.getLeagueManualResults(leagueId);
-    const manualTournamentsByPlayer: Record<string, Set<string>> = {};
-    for (const mr of manualResults) {
-      const key = mr.playerName.replace(/\s+/g, ' ').toLowerCase().trim();
-      if (!playerAgg[key]) {
-        playerAgg[key] = { name: mr.playerName, points: 0, legsWon: 0, legsLost: 0, tournaments: 0, wins: 0 };
-      }
-      playerAgg[key].points += mr.points;
-      playerAgg[key].legsWon += mr.legsWon;
-      playerAgg[key].legsLost += mr.legsLost;
-      if (!manualTournamentsByPlayer[key]) manualTournamentsByPlayer[key] = new Set();
-      manualTournamentsByPlayer[key].add(mr.tournamentLabel.toLowerCase().trim());
-    }
-    for (const [key, labels] of Object.entries(manualTournamentsByPlayer)) {
-      if (playerAgg[key]) playerAgg[key].tournaments += labels.size;
-    }
-
-    const standings = Object.values(playerAgg).sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.legsWon !== a.legsWon) return b.legsWon - a.legsWon;
-      const diffA = a.legsWon - a.legsLost;
-      const diffB = b.legsWon - b.legsLost;
-      if (diffB !== diffA) return diffB - diffA;
-      return b.tournaments - a.tournaments;
-    });
+    const standings = calculateLeagueStandings(tournamentResults, manualResults);
 
     res.json({
       league,
@@ -3306,6 +3235,64 @@ export async function registerRoutes(
         tournaments: s.tournaments,
       })),
       shareToken: league.shareToken,
+    });
+  });
+
+  app.get("/api/leagues/:id/profile-links", isAuthenticated, async (req, res) => {
+    const leagueId = Number(req.params.id);
+    if (!Number.isSafeInteger(leagueId) || leagueId <= 0) return res.status(400).json({ message: "Invalid league" });
+    const league = await storage.getLeague(leagueId);
+    if (!league) return res.status(404).json({ message: "League not found" });
+    if (league.userId !== (req.user as any).id) return res.status(403).json({ message: "Forbidden" });
+    const players = await storage.getLeagueProfilePlayerLinks(leagueId);
+    const links: Record<string, number> = Object.create(null);
+    for (const player of players) {
+      const identity = normalizeLeaguePlayerIdentity(player.name);
+      if (!Object.prototype.hasOwnProperty.call(links, identity)) links[identity] = player.id;
+    }
+    return res.json(links);
+  });
+
+  // Private profile endpoints: ownership is checked before any player lookup or data read.
+  app.get("/api/leagues/:id/players/:playerId/profile", isAuthenticated, async (req, res) => {
+    const leagueId = Number(req.params.id);
+    const playerId = Number(req.params.playerId);
+    if (!Number.isSafeInteger(leagueId) || leagueId <= 0 || !Number.isSafeInteger(playerId) || playerId <= 0) {
+      return res.status(400).json({ message: "Invalid league or player" });
+    }
+    const league = await storage.getLeague(leagueId);
+    if (!league) return res.status(404).json({ message: "League not found" });
+    if (league.userId !== (req.user as any).id) return res.status(403).json({ message: "Forbidden" });
+
+    const source = await storage.getLeagueProfileSource(leagueId);
+    const player = source.players.find(p => p.id === playerId);
+    if (!player) return res.status(404).json({ message: "Player not found in league" });
+    const identity = normalizeLeaguePlayerIdentity(player.name);
+    const membership = await storage.getLeaguePlayerMembership(leagueId, identity);
+    return res.json(buildLeaguePlayerProfile(league, player, source, membership));
+  });
+
+  app.patch("/api/leagues/:id/players/:playerId/profile/membership", isAuthenticated, async (req, res) => {
+    const leagueId = Number(req.params.id);
+    const playerId = Number(req.params.playerId);
+    if (!Number.isSafeInteger(leagueId) || leagueId <= 0 || !Number.isSafeInteger(playerId) || playerId <= 0) {
+      return res.status(400).json({ message: "Invalid league or player" });
+    }
+    const league = await storage.getLeague(leagueId);
+    if (!league) return res.status(404).json({ message: "League not found" });
+    if (league.userId !== (req.user as any).id) return res.status(403).json({ message: "Forbidden" });
+    if (typeof req.body?.isClubMember !== "boolean") {
+      return res.status(400).json({ message: "isClubMember must be a boolean" });
+    }
+
+    const player = await storage.getLeaguePlayerById(leagueId, playerId);
+    if (!player) return res.status(404).json({ message: "Player not found in league" });
+    const membership = await storage.setLeaguePlayerMembership(
+      leagueId, normalizeLeaguePlayerIdentity(player.name), req.body.isClubMember,
+    );
+    return res.json({
+      isClubMember: membership.isClubMember,
+      membershipConfirmedAt: membership.membershipConfirmedAt,
     });
   });
 

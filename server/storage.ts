@@ -1,4 +1,4 @@
-import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, matchLegSubmissions, boardSessions, scorerLeases, scorerCurrentLegs, boardOverlaySettings, leagues, leagueManualResults, betaFeedback, feedbackNotifications, adminSettings, adminLogs, SCORER_LEASE_TTL_MS } from "@shared/schema";
+import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, matchLegSubmissions, boardSessions, scorerLeases, scorerCurrentLegs, boardOverlaySettings, leagues, leagueManualResults, leaguePlayerMemberships, betaFeedback, feedbackNotifications, adminSettings, adminLogs, SCORER_LEASE_TTL_MS } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -13,7 +13,7 @@ import type {
   ScorerCurrentLeg,
   BoardOverlaySettings,
   League, InsertLeague,
-  LeagueManualResult, InsertLeagueManualResult,
+  LeagueManualResult, InsertLeagueManualResult, LeaguePlayerMembership,
   BetaFeedback, InsertBetaFeedback,
   FeedbackNotification,
   AdminSetting,
@@ -42,6 +42,14 @@ export type ScorerLeaseOwner = Pick<
   ScorerLease,
   "boardSessionId" | "acquiredAt" | "lastActivityAt" | "expiresAt"
 >;
+
+export type LeagueProfileSource = {
+  tournaments: Tournament[];
+  players: Player[];
+  matches: Match[];
+  notes: MatchNote[];
+  manualResults: LeagueManualResult[];
+};
 
 export class ScorerLeaseConflictError extends Error {
   constructor(
@@ -219,6 +227,11 @@ export interface IStorage {
   updateLeague(id: number, data: Partial<InsertLeague>): Promise<League>;
   deleteLeague(id: number): Promise<void>;
   getTournamentsByLeagueId(leagueId: number): Promise<Tournament[]>;
+  getLeaguePlayerById(leagueId: number, playerId: number): Promise<Pick<Player, "id" | "name"> | undefined>;
+  getLeagueProfilePlayerLinks(leagueId: number): Promise<Array<Pick<Player, "id" | "name">>>;
+  getLeagueProfileSource(leagueId: number): Promise<LeagueProfileSource>;
+  getLeaguePlayerMembership(leagueId: number, identity: string): Promise<LeaguePlayerMembership | undefined>;
+  setLeaguePlayerMembership(leagueId: number, identity: string, isClubMember: boolean): Promise<LeaguePlayerMembership>;
 
   getLeagueByShareToken(token: string): Promise<League | undefined>;
 
@@ -1337,6 +1350,62 @@ export class DatabaseStorage implements IStorage {
 
   async getTournamentsByLeagueId(leagueId: number): Promise<Tournament[]> {
     return await db.select().from(tournaments).where(eq(tournaments.leagueId, leagueId)).orderBy(desc(tournaments.createdAt));
+  }
+
+  async getLeaguePlayerById(leagueId: number, playerId: number): Promise<Pick<Player, "id" | "name"> | undefined> {
+    const [player] = await db.select({ id: players.id, name: players.name })
+      .from(players)
+      .innerJoin(tournaments, eq(players.tournamentId, tournaments.id))
+      .where(and(eq(players.id, playerId), eq(tournaments.leagueId, leagueId)));
+    return player;
+  }
+
+  async getLeagueProfilePlayerLinks(leagueId: number): Promise<Array<Pick<Player, "id" | "name">>> {
+    return db.select({ id: players.id, name: players.name })
+      .from(players)
+      .innerJoin(tournaments, eq(players.tournamentId, tournaments.id))
+      .where(eq(tournaments.leagueId, leagueId));
+  }
+
+  async getLeagueProfileSource(leagueId: number): Promise<LeagueProfileSource> {
+    const leagueTournaments = await this.getTournamentsByLeagueId(leagueId);
+    const ids = leagueTournaments.map(t => t.id);
+    const [leaguePlayers, leagueMatches, manualResults] = await Promise.all([
+      ids.length ? db.select().from(players).where(inArray(players.tournamentId, ids)) : Promise.resolve([] as Player[]),
+      ids.length ? db.select().from(matches).where(inArray(matches.tournamentId, ids)) : Promise.resolve([] as Match[]),
+      this.getLeagueManualResults(leagueId),
+    ]);
+    const notes = await this.getMatchNotesByMatchIds(leagueMatches.map(m => m.id));
+    return { tournaments: leagueTournaments, players: leaguePlayers, matches: leagueMatches, notes, manualResults };
+  }
+
+  async getLeaguePlayerMembership(leagueId: number, identity: string): Promise<LeaguePlayerMembership | undefined> {
+    const [membership] = await db.select().from(leaguePlayerMemberships).where(and(
+      eq(leaguePlayerMemberships.leagueId, leagueId),
+      eq(leaguePlayerMemberships.normalizedPlayerIdentity, identity),
+    ));
+    return membership;
+  }
+
+  async setLeaguePlayerMembership(leagueId: number, identity: string, isClubMember: boolean): Promise<LeaguePlayerMembership> {
+    const [membership] = await db.insert(leaguePlayerMemberships)
+      .values({
+        leagueId,
+        normalizedPlayerIdentity: identity,
+        isClubMember,
+        membershipConfirmedAt: isClubMember ? new Date() : null,
+      })
+      .onConflictDoUpdate({
+        target: [leaguePlayerMemberships.leagueId, leaguePlayerMemberships.normalizedPlayerIdentity],
+        set: {
+          isClubMember,
+          ...(isClubMember ? {
+            membershipConfirmedAt: sql`COALESCE(${leaguePlayerMemberships.membershipConfirmedAt}, NOW())`,
+          } : {}),
+        },
+      })
+      .returning();
+    return membership;
   }
 
   async getLeagueByShareToken(token: string): Promise<League | undefined> {

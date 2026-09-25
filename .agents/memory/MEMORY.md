@@ -1,2 +1,4 @@
 - [Scoring side-effect recovery](scoring-side-effect-recovery.md) — accepted leg submissions durably track whether post-commit tournament processing finished.
 - [Unfinished scorer legs](unfinished-scorer-legs.md) — server-owned current-leg snapshots are version-bound and must survive scorer turnover and process restarts.
+- [Manual league results and profiles](manual-league-results-profile-identity.md) — free-text labels do not establish a private roster identity or unique tournament.
+- [Workflow config normalization](workflow-config-normalization.md) — managed restarts can rewrite the order and newline of the project’s runtime module list.

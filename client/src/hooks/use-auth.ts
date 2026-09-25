@@ -38,6 +38,10 @@ export function useLogin() {
       return res.json();
     },
     onSuccess: (user) => {
+      queryClient.removeQueries({ predicate: q =>
+        q.queryKey[0] === "/api/leagues/:id/players/:playerId/profile" ||
+        q.queryKey[0] === "/api/leagues/:id/profile-links",
+      });
       queryClient.setQueryData([api.auth.me.path], user);
     },
   });
@@ -80,6 +84,10 @@ export function useLogout() {
     },
     onSuccess: () => {
       queryClient.setQueryData([api.auth.me.path], null);
+      queryClient.removeQueries({ predicate: q =>
+        q.queryKey[0] === "/api/leagues/:id/players/:playerId/profile" ||
+        q.queryKey[0] === "/api/leagues/:id/profile-links",
+      });
       queryClient.invalidateQueries();
     },
   });

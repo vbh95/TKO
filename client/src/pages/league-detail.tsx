@@ -23,6 +23,7 @@ import {
 import { Loader2, ArrowLeft, Trophy, Calendar, ArrowUpCircle, ArrowDownCircle, Share2, Copy, Check, Code, Target, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/hooks/use-auth";
 import { QRCodeSVG } from "qrcode.react";
 
 interface League {
@@ -117,6 +118,7 @@ export default function LeagueDetail() {
   const [copied, setCopied] = useState<string | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const { toast } = useToast();
+  const { data: currentUser } = useUser();
   const { data, isLoading, error } = useQuery<LeagueStandings>({
     queryKey: ['/api/leagues/:id/standings', leagueId],
     queryFn: async () => {
@@ -125,6 +127,17 @@ export default function LeagueDetail() {
       return res.json();
     },
     enabled: leagueId > 0,
+  });
+
+  const { data: profileLinks } = useQuery<Record<string, number>>({
+    queryKey: ['/api/leagues/:id/profile-links', leagueId, currentUser?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/leagues/${leagueId}/profile-links`, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch profile links");
+      return res.json();
+    },
+    enabled: leagueId > 0 && !!data && currentUser?.id === data.league.userId,
+    retry: false,
   });
 
   const { data: playerMatchesData } = useQuery<Record<string, PlayerMatch[]>>({
@@ -355,13 +368,24 @@ export default function LeagueDetail() {
                             </div>
                           </TableCell>
                           <TableCell className="font-medium">
-                            <button
-                              className="text-left hover:text-primary hover:underline underline-offset-2 transition-colors cursor-pointer"
-                              onClick={() => setSelectedPlayer(row.name)}
-                              data-testid={`button-player-${row.position}`}
-                            >
-                              {row.name}
-                            </button>
+                             <div className="flex items-center gap-3">
+                               <button
+                                 className="text-left hover:text-primary hover:underline underline-offset-2 transition-colors cursor-pointer"
+                                 onClick={() => setSelectedPlayer(row.name)}
+                                 data-testid={`button-player-${row.position}`}
+                               >
+                                 {row.name}
+                               </button>
+                               {currentUser?.id === league.userId && profileLinks?.[row.name.replace(/\s+/g, ' ').toLowerCase().trim()] && (
+                                 <Link
+                                   href={`/leagues/${leagueId}/players/${profileLinks[row.name.replace(/\s+/g, ' ').toLowerCase().trim()]}/profile`}
+                                   className="text-xs text-primary hover:underline whitespace-nowrap"
+                                   data-testid={`link-player-profile-${row.position}`}
+                                 >
+                                   View Profile
+                                 </Link>
+                               )}
+                             </div>
                           </TableCell>
                           <TableCell className="text-center tabular-nums">
                             {row.wins > 0 ? (
