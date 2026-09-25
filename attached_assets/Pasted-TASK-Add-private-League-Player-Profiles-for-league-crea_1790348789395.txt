@@ -1,0 +1,455 @@
+TASK: Add private League Player Profiles for league creators only.
+
+IMPORTANT:
+- Keep this task tightly scoped and low-credit.
+- Do not refactor unrelated code.
+- Reuse the existing TKO components, styling, colours, spacing, cards, tables, typography and dark theme.
+- Inspect the existing league page, league database structure, authentication/session handling and existing stats queries before changing anything.
+- Reuse existing data/functions wherever possible.
+- Do not add a new UI library.
+- If a chart library already exists in the project, reuse it.
+- If no chart library exists, use a simple lightweight SVG/CSS chart rather than installing a dependency.
+- Do not change existing tournament scoring, standings calculations, qualification rules or public league pages.
+- Make only the minimum database changes required.
+
+GOAL
+
+Create an admin-only "Player Profile" page within each league.
+
+The page is intended to help the league creator review players, season performance, attendance and club membership when managing things such as Champions Night wildcard places.
+
+This page and its data MUST only be accessible by the authenticated user who originally created that league.
+
+Other users, players and public visitors must not be able to:
+- view the page
+- access the profile API
+- view club membership information
+- edit membership information
+- retrieve the private profile data by manually entering a URL/API endpoint
+
+==================================================
+1. SECURITY / ACCESS CONTROL
+==================================================
+
+Identify how the existing league creator/owner is stored.
+
+Use the existing ownership field rather than creating a second ownership system.
+
+For every Player Profile route/API:
+
+1. Require an authenticated session.
+2. Load the league.
+3. Confirm:
+
+authenticatedUser.id === league.creatorId / ownerId
+
+(use the actual existing field name).
+
+If not authenticated:
+return the existing application's normal unauthorised response.
+
+If authenticated but not the league creator:
+return HTTP 403.
+
+DO NOT rely only on hiding buttons in React.
+
+The server/API itself must enforce this ownership check.
+
+The client should also hide the Player Profile controls from anyone who is not the league creator.
+
+==================================================
+2. ENTRY POINT
+==================================================
+
+On the existing league administration/view page, if the logged-in user is the league creator, allow them to click a player's name or an admin-only "View Profile" action.
+
+This should open:
+
+League > Player Profile
+
+Use the application's existing routing pattern.
+
+Example concept only:
+
+/leagues/:leagueId/players/:playerId/profile
+
+Do not use this exact route if the project already has a preferred routing convention.
+
+Do not expose this link on the public league table.
+
+==================================================
+3. PLAYER PROFILE HEADER
+==================================================
+
+Match the visual style of the existing TKO league page.
+
+Header should include:
+
+Player name
+
+League name / season
+
+Club membership badge:
+✓ CLUB MEMBER
+or
+NOT A CLUB MEMBER
+
+League summary cards:
+
+- Current league position
+- League points
+- Tournaments attended
+- Attendance percentage
+- Tournament wins
+
+If the player currently sits within the league's automatic qualification places, show a small informational label such as:
+
+"Automatic qualification position"
+
+Do NOT calculate or display a wildcard recommendation or player score.
+
+==================================================
+4. CLUB MEMBERSHIP
+==================================================
+
+Add private league-specific membership information.
+
+A player may be considered a club member for one league without this becoming a global player setting.
+
+Store:
+
+isClubMember boolean
+membershipConfirmedAt nullable date/timestamp
+
+Only the league creator can change this.
+
+UI:
+
+[ ] Sports & Social Club Member
+
+When ticking it:
+- set isClubMember = true
+- if membershipConfirmedAt is empty, set it to the current date
+
+When unticking:
+- set isClubMember = false
+- preserve the existing confirmation date unless there is a good technical reason not to
+
+Display the confirmation date to the league creator.
+
+IMPORTANT:
+This membership information must NOT appear in public APIs/pages.
+
+Use the smallest sensible schema change.
+
+If there is already a league-player/member/junction table, add the fields there rather than creating a duplicate structure.
+
+==================================================
+5. SEASON SUMMARY STATISTICS
+==================================================
+
+Calculate these from existing tournament/match/match_notes data.
+
+DO NOT manually store duplicated aggregate statistics unless the existing architecture already does so.
+
+Show:
+
+League:
+- Current position
+- Points
+- Tournaments entered
+- Total tournaments in league
+- Attendance %
+- Tournament wins
+- Runner-up finishes
+- Semi-final finishes
+- Quarter-final finishes
+- Group-stage exits
+
+Matches:
+- Matches played
+- Matches won
+- Matches lost
+- Match win %
+
+Legs:
+- Legs won
+- Legs lost
+- Leg difference
+- Leg win %
+
+Scoring:
+- Overall 3-dart average
+- Overall First 9 average
+- 100+ visits
+- 140+ visits
+- 180s
+
+Finishing:
+- Checkout %
+- Highest checkout
+
+Performance records:
+- Best leg in darts
+- Highest visit
+- Best match average
+- Best tournament average
+- Longest match winning streak
+
+Only show a statistic where reliable source data already exists.
+
+If a statistic cannot be calculated accurately from the existing data, show "—" rather than inventing or approximating data.
+
+==================================================
+6. TOURNAMENT HISTORY
+==================================================
+
+Add a section showing every tournament in this league in chronological order.
+
+Columns / information:
+
+Tournament
+Date
+Attended
+Finish
+Points earned
+3-dart average
+First 9 average
+Best leg
+Highest checkout
+180s
+
+Example:
+
+TKO #1 | Attended | QF | 10 pts | 54.21 | 58.10 | 18 | 96 | 0
+TKO #2 | Attended | Winner | 40 pts | 59.72 | 63.45 | 15 | 121 | 2
+TKO #3 | Did not attend | — | — | — | — | — | — | —
+
+Reuse the league's existing points/result logic.
+
+Do not create a second standings calculation.
+
+==================================================
+7. PERFORMANCE TREND CHART
+==================================================
+
+Add a chart titled:
+
+"Performance Trend"
+
+X axis:
+each league tournament in chronological order
+
+Lines:
+- 3-Dart Average
+- First 9 Average
+
+Only plot tournaments the player actually competed in.
+
+Hover/tap tooltip should show:
+
+Tournament
+3-dart average
+First 9 average
+Best leg
+Highest checkout
+
+Reuse an existing chart library if already installed.
+
+DO NOT install a large new chart package just for this.
+
+If no chart library exists, implement a simple responsive SVG line chart.
+
+==================================================
+8. LEAGUE POSITION CHART
+==================================================
+
+Add a second simple chart:
+
+"League Position"
+
+Show the player's league position after each completed tournament.
+
+Example:
+
+Tournament 1: 12th
+Tournament 2: 9th
+Tournament 3: 7th
+Tournament 4: 6th
+
+Position 1 should visually appear at the top of the graph.
+
+IMPORTANT:
+Only implement this if the historical standings can be derived reliably from existing tournament results.
+
+Do not create fake historical positions from the current table.
+
+If this would require a major rewrite, omit this chart for now and leave a code comment explaining why.
+
+==================================================
+9. ATTENDANCE / SEASON TIMELINE
+==================================================
+
+Create a compact visual timeline for all league tournaments.
+
+For each tournament display something similar to:
+
+TKO #1
+QF
+✓
+
+TKO #2
+WIN
+✓
+
+TKO #3
+—
+Not attended
+
+TKO #4
+SF
+✓
+
+Use the existing TKO visual language.
+
+Also show:
+
+8 / 10 tournaments attended
+80% attendance
+
+==================================================
+10. SEASON BESTS
+==================================================
+
+Create a section of compact cards:
+
+Best tournament finish
+Best leg
+Highest checkout
+Most 180s in one tournament
+Best match average
+Best tournament average
+Longest winning streak
+
+Where possible, clicking/expanding a record should show where it occurred.
+
+Example:
+
+Best Leg
+14 darts
+
+TKO September 2026
+Quarter Final
+vs Lee Constable
+
+Only do this using data already available.
+
+==================================================
+11. DESIGN
+==================================================
+
+The page must look native to the existing TKO application.
+
+Use the same:
+- dark background
+- borders
+- green accent colour
+- muted secondary text
+- card radius
+- fonts
+- table styling
+- responsive breakpoints
+- spacing system
+
+Do not create a visually separate admin theme.
+
+Desktop:
+use a dashboard-style layout.
+
+Tablet/mobile:
+cards and tables should stack sensibly.
+
+Avoid excessive animations.
+
+==================================================
+12. PERFORMANCE
+==================================================
+
+Do not perform a separate database request for every statistic.
+
+Prefer one server request for the profile page which gathers the necessary data efficiently and calculates aggregates server-side.
+
+Avoid N+1 queries.
+
+Do not recalculate statistics continuously in React.
+
+==================================================
+13. DO NOT CHANGE
+==================================================
+
+Do NOT modify:
+
+- scoring behaviour
+- scorer routes
+- leg submission logic
+- match completion logic
+- existing leaderboard ranking rules
+- points allocation
+- tournament progression
+- public player pages
+- OBS overlays
+- Charity Mode
+- Champions Night qualification logic
+
+This task is profile/reporting functionality only.
+
+==================================================
+14. TESTING
+==================================================
+
+Verify:
+
+1. League creator can access the Player Profile.
+2. League creator can toggle club membership.
+3. Membership change persists after refresh.
+4. Non-owner logged-in user receives 403 from the profile API.
+5. Logged-out visitor cannot access profile API.
+6. Manually entering the profile URL does not bypass security.
+7. Membership fields are not exposed through existing public league endpoints.
+8. Existing league table still calculates exactly as before.
+9. Tournament results still calculate exactly as before.
+10. Missing stats show "—" without crashing.
+11. Player with zero tournaments works correctly.
+12. Charts handle one tournament and missing tournament data correctly.
+
+==================================================
+15. BEFORE IMPLEMENTING
+==================================================
+
+First inspect only the relevant existing files and identify:
+
+- league table/model
+- field identifying league creator
+- league-player relationship
+- standings calculation
+- match/match_notes statistics structure
+- authentication/session middleware
+- existing admin page styling/components
+- whether a chart library already exists
+
+Then implement the feature using the existing architecture.
+
+Do not perform a broad project audit.
+
+At completion give me:
+
+1. Files changed
+2. Database migration/schema changes
+3. New routes/API endpoints
+4. Exact security/ownership check used
+5. Which statistics were implemented
+6. Any requested statistics that could not be reliably calculated and why
+7. Confirmation that no tournament/scoring logic was changed
+8. Tests performed and results
+
+Do not start unrelated improvements after completing this task.
