@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useUser } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { playoffQueryKey, safePlayoffsReturnPath } from "@/lib/league-playoffs";
 
 type RecordInfo<T = number> = {
   value: T;
@@ -192,6 +193,9 @@ export default function LeaguePlayerProfile() {
     },
     onSuccess: membership => {
       queryClient.setQueryData<Profile>(queryKey, old => old ? { ...old, membership } : old);
+      queryClient.invalidateQueries({
+        queryKey: playoffQueryKey(currentUser?.id, leagueId),
+      });
       toast({ title: "Club membership updated" });
     },
     onError: () => toast({ title: "Membership was not changed", variant: "destructive" }),
@@ -209,6 +213,10 @@ export default function LeaguePlayerProfile() {
 
   const { league, player, membership, summary, stats, history } = data;
   const isOwner = currentUser?.id === league.userId;
+  const playoffsReturnTo = safePlayoffsReturnPath(
+    new URLSearchParams(window.location.search).get("returnTo"),
+    league.id,
+  );
   if (!isOwner) return (
     <LayoutShell><Card><CardContent className="py-12 text-center">Only the league creator can view this profile.</CardContent></Card></LayoutShell>
   );
@@ -224,7 +232,9 @@ export default function LeaguePlayerProfile() {
     <LayoutShell>
       <div className="space-y-6 pb-10">
         <div className="flex items-start gap-3">
-          <Link href={`/leagues/${league.id}`}><Button variant="ghost" size="icon" aria-label="Back to league"><ArrowLeft className="w-5 h-5" /></Button></Link>
+          <Link href={playoffsReturnTo ?? `/leagues/${league.id}`}>
+            <Button variant="ghost" size="icon" aria-label={playoffsReturnTo ? "Back to Playoffs" : "Back to league"}><ArrowLeft className="w-5 h-5" /></Button>
+          </Link>
           <div className="flex-1 min-w-0">
             <p className="text-xs uppercase tracking-widest text-muted-foreground">{league.name} / Player Profile</p>
             <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight break-words">{player.name}</h1>

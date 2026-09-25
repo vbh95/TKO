@@ -17,6 +17,7 @@ import { ScorerLeaseConflictError, ScorerMatchStartConflictError } from "./stora
 import { getScorerBoardAssignment, assertScorerMatchAssignedToBoard, ScorerBoardAuthorizationError } from "./scorer-board-authorization";
 import { calculateLeagueStandings, normalizeLeaguePlayerIdentity, type LeagueTournamentResults } from "./league-standings";
 import { buildLeaguePlayerProfile } from "./league-player-profile";
+import { buildLeaguePlayoffsData, normalizeCurrentPlayoffIdentity } from "./league-playoffs";
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -3236,6 +3237,55 @@ export async function registerRoutes(
       })),
       shareToken: league.shareToken,
     });
+  });
+
+  app.get("/api/leagues/:id/playoffs", isAuthenticated, async (req, res) => {
+    const leagueId = Number(req.params.id);
+    if (!Number.isSafeInteger(leagueId) || leagueId <= 0) {
+      return res.status(400).json({ message: "Invalid league" });
+    }
+    const league = await storage.getLeague(leagueId);
+    if (!league) return res.status(404).json({ message: "League not found" });
+    if (league.userId !== (req.user as any).id) return res.status(403).json({ message: "Forbidden" });
+
+    const [source, memberships, storedSelectedIdentities] = await Promise.all([
+      storage.getLeagueProfileSource(leagueId),
+      storage.getLeaguePlayerMemberships(leagueId),
+      storage.getLeaguePlayoffSelectionIdentities(leagueId),
+    ]);
+    return res.json(buildLeaguePlayoffsData(league, source, memberships, storedSelectedIdentities));
+  });
+
+  app.post("/api/leagues/:id/playoffs/selection", isAuthenticated, async (req, res) => {
+    const leagueId = Number(req.params.id);
+    if (!Number.isSafeInteger(leagueId) || leagueId <= 0) {
+      return res.status(400).json({ message: "Invalid league" });
+    }
+    const league = await storage.getLeague(leagueId);
+    if (!league) return res.status(404).json({ message: "League not found" });
+    if (league.userId !== (req.user as any).id) return res.status(403).json({ message: "Forbidden" });
+
+    const source = await storage.getLeagueProfileSource(leagueId);
+    const identity = normalizeCurrentPlayoffIdentity(req.body?.identity, source);
+    if (!identity) return res.status(400).json({ message: "Player is not in this league's current standings" });
+    await storage.addLeaguePlayoffSelection(leagueId, identity);
+    return res.json({ success: true });
+  });
+
+  app.delete("/api/leagues/:id/playoffs/selection", isAuthenticated, async (req, res) => {
+    const leagueId = Number(req.params.id);
+    if (!Number.isSafeInteger(leagueId) || leagueId <= 0) {
+      return res.status(400).json({ message: "Invalid league" });
+    }
+    const league = await storage.getLeague(leagueId);
+    if (!league) return res.status(404).json({ message: "League not found" });
+    if (league.userId !== (req.user as any).id) return res.status(403).json({ message: "Forbidden" });
+
+    const source = await storage.getLeagueProfileSource(leagueId);
+    const identity = normalizeCurrentPlayoffIdentity(req.body?.identity, source);
+    if (!identity) return res.status(400).json({ message: "Player is not in this league's current standings" });
+    await storage.removeLeaguePlayoffSelection(leagueId, identity);
+    return res.json({ success: true });
   });
 
   app.get("/api/leagues/:id/profile-links", isAuthenticated, async (req, res) => {

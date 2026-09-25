@@ -88,6 +88,17 @@ export const leaguePlayerMemberships = pgTable("league_player_memberships", {
     .on(table.leagueId, table.normalizedPlayerIdentity),
 }));
 
+// A private, league-scoped manual playoff shortlist; player identities use the same
+// normalization as standings and private player profiles.
+export const leaguePlayoffSelections = pgTable("league_playoff_selections", {
+  id: serial("id").primaryKey(),
+  leagueId: integer("league_id").notNull().references(() => leagues.id, { onDelete: "cascade" }),
+  normalizedPlayerIdentity: text("normalized_player_identity").notNull(),
+}, (table) => ({
+  leaguePlayerUnique: uniqueIndex("league_playoff_selections_league_player_uidx")
+    .on(table.leagueId, table.normalizedPlayerIdentity),
+}));
+
 // === TOURNAMENTS ===
 export const tournaments = pgTable("tournaments", {
   id: serial("id").primaryKey(),
@@ -380,6 +391,7 @@ export type InsertLeague = z.infer<typeof insertLeagueSchema>;
 
 export type LeagueManualResult = typeof leagueManualResults.$inferSelect;
 export type LeaguePlayerMembership = typeof leaguePlayerMemberships.$inferSelect;
+export type LeaguePlayoffSelection = typeof leaguePlayoffSelections.$inferSelect;
 export type InsertLeagueManualResult = z.infer<typeof insertLeagueManualResultSchema>;
 
 export type User = typeof users.$inferSelect;

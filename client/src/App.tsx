@@ -17,6 +17,7 @@ import Account from "@/pages/account";
 import LeaguesPage from "@/pages/leagues";
 import LeagueDetail from "@/pages/league-detail";
 import LeaguePlayerProfile from "@/pages/league-player-profile";
+import LeaguePlayoffs from "@/pages/league-playoffs";
 import PublicView from "@/pages/public-view";
 import BoardView from "@/pages/board-view";
 import ScorerPage from "@/pages/scorer";
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/tournaments/:id" component={() => <ProtectedRoute component={TournamentDetail} />} />
       <Route path="/leagues" component={() => <ProtectedRoute component={LeaguesPage} />} />
       <Route path="/leagues/:id/players/:playerId/profile" component={() => <ProtectedRoute component={LeaguePlayerProfile} />} />
+      <Route path="/leagues/:id/playoffs" component={() => <ProtectedRoute component={LeaguePlayoffs} />} />
       <Route path="/leagues/:id" component={() => <ProtectedRoute component={LeagueDetail} />} />
       <Route path="/account" component={() => <ProtectedRoute component={Account} />} />
       <Route path="/admin" component={() => <ProtectedRoute component={AdminDashboard} />} />

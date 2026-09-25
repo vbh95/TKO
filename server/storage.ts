@@ -1,4 +1,4 @@
-import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, matchLegSubmissions, boardSessions, scorerLeases, scorerCurrentLegs, boardOverlaySettings, leagues, leagueManualResults, leaguePlayerMemberships, betaFeedback, feedbackNotifications, adminSettings, adminLogs, SCORER_LEASE_TTL_MS } from "@shared/schema";
+import { users, tournaments, tournamentCollaborators, players, groups, groupMemberships, matches, matchNotes, matchLegSubmissions, boardSessions, scorerLeases, scorerCurrentLegs, boardOverlaySettings, leagues, leagueManualResults, leaguePlayerMemberships, leaguePlayoffSelections, betaFeedback, feedbackNotifications, adminSettings, adminLogs, SCORER_LEASE_TTL_MS } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Tournament, InsertTournament, 
@@ -231,6 +231,10 @@ export interface IStorage {
   getLeagueProfilePlayerLinks(leagueId: number): Promise<Array<Pick<Player, "id" | "name">>>;
   getLeagueProfileSource(leagueId: number): Promise<LeagueProfileSource>;
   getLeaguePlayerMembership(leagueId: number, identity: string): Promise<LeaguePlayerMembership | undefined>;
+  getLeaguePlayerMemberships(leagueId: number): Promise<LeaguePlayerMembership[]>;
+  getLeaguePlayoffSelectionIdentities(leagueId: number): Promise<string[]>;
+  addLeaguePlayoffSelection(leagueId: number, identity: string): Promise<void>;
+  removeLeaguePlayoffSelection(leagueId: number, identity: string): Promise<void>;
   setLeaguePlayerMembership(leagueId: number, identity: string, isClubMember: boolean): Promise<LeaguePlayerMembership>;
 
   getLeagueByShareToken(token: string): Promise<League | undefined>;
@@ -1371,7 +1375,9 @@ export class DatabaseStorage implements IStorage {
     const leagueTournaments = await this.getTournamentsByLeagueId(leagueId);
     const ids = leagueTournaments.map(t => t.id);
     const [leaguePlayers, leagueMatches, manualResults] = await Promise.all([
-      ids.length ? db.select().from(players).where(inArray(players.tournamentId, ids)) : Promise.resolve([] as Player[]),
+      // The standings route reads players by ID within each tournament. Keep
+      // fully tied players in the same order at an automatic-place cutoff.
+      ids.length ? db.select().from(players).where(inArray(players.tournamentId, ids)).orderBy(players.id) : Promise.resolve([] as Player[]),
       ids.length ? db.select().from(matches).where(inArray(matches.tournamentId, ids)) : Promise.resolve([] as Match[]),
       this.getLeagueManualResults(leagueId),
     ]);
@@ -1385,6 +1391,34 @@ export class DatabaseStorage implements IStorage {
       eq(leaguePlayerMemberships.normalizedPlayerIdentity, identity),
     ));
     return membership;
+  }
+
+  async getLeaguePlayerMemberships(leagueId: number): Promise<LeaguePlayerMembership[]> {
+    return db.select().from(leaguePlayerMemberships)
+      .where(eq(leaguePlayerMemberships.leagueId, leagueId));
+  }
+
+  async getLeaguePlayoffSelectionIdentities(leagueId: number): Promise<string[]> {
+    const selections = await db.select({
+      identity: leaguePlayoffSelections.normalizedPlayerIdentity,
+    }).from(leaguePlayoffSelections)
+      .where(eq(leaguePlayoffSelections.leagueId, leagueId));
+    return selections.map(selection => selection.identity);
+  }
+
+  async addLeaguePlayoffSelection(leagueId: number, identity: string): Promise<void> {
+    await db.insert(leaguePlayoffSelections)
+      .values({ leagueId, normalizedPlayerIdentity: identity })
+      .onConflictDoNothing({
+        target: [leaguePlayoffSelections.leagueId, leaguePlayoffSelections.normalizedPlayerIdentity],
+      });
+  }
+
+  async removeLeaguePlayoffSelection(leagueId: number, identity: string): Promise<void> {
+    await db.delete(leaguePlayoffSelections).where(and(
+      eq(leaguePlayoffSelections.leagueId, leagueId),
+      eq(leaguePlayoffSelections.normalizedPlayerIdentity, identity),
+    ));
   }
 
   async setLeaguePlayerMembership(leagueId: number, identity: string, isClubMember: boolean): Promise<LeaguePlayerMembership> {

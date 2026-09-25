@@ -233,7 +233,7 @@ export default function LeagueDetail() {
   return (
     <LayoutShell>
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link href="/leagues">
             <Button variant="ghost" size="icon" data-testid="button-back-to-leagues">
               <ArrowLeft className="w-5 h-5" />
@@ -262,6 +262,14 @@ export default function LeagueDetail() {
               )}
             </div>
           </div>
+          {currentUser?.id === league.userId && (
+            <Link href={`/leagues/${leagueId}/playoffs`}>
+              <Button variant="outline" size="sm" className="shrink-0 gap-2" data-testid="button-league-playoffs">
+                <Target className="w-4 h-4" />
+                PLAYOFFS
+              </Button>
+            </Link>
+          )}
           {publicUrl && (
             <Button
               variant="outline"

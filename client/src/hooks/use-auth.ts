@@ -40,7 +40,8 @@ export function useLogin() {
     onSuccess: (user) => {
       queryClient.removeQueries({ predicate: q =>
         q.queryKey[0] === "/api/leagues/:id/players/:playerId/profile" ||
-        q.queryKey[0] === "/api/leagues/:id/profile-links",
+        q.queryKey[0] === "/api/leagues/:id/profile-links" ||
+        q.queryKey[0] === "/api/leagues/:id/playoffs",
       });
       queryClient.setQueryData([api.auth.me.path], user);
     },
@@ -86,7 +87,8 @@ export function useLogout() {
       queryClient.setQueryData([api.auth.me.path], null);
       queryClient.removeQueries({ predicate: q =>
         q.queryKey[0] === "/api/leagues/:id/players/:playerId/profile" ||
-        q.queryKey[0] === "/api/leagues/:id/profile-links",
+        q.queryKey[0] === "/api/leagues/:id/profile-links" ||
+        q.queryKey[0] === "/api/leagues/:id/playoffs",
       });
       queryClient.invalidateQueries();
     },
