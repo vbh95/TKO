@@ -1,0 +1,152 @@
+We now need to formally define and assess Stage 3 of the TKO scoring audit.
+
+Do NOT modify production code yet.
+
+STAGE 3 DEFINITION
+
+Stage 3 — Scorer Recovery, Refresh & Reconnection Integrity
+
+Purpose:
+Verify that an active scoring session can safely survive browser refreshes, temporary network/socket disconnections, scorer reconnection, page remounts, and recovery of an unfinished leg without duplicating, losing, reverting, or inventing scoring state.
+
+Stage 1 already protects authoritative completed-leg database writes and submission/version integrity.
+
+Stage 2 already covers scorer ownership and durable unfinished-leg recovery/takeover.
+
+Stage 3 should now verify the CLIENT/SERVER RECOVERY PATH around those protections.
+
+IMPORTANT CONSTRAINTS
+
+- Do not redo Stage 1.
+- Do not redo ownership logic already proven by Stage 2 unless Stage 3 exposes an actual integration problem.
+- Do not weaken any existing validation.
+- Do not modify tests merely to make failures disappear.
+- Do not make broad refactors.
+- Do not touch deployment, .replit, Nix, environment configuration, or database configuration.
+- Do not run destructive migrations.
+- Do not touch the live Neon database.
+- Keep scope and credit usage low.
+
+ASSESS THESE EXACT BEHAVIOURS
+
+1. Browser refresh during an untouched active leg
+   - scorer returns to the same match
+   - correct current scores are restored
+   - correct leg number is restored
+   - correct thrower/starter state is restored where persisted
+   - no leg or visit is created merely by refreshing
+
+2. Browser refresh during a partially played unfinished leg
+   - durable current-leg state is restored
+   - remaining scores are correct
+   - visit history is correct
+   - current thrower is correct
+   - checkout-ready state is preserved
+   - no submitted visit is duplicated
+   - no persisted visit disappears
+
+3. Refresh immediately after a completed-leg submission
+   - scorer adopts the authoritative returned match state/version
+   - the completed leg appears exactly once
+   - the next leg starts with the correct score
+   - previous-leg state cannot be resubmitted accidentally
+
+4. Lost response after successful server submission
+   - if the client does not receive the response but the server committed the leg, recovery must not submit the leg a second time
+   - existing submission-id/idempotency protections must still work through the client recovery path
+
+5. Temporary socket/network disconnect
+   - scorer does not reset local state incorrectly
+   - reconnect retrieves authoritative state
+   - no phantom score/leg is generated
+   - stale local state must not overwrite newer server state
+
+6. Ownership/session state after reconnect
+   - valid scorer ownership should resume appropriately
+   - invalidated ownership must not silently regain write access
+   - admin reset/version invalidation must continue to block stale submissions
+
+7. Back/forward navigation or scorer page remount
+   - scorer must not recreate a previously submitted leg
+   - scorer must not initialise an already-active leg from starting score if durable state exists
+
+8. Match completion recovery
+   - refreshing after the final leg must show the match as completed
+   - scorer must not reopen the match
+   - no additional leg can be submitted from stale client state
+
+9. Undo/reset interaction
+   - determine whether a refresh after an admin reset or scorer undo restores the authoritative post-reset state
+   - stale pre-reset snapshots must not be reapplied
+
+10. Multiple scorers / stale tab
+   - a stale browser tab must not overwrite or resubmit state after another valid scorer/session has advanced the match
+
+ASSESSMENT TASK
+
+Inspect the current implementation only.
+
+Trace the relevant flow through:
+- client/src/pages/scorer.tsx
+- scorer hooks/components used by that page
+- Socket.IO client handling
+- relevant server routes
+- ownership/version validation
+- current-leg snapshot persistence/recovery
+- match_notes / legHistory handling
+- submission ID generation/reuse
+- match completion handling
+
+Also inspect:
+- tests/scoring-integrity.test.ts
+- tests/stage1-database.integration.ts
+- tests/stage2-database.integration.ts
+- any scorer/client tests elsewhere in the repository
+
+Do not assume a bug exists.
+
+For each of the 10 behaviours above, classify it as:
+
+- VERIFIED BY EXISTING TEST
+- IMPLEMENTED BUT NOT TESTED
+- PARTIALLY PROTECTED
+- POTENTIAL DEFECT
+- NOT IMPLEMENTED
+- NOT APPLICABLE
+
+Where possible, cite the relevant file/function or test case.
+
+Then provide:
+
+# STAGE 3 ASSESSMENT
+
+## Behaviour matrix
+A table with:
+- Behaviour
+- Status
+- Existing protection
+- Test coverage
+- Risk
+
+## Findings
+List only concrete findings supported by the code.
+
+## Missing tests
+Identify the smallest set of additional tests required to prove Stage 3.
+
+## Production changes
+State whether any production changes are actually required based on the assessment.
+Do not propose speculative rewrites.
+
+## Recommended implementation order
+If defects exist:
+1. tests that reproduce them
+2. smallest fix
+3. regression verification
+
+## Regression suites that must remain green
+Include Stage 1 and Stage 2 tests.
+
+STOP AFTER THE ASSESSMENT.
+
+Do not change any files.
