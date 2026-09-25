@@ -1,0 +1,58 @@
+We have encountered an intermittent **"Internal Server Error"** on two tablets using the TKO darts system.
+
+Do NOT change any production code yet.
+
+I want you to investigate and identify the cause first.
+
+Please:
+
+1. Inspect the server/application logs for recent HTTP 500 responses associated with tablet/scorer routes.
+
+2. Identify:
+
+   * the exact endpoint that returned 500;
+   * the HTTP method;
+   * timestamp;
+   * relevant tournament/match/board/session information if available;
+   * the server-side exception/error and stack trace;
+   * whether the two tablet failures have the same cause.
+
+3. Pay particular attention to the recently implemented scorer ownership and recovery system, including:
+
+   * scorer ownership acquisition;
+   * ownership validation;
+   * scorer session/version handling;
+   * score submission;
+   * current-leg snapshot persistence;
+   * completed-leg submission;
+   * post-commit progression/recovery;
+   * tablet pairing and scorer loading.
+
+4. Check whether this could be caused by:
+
+   * a database query failing;
+   * Neon connection/transient database failure;
+   * stale scorer ownership/session data;
+   * version mismatch;
+   * malformed or missing request data;
+   * an unhandled exception;
+   * a race/concurrency condition;
+   * the server returning 500 where a controlled 4xx/conflict/recovery response should be returned.
+
+5. Do not assume the recent Stage 2 changes are responsible. Trace the actual failing request and exception.
+
+6. Check whether there are other recent occurrences of the same 500 error in the logs, even if they were not reported by a user.
+
+7. Do NOT weaken any of the Stage 1/Stage 2 scorer integrity protections to fix this.
+
+Report back with:
+
+* exact failing endpoint;
+* exact error/exception;
+* likely root cause;
+* whether both tablet incidents are related;
+* whether any scorer/match data was at risk;
+* whether the existing recovery system handled the failure safely;
+* recommended fix.
+
+Do not implement the fix until the cause has been identified and reported.
