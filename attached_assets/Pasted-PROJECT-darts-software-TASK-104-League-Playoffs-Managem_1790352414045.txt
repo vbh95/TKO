@@ -1,0 +1,463 @@
+PROJECT: darts-software
+
+TASK #104 — League Playoffs Management Page
+
+IMPORTANT WORKING RULES
+
+This task is for the existing `darts-software` project.
+
+The site is currently working.
+
+Make this change conservatively and additively.
+
+DO NOT:
+- change tournament scoring
+- change visit submission
+- change leg completion
+- change match completion
+- change standings calculations
+- change ranking/tie-break rules
+- change league points
+- change qualification logic
+- change public league behaviour
+- change Charity Mode
+- change OBS overlays
+- refactor unrelated code
+- redesign unrelated pages
+- install unnecessary packages
+
+Reuse the private player-profile/statistics work already implemented in Task #103.
+
+Do not change how any existing statistic is calculated.
+
+Prefer the smallest safe change.
+
+==================================================
+GOAL
+==================================================
+
+Add a private league-owner-only "Playoffs" page to help the league creator review, filter, sort and manually select players who may compete for the remaining Champions Night / promotion places.
+
+This is an administrative selection workspace only.
+
+The software must NOT automatically decide who should qualify.
+
+==================================================
+ENTRY POINT
+==================================================
+
+On the existing league detail/admin page:
+
+When the authenticated user is the league creator, add a new button:
+
+PLAYOFFS
+
+Place it next to the existing:
+
+SHARE LEAGUE TABLE
+
+button.
+
+The button must only appear to the league creator.
+
+Do not show it on the public league page.
+
+Opening the button should navigate to a new private route using the existing routing style.
+
+Example concept only:
+
+/leagues/:leagueId/playoffs
+
+Use the project's existing route conventions.
+
+==================================================
+SECURITY
+==================================================
+
+This page is private.
+
+Only the authenticated league creator may access it.
+
+Every supporting API must:
+
+1. require authentication
+2. load the league
+3. confirm the authenticated user's ID matches the league owner/creator field
+4. return the existing unauthenticated response when logged out
+5. return HTTP 403 for an authenticated non-owner
+
+Do not rely only on hiding the Playoffs button.
+
+Direct URL/API access must also be blocked.
+
+Do not expose private membership data publicly.
+
+==================================================
+PAGE DESIGN
+==================================================
+
+Use the existing TKO theme.
+
+Reuse existing:
+- dark background
+- green accent
+- cards
+- badges
+- buttons
+- tables
+- typography
+- spacing
+- responsive patterns
+
+Do not create a new design system.
+
+Page title:
+
+PLAYOFFS
+
+Subtitle example:
+
+Review and select players for Champions Night playoff places.
+
+==================================================
+SUMMARY AREA
+==================================================
+
+At the top, show:
+
+- League name
+- Total league players
+- Automatic qualification places
+- Players currently outside automatic qualification
+- Number of selected playoff players
+
+Use existing league configuration where available.
+
+Do not change qualification rules.
+
+If automatic qualification count is already stored, reuse it.
+
+If it is not stored, do not invent new qualification behaviour just for this page.
+
+==================================================
+PLAYER DATA
+==================================================
+
+Reuse the same reliable player summary/profile data already implemented in Task #103.
+
+Do not recalculate existing statistics differently.
+
+Each player row should support these fields where available:
+
+- Player name
+- Current league position
+- League points
+- Tournaments attended
+- Total tournaments
+- Attendance %
+- Club member status
+- Tournament wins
+- Runner-up finishes
+- Overall 3-dart average
+- Best tournament 3-dart average
+- First 9 average
+- Highest checkout
+- Best leg
+- 180s
+- Match win %
+- Leg win %
+- Qualification status
+- View Profile action
+
+Show `—` for unavailable data.
+
+==================================================
+FILTERS
+==================================================
+
+Add these filters:
+
+1. PLAYER SEARCH
+- Search by player name
+
+2. ATTENDANCE
+- Minimum attendance slider
+- 0% to 100%
+- 10% increments
+
+Example:
+Minimum attendance: 60%
+
+3. MEMBERSHIP
+Options:
+- All players
+- Members only
+- Non-members only
+
+4. QUALIFICATION STATUS
+Options:
+- All players
+- Automatically qualified
+- Not automatically qualified
+
+Default on this page should preferably be:
+
+Not automatically qualified
+
+because the page is intended to organise playoff candidates.
+
+Do not alter the actual qualification state.
+
+5. MINIMUM TOURNAMENTS ATTENDED
+Options should be generated sensibly from the number of tournaments in the league.
+
+6. TOURNAMENT WINNER
+Options:
+- All
+- Has won a tournament
+- Has not won a tournament
+
+==================================================
+SORTING
+==================================================
+
+Provide a Sort By control with:
+
+- League position
+- Points: high to low
+- Points: low to high
+- Attendance: high to low
+- Attendance: low to high
+- Tournaments attended
+- Tournament wins
+- Overall 3-dart average
+- Best tournament 3-dart average
+- First 9 average
+- Highest checkout
+- Best leg
+- Most 180s
+- Match win %
+- Leg win %
+
+Only include sort options for statistics reliably available from Task #103.
+
+Do not invent values.
+
+For "Best leg":
+fewer darts is better.
+
+For all percentage and average sorts:
+missing values should sort below valid values.
+
+==================================================
+TABLE SORTING
+==================================================
+
+On desktop, where practical, allow clicking relevant table headings to sort ascending/descending.
+
+Example:
+
+POINTS ↓
+
+Click again:
+
+POINTS ↑
+
+Keep the main Sort By dropdown for mobile/tablet usability.
+
+==================================================
+PLAYER SELECTION
+==================================================
+
+Allow the league creator to manually select players for the playoff field.
+
+Each player row should have:
+
+[ Select ]
+
+or
+
+[ ✓ Selected ]
+
+Selection must NOT automatically qualify the player.
+
+It simply adds them to the organiser's playoff shortlist.
+
+Show a selected-player panel near the top or side of the page.
+
+Example:
+
+PLAYOFF FIELD
+
+4 players selected
+
+- Mark North
+- Tom Martin
+- Sam Hicks
+- Joe Bloggs
+
+Each selected player should have a Remove action.
+
+==================================================
+SELECTION PERSISTENCE
+==================================================
+
+Persist the playoff selection for that specific league so the creator can leave and return later.
+
+Use the smallest sensible league-scoped database structure.
+
+Do not add fields to global players.
+
+Use the same normalized player identity approach used by Task #103 where appropriate.
+
+Prevent duplicate selected-player records for the same league/player.
+
+Only the league creator may read or modify the selection.
+
+==================================================
+PLAYER PROFILE
+==================================================
+
+Each player row should have:
+
+VIEW PROFILE
+
+This should open the private player profile created in Task #103.
+
+When returning to the Playoffs page, preserve:
+
+- filters
+- sort order
+- search term
+
+Prefer URL query parameters or existing navigation-state conventions.
+
+==================================================
+FILTER STATE
+==================================================
+
+Preserve filter and sort state where practical.
+
+Example concept:
+
+?attendance=60&membership=member&qualification=not-qualified&sort=points-desc
+
+Do not force this exact format if the existing router has a better convention.
+
+Add:
+
+RESET FILTERS
+
+Also display:
+
+X players shown
+
+and, if useful:
+
+Filters (3)
+
+==================================================
+PERFORMANCE
+==================================================
+
+Do not create a separate API request for every filter or statistic.
+
+Prefer one owner-only playoffs-data request.
+
+If all required player summary data is already available from the Task #103 profile/list implementation, reuse it.
+
+For normal league sizes, perform filtering and sorting client-side where sensible.
+
+Avoid N+1 database queries.
+
+Do not issue one query per player or one query per match.
+
+==================================================
+PUBLIC PRIVACY
+==================================================
+
+Confirm the following remain private:
+
+- Club membership status
+- Membership confirmation date
+- Playoff shortlist
+- Playoff selection controls
+- Private profile data
+
+Do not expose these through public league APIs.
+
+==================================================
+OUT OF SCOPE
+==================================================
+
+Do NOT add:
+
+- automatic wildcard recommendations
+- player rating scores
+- "best candidate" algorithms
+- automatic Champions Night qualification
+- playoff bracket generation
+- playoff match scheduling
+- changes to league standings
+- changes to league points
+- changes to qualification rules
+
+This task is only for reviewing, filtering, sorting and manually selecting the potential playoff field.
+
+==================================================
+TESTING
+==================================================
+
+Verify:
+
+1. League creator sees the Playoffs button next to Share League Table.
+2. Public users do not see it.
+3. Other logged-in users do not see it.
+4. League creator can open the Playoffs page.
+5. Logged-out direct URL access is denied.
+6. Authenticated non-owner direct URL/API access returns 403.
+7. Player search works.
+8. Attendance slider works from 0–100% in 10% increments.
+9. Member filter works.
+10. Non-member filter works.
+11. Qualification filter works.
+12. Minimum tournaments filter works.
+13. Tournament winner filter works.
+14. Sorting works for all available sort options.
+15. Missing statistics do not break sorting.
+16. Player selection can be added.
+17. Player selection can be removed.
+18. Selection persists after refresh.
+19. Duplicate player selections cannot be created.
+20. View Profile opens Task #103 private profile.
+21. Returning preserves filters/sort where implemented.
+22. Public league APIs expose no playoff or membership data.
+23. Existing standings remain unchanged.
+24. Existing points remain unchanged.
+25. Existing tournament/scoring behaviour remains unchanged.
+
+==================================================
+COMPLETION REPORT
+==================================================
+
+When finished, STOP.
+
+Report:
+
+1. Files changed
+2. Database/schema changes
+3. New routes/API endpoints
+4. Exact owner security check used
+5. Filters implemented
+6. Sort options implemented
+7. How playoff selection is stored
+8. How duplicate selections are prevented
+9. Whether filters are client-side or server-side
+10. How filter state is preserved
+11. Tests performed and results
+12. Confirmation no scoring logic changed
+13. Confirmation no standings/points logic changed
+14. Confirmation no qualification logic changed
+15. Confirmation no private data is exposed publicly
+
+Do not start unrelated improvements after completion.
