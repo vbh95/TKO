@@ -71,6 +71,7 @@ export default function CreateTournament() {
     const showQF = type === "DOUBLE_ELIMINATION" || ((type === "KNOCKOUT" || type === "MULTI_STAGE") && koTotalSlots >= 8);
     const showSF = type === "DOUBLE_ELIMINATION" || ((type === "KNOCKOUT" || type === "MULTI_STAGE") && koTotalSlots >= 4);
     const showTpQF = groupCount >= 5;
+    const showTpSF = groupCount >= 3;
 
     const handleAddPlayer = () => {
       if (players.length >= 48) return;
@@ -151,6 +152,25 @@ export default function CreateTournament() {
         }
       }
 
+      if (type === "MULTI_STAGE" && groupCount >= 2 && enableThirdPlaceBracket) {
+        const playersPerGroup = Math.ceil(validPlayers.length / groupCount);
+        const hasThirdPlaceCandidateInEveryGroup = Array.from(
+          { length: groupCount },
+          (_, groupIndex) => Math.max(0, Math.min(
+            playersPerGroup,
+            validPlayers.length - groupIndex * playersPerGroup,
+          )),
+        ).every(playerCount => playerCount >= 3);
+        if (!hasThirdPlaceCandidateInEveryGroup) {
+          toast({
+            title: "Not enough players per group",
+            description: "Each group needs at least three players for the 3rd-place consolation bracket.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       create({
         name,
         type,
@@ -174,12 +194,12 @@ export default function CreateTournament() {
           useSets: type === "KNOCKOUT" ? useSets : undefined,
           pointsForWin: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForWin : undefined,
           pointsForLoss: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") ? pointsForLoss : undefined,
-          groupScheduleMode: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") && groupCount >= 4 ? groupScheduleMode : undefined,
-          numberOfBoards: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") && groupCount >= 4 && groupScheduleMode === 'board_rotation' ? groupNumBoards : undefined,
-          enableThirdPlaceBracket: type === "MULTI_STAGE" && groupCount >= 4 && groupScheduleMode === 'board_rotation' && enableThirdPlaceBracket ? true : undefined,
-          thirdPlaceBestOfByRound: type === "MULTI_STAGE" && groupCount >= 4 && groupScheduleMode === 'board_rotation' && enableThirdPlaceBracket ? {
+          groupScheduleMode: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") && groupCount >= (type === "MULTI_STAGE" ? 2 : 4) ? groupScheduleMode : undefined,
+          numberOfBoards: (type === "ROUND_ROBIN" || type === "MULTI_STAGE") && groupCount >= (type === "MULTI_STAGE" ? 2 : 4) && groupScheduleMode === 'board_rotation' ? groupNumBoards : undefined,
+          enableThirdPlaceBracket: type === "MULTI_STAGE" && groupCount >= 2 && enableThirdPlaceBracket ? true : undefined,
+          thirdPlaceBestOfByRound: type === "MULTI_STAGE" && groupCount >= 2 && enableThirdPlaceBracket ? {
             ...(showTpQF ? { quarterFinal: tpQfBestOf } : {}),
-            semiFinal: tpSfBestOf,
+            ...(showTpSF ? { semiFinal: tpSfBestOf } : {}),
             final: tpFBestOf,
           } : undefined,
         }
@@ -322,14 +342,14 @@ export default function CreateTournament() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {[1, 2, 4, 8].map(n => (
+                          {(type === "MULTI_STAGE" ? [1, 2, 3, 4, 5, 6, 7, 8] : [1, 2, 4, 8]).map(n => (
                             <SelectItem key={n} value={n.toString()}>{n} Group{n > 1 ? 's' : ''}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
 
-                    {groupCount >= 4 && (
+                    {groupCount >= (type === "MULTI_STAGE" ? 2 : 4) && (
                       <div className="space-y-2">
                         <Label htmlFor="groupScheduleMode">Board Schedule Mode</Label>
                         <Select
@@ -347,7 +367,7 @@ export default function CreateTournament() {
                       </div>
                     )}
 
-                    {type === "MULTI_STAGE" && groupCount >= 4 && groupScheduleMode === 'board_rotation' && (
+                    {type === "MULTI_STAGE" && groupCount >= 2 && (
                       <div className="flex items-center justify-between">
                         <Label htmlFor="enableThirdPlaceBracket" className="cursor-pointer">3rd Place Consolation Bracket</Label>
                         <Switch
@@ -359,7 +379,7 @@ export default function CreateTournament() {
                       </div>
                     )}
 
-                    {type === "MULTI_STAGE" && groupCount >= 4 && groupScheduleMode === 'board_rotation' && enableThirdPlaceBracket && (
+                    {type === "MULTI_STAGE" && groupCount >= 2 && enableThirdPlaceBracket && (
                       <div className="space-y-3 border rounded-xl p-3 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/40">
                         <Label className="text-sm font-semibold text-amber-800 dark:text-amber-300">3rd Place Bracket Formats</Label>
                         <div className={`grid gap-3 ${showTpQF ? "md:grid-cols-3" : "grid-cols-2"}`}>
@@ -378,19 +398,21 @@ export default function CreateTournament() {
                               </Select>
                             </div>
                           )}
-                          <div className="space-y-1.5">
-                            <Label htmlFor="tpSfBestOf" className="text-xs text-muted-foreground">Semi Finals</Label>
-                            <Select value={tpSfBestOf.toString()} onValueChange={(v) => setTpSfBestOf(parseInt(v))}>
-                              <SelectTrigger id="tpSfBestOf" className="h-9" data-testid="select-tp-sf-best-of">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[1, 3, 5, 7, 9, 11].map(n => (
-                                  <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {showTpSF && (
+                            <div className="space-y-1.5">
+                              <Label htmlFor="tpSfBestOf" className="text-xs text-muted-foreground">Semi Finals</Label>
+                              <Select value={tpSfBestOf.toString()} onValueChange={(v) => setTpSfBestOf(parseInt(v))}>
+                                <SelectTrigger id="tpSfBestOf" className="h-9" data-testid="select-tp-sf-best-of">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {[1, 3, 5, 7, 9, 11].map(n => (
+                                    <SelectItem key={n} value={n.toString()}>Best of {n}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                           <div className="space-y-1.5">
                             <Label htmlFor="tpFBestOf" className="text-xs text-muted-foreground">Final</Label>
                             <Select value={tpFBestOf.toString()} onValueChange={(v) => setTpFBestOf(parseInt(v))}>
@@ -408,7 +430,7 @@ export default function CreateTournament() {
                       </div>
                     )}
 
-                    {groupCount >= 4 && groupScheduleMode === 'board_rotation' && (
+                    {groupCount >= (type === "MULTI_STAGE" ? 2 : 4) && groupScheduleMode === 'board_rotation' && (
                       <div className="space-y-2">
                         <Label htmlFor="groupNumBoards">Number of Boards</Label>
                         <Select
@@ -419,7 +441,7 @@ export default function CreateTournament() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {[2, 4, 6, 8].map(n => (
+                            {(type === "MULTI_STAGE" ? [1, 2, 3, 4, 6, 8] : [2, 4, 6, 8]).map(n => (
                               <SelectItem key={n} value={n.toString()}>{n} Board{n > 1 ? 's' : ''}</SelectItem>
                             ))}
                           </SelectContent>
