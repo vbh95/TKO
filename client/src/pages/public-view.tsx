@@ -123,6 +123,8 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
   const [loading, setLoading] = useState(false);
   const fetchPromiseRef = useRef<Promise<void> | null>(null);
   const isCompleted = match.status === 'COMPLETED';
+  const isBye = isCompleted && match.stage === 'KNOCKOUT' &&
+    Boolean(match.playerAId) !== Boolean(match.playerBId);
 
   const fetchNotes = async () => {
     if (notes) return;
@@ -141,7 +143,7 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
     return promise;
   };
 
-  useEffect(() => { if (isCompleted) fetchNotes(); }, []);
+  useEffect(() => { if (isCompleted && !isBye) fetchNotes(); }, []);
 
   const handleStatsClick = async () => {
     if (!isCompleted) return;
@@ -189,7 +191,7 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
             match.winnerId === match.playerAId && match.playerAId ? "text-green-600 dark:text-green-400 font-bold" : "text-foreground",
             !playerA && "text-muted-foreground/60 font-normal"
           )}>
-            {playerA?.name || "TBD"}
+            {playerA?.name || (isBye ? "Bye" : "TBD")}
           </span>
         </div>
 
@@ -214,12 +216,12 @@ function CompletedMatchRow({ match, playerA, playerB, shareToken, scorerName }: 
             match.winnerId === match.playerBId && match.playerBId ? "text-green-600 dark:text-green-400 font-bold" : "text-foreground",
             !playerB && "text-muted-foreground/60 font-normal"
           )}>
-            {playerB?.name || "TBD"}
+            {playerB?.name || (isBye ? "Bye" : "TBD")}
           </span>
         </div>
       </div>
 
-      {isCompleted && (
+      {isCompleted && !isBye && (
         <div className="flex items-center justify-center gap-3 pb-3">
           <button
             onClick={handleStatsClick}

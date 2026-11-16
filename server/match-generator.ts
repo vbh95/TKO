@@ -1,5 +1,10 @@
 import type { Player, TournamentSettings } from "@shared/schema";
 import { storage } from "./storage";
+import {
+  getThirdPlaceBracketRounds,
+  getThirdPlaceBoardNumber,
+  usesThirdPlaceBoardSplit,
+} from "./third-place-bracket";
 
 function groupLabel(index: number): string {
   return `Group ${String.fromCharCode(65 + index)}`;
@@ -23,14 +28,6 @@ function getBestOfForRound(roundKey: string, settings: TournamentSettings): numb
     if (roundKey === "F" && settings.knockoutBestOfByRound.final) return settings.knockoutBestOfByRound.final;
   }
   return settings.knockoutBestOf || 3;
-}
-
-function getTpRoundKey(totalSlots: number, round: number): string {
-  const matchesInRound = totalSlots / Math.pow(2, round + 1);
-  if (matchesInRound === 1) return "TP_F";
-  if (matchesInRound === 2) return "TP_SF";
-  if (matchesInRound === 4) return "TP_QF";
-  return `TP_R${round + 1}`;
 }
 
 function nextPowerOfTwo(n: number): number {
@@ -530,12 +527,9 @@ export async function generateMultiStageMatches(
     }
   }
 
-  if (settings.enableThirdPlaceBracket && settings.groupScheduleMode === 'board_rotation' && settings.numberOfBoards && groupCount >= 4) {
-    const tpSlots = nextPowerOfTwo(groupCount);
-    const tpRounds = Math.log2(tpSlots);
-    for (let round = 0; round < tpRounds; round++) {
-      const matchCount = tpSlots / Math.pow(2, round + 1);
-      const tpRoundKey = getTpRoundKey(tpSlots, round);
+  if (settings.enableThirdPlaceBracket && groupCount >= 2) {
+    const tpRounds = getThirdPlaceBracketRounds(groupCount);
+    for (const { roundKey: tpRoundKey, matchCount } of tpRounds) {
       const tp = settings.thirdPlaceBestOfByRound;
       const bestOf = tp
         ? (tpRoundKey === 'TP_QF' && tp.quarterFinal ? tp.quarterFinal
@@ -561,35 +555,45 @@ export async function generateMultiStageMatches(
       }
     }
 
-    // Pre-assign board numbers to all knockout matches so tablets know ahead of time
-    const nbBoards = settings.numberOfBoards!;
-    const halfBoards = Math.floor(nbBoards / 2);
-    const allNewMatches = await storage.getMatchesByTournamentId(tournamentId);
-    const koMatches = allNewMatches
-      .filter(m => m.stage === 'KNOCKOUT')
-      .sort((a, b) => a.order - b.order);
+    // Preserve the established split-board layout for valid board rotations.
+    // Other schedules assign boards after group qualification using their normal
+    // board count, so a missing/invalid rotation setting cannot block TP matches.
+    if (
+      settings.groupScheduleMode === 'board_rotation' &&
+      settings.numberOfBoards &&
+      groupCount === settings.numberOfBoards * 2
+    ) {
+      const allNewMatches = await storage.getMatchesByTournamentId(tournamentId);
+      const koMatches = allNewMatches
+        .filter(m => m.stage === 'KNOCKOUT')
+        .sort((a, b) => a.order - b.order);
 
-    const mainKo = koMatches.filter(m => !(m.roundKey as string).startsWith('TP_'));
-    const tpKo = koMatches.filter(m => (m.roundKey as string).startsWith('TP_'));
+      const mainKo = koMatches.filter(m => !(m.roundKey as string).startsWith('TP_'));
+      const tpKo = koMatches.filter(m => (m.roundKey as string).startsWith('TP_'));
+      const splitBoards = usesThirdPlaceBoardSplit(groupCount, settings);
+      const mainBoardCount = splitBoards
+        ? Math.ceil(settings.numberOfBoards / 2)
+        : settings.numberOfBoards;
 
-    const mainRounds = Array.from(new Set(mainKo.map(m => m.roundKey)));
-    const firstMainRound = mainRounds[0];
-    for (const rk of mainRounds) {
-      const roundMatches = mainKo.filter(m => m.roundKey === rk);
-      for (let i = 0; i < roundMatches.length; i++) {
-        const board = rk === firstMainRound
-          ? (i < nbBoards ? i + 1 : ((i - nbBoards) % halfBoards) + 1)
-          : (i % halfBoards) + 1;
-        await storage.updateMatch(roundMatches[i].id, { boardNumber: board } as any);
+      const mainRounds = Array.from(new Set(mainKo.map(m => m.roundKey)));
+      const firstMainRound = mainRounds[0];
+      for (const rk of mainRounds) {
+        const roundMatches = mainKo.filter(m => m.roundKey === rk);
+        for (let i = 0; i < roundMatches.length; i++) {
+          const board = splitBoards && rk === firstMainRound && i < settings.numberOfBoards
+            ? i + 1
+            : (i % mainBoardCount) + 1;
+          await storage.updateMatch(roundMatches[i].id, { boardNumber: board } as any);
+        }
       }
-    }
 
-    const tpRoundsSorted = Array.from(new Set(tpKo.map(m => m.roundKey)));
-    for (const rk of tpRoundsSorted) {
-      const roundMatches = tpKo.filter(m => m.roundKey === rk);
-      for (let i = 0; i < roundMatches.length; i++) {
-        const board = (i % halfBoards) + halfBoards + 1;
-        await storage.updateMatch(roundMatches[i].id, { boardNumber: board } as any);
+      const tpRoundsSorted = Array.from(new Set(tpKo.map(m => m.roundKey)));
+      for (const rk of tpRoundsSorted) {
+        const roundMatches = tpKo.filter(m => m.roundKey === rk);
+        for (let i = 0; i < roundMatches.length; i++) {
+          const board = getThirdPlaceBoardNumber(i, groupCount, settings);
+          await storage.updateMatch(roundMatches[i].id, { boardNumber: board } as any);
+        }
       }
     }
   }

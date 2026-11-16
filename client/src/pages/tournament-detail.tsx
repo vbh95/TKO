@@ -760,14 +760,16 @@ export default function TournamentDetail() {
     const tpFirstRound = tpMatchData[0];
     if (!tpFirstRound || groups.length === 0) return labels;
     const matchRefs: Record<number, string> = {};
+    const fullMatches = groups.length - tpFirstRound.matches.length;
     tpFirstRound.matches.forEach((match: any, idx: number) => {
-      const grpA = groups[idx * 2];
-      const grpB = groups[idx * 2 + 1];
+      const isFullMatch = idx < fullMatches;
+      const grpA = groups[isFullMatch ? idx * 2 : fullMatches + idx];
+      const grpB = isFullMatch ? groups[idx * 2 + 1] : undefined;
       labels[match.id] = {
         a: grpA ? `3rd ${grpA.name}` : 'TBD',
-        b: grpB ? `3rd ${grpB.name}` : 'TBD',
+        b: grpB ? `3rd ${grpB.name}` : 'Bye',
       };
-      matchRefs[match.id] = `TP_QF ${idx + 1}`;
+      matchRefs[match.id] = `${tpFirstRound.roundKey} ${idx + 1}`;
     });
     for (let r = 1; r < tpMatchData.length; r++) {
       const prevMatches = tpMatchData[r - 1].matches;
@@ -1064,8 +1066,9 @@ export default function TournamentDetail() {
               const playerA = getPlayer(match.playerAId);
               const playerB = getPlayer(match.playerBId);
               const slotLabel = knockoutSlotLabels[match.id];
-              const labelA = playerA?.name || slotLabel?.a || 'TBD';
-              const labelB = playerB?.name || slotLabel?.b || 'TBD';
+              const isBye = match.status === 'COMPLETED' && Boolean(match.playerAId) !== Boolean(match.playerBId);
+              const labelA = playerA?.name || (isBye ? 'Bye' : slotLabel?.a || 'TBD');
+              const labelB = playerB?.name || (isBye ? 'Bye' : slotLabel?.b || 'TBD');
               const isEditingThis = editingKnockoutMatchId === match.id && tournament.isLegacy;
 
               return (
@@ -1210,8 +1213,9 @@ export default function TournamentDetail() {
               const playerA = getPlayer(match.playerAId);
               const playerB = getPlayer(match.playerBId);
               const slotLabel = tpSlotLabels[match.id];
-              const labelA = playerA?.name || slotLabel?.a || 'TBD';
-              const labelB = playerB?.name || slotLabel?.b || 'TBD';
+              const isBye = match.status === 'COMPLETED' && Boolean(match.playerAId) !== Boolean(match.playerBId);
+              const labelA = playerA?.name || (isBye ? 'Bye' : slotLabel?.a || 'TBD');
+              const labelB = playerB?.name || (isBye ? 'Bye' : slotLabel?.b || 'TBD');
               return (
                 <Card
                   key={match.id}

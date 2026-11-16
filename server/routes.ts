@@ -12,6 +12,16 @@ import { generateMatches, regenerateGroupMatchesFromMemberships } from "./match-
 import type { TournamentSettings } from "@shared/schema";
 import { emitMatchUpdate, emitTournamentUpdate, emitBoardMatchUpdate, emitLegScoring, clearLiveScoringCache, clearLiveScoringForTournament, liveScoringCache } from "./socket";
 import rateLimit from "express-rate-limit";
+import {
+  getThirdPlaceBoardNumber,
+  getThirdPlaceByeProgressionUpdates,
+  getThirdPlaceProgressionUpdate,
+  getThirdPlaceQualifierIds,
+  getThirdPlaceSeedUpdates,
+  getKnockoutProgressionUpdate,
+  shouldCompleteTournament,
+  usesThirdPlaceBoardSplit,
+} from "./third-place-bracket";
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -38,9 +48,8 @@ async function repairTpBracket(
   tournamentId: number,
   settings: TournamentSettings | undefined
 ): Promise<boolean> {
-  const enableTp = !!(settings?.enableThirdPlaceBracket && settings?.groupScheduleMode === 'board_rotation');
+  const enableTp = !!settings?.enableThirdPlaceBracket;
   if (!enableTp) return false;
-  const nbBoards = settings?.numberOfBoards || 0;
   const ptsWin = (settings as any)?.pointsForWin ?? 2;
   const ptsLoss = (settings as any)?.pointsForLoss ?? 0;
 
@@ -61,117 +70,66 @@ async function repairTpBracket(
   const playersList = await storage.getPlayersByTournamentId(tournamentId);
   const memberships = await storage.getGroupMembershipsByTournamentId(tournamentId);
   if (groupsList.length === 0) return false;
+  const qualifierIds = getThirdPlaceQualifierIds(
+    groupsList,
+    memberships,
+    playersList,
+    groupMatches,
+    ptsWin,
+    ptsLoss,
+  );
+  if (qualifierIds.length !== groupsList.length) return false;
 
-  const calcStandings = (groupId: number) => {
-    const memberPlayerIds = memberships.filter(gm => gm.groupId === groupId).map(gm => gm.playerId);
-    const groupPlayers = playersList.filter(p => memberPlayerIds.includes(p.id));
-    const gMatches = groupMatches.filter(m => m.groupId === groupId && m.status === 'COMPLETED');
-
-    const stats = groupPlayers.map(player => {
-      const playerMs = gMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
-      let played = 0, won = 0, lost = 0, legsFor = 0, legsAgainst = 0;
-      playerMs.forEach(m => {
-        played++;
-        const isA = m.playerAId === player.id;
-        legsFor += isA ? (m.scoreA || 0) : (m.scoreB || 0);
-        legsAgainst += isA ? (m.scoreB || 0) : (m.scoreA || 0);
-        if (m.winnerId === player.id) won++;
-        else lost++;
-      });
-      return { id: player.id, played, pts: won * ptsWin + lost * ptsLoss, legsFor, legsAgainst, diff: legsFor - legsAgainst };
-    });
-
-    stats.sort((a, b) => {
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      if (b.diff !== a.diff) return b.diff - a.diff;
-      if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-      return a.id - b.id;
-    });
-
-    let i = 0;
-    while (i < stats.length) {
-      let j = i + 1;
-      while (j < stats.length && stats[j].pts === stats[i].pts && stats[j].diff === stats[i].diff && stats[j].legsFor === stats[i].legsFor) j++;
-      if (j - i > 1) {
-        const tiedGroup = stats.slice(i, j);
-        const tiedIds = new Set(tiedGroup.map(p => p.id));
-        const h2hMatches = gMatches.filter(m =>
-          m.playerAId !== null && m.playerBId !== null &&
-          tiedIds.has(m.playerAId) && tiedIds.has(m.playerBId)
-        );
-        const expectedPairings = tiedGroup.length * (tiedGroup.length - 1) / 2;
-        const pairingSet = new Set<string>();
-        h2hMatches.forEach(m => {
-          const pair = [m.playerAId!, m.playerBId!].sort((a, b) => a - b).join('-');
-          pairingSet.add(pair);
-        });
-        let resolved = false;
-        if (pairingSet.size >= expectedPairings) {
-          const matchCounts = new Map<number, number>();
-          tiedGroup.forEach(p => matchCounts.set(p.id, 0));
-          h2hMatches.forEach(m => {
-            matchCounts.set(m.playerAId!, (matchCounts.get(m.playerAId!) || 0) + 1);
-            matchCounts.set(m.playerBId!, (matchCounts.get(m.playerBId!) || 0) + 1);
-          });
-          const counts: number[] = [];
-          matchCounts.forEach(v => counts.push(v));
-          if (counts.every(c => c === counts[0])) {
-            const h2hStats = tiedGroup.map(player => {
-              const playerH2H = h2hMatches.filter(m => m.playerAId === player.id || m.playerBId === player.id);
-              let hWon = 0, hFor = 0, hAgainst = 0;
-              playerH2H.forEach(m => {
-                const isA = m.playerAId === player.id;
-                hFor += isA ? (m.scoreA || 0) : (m.scoreB || 0);
-                hAgainst += isA ? (m.scoreB || 0) : (m.scoreA || 0);
-                if (m.winnerId === player.id) hWon++;
-              });
-              return { id: player.id, pts: hWon * ptsWin, diff: hFor - hAgainst, legsFor: hFor, played: player.played };
-            });
-            h2hStats.sort((a, b) => {
-              if (b.pts !== a.pts) return b.pts - a.pts;
-              if (b.diff !== a.diff) return b.diff - a.diff;
-              if (b.legsFor !== a.legsFor) return b.legsFor - a.legsFor;
-              if (a.played !== b.played) return a.played - b.played;
-              return a.id - b.id;
-            });
-            const reordered = h2hStats.map(h => tiedGroup.find(p => p.id === h.id)!);
-            for (let k = 0; k < reordered.length; k++) stats[i + k] = reordered[k];
-            resolved = true;
-          }
-        }
-        if (!resolved) {
-          const fallback = tiedGroup.sort((a, b) => a.played !== b.played ? a.played - b.played : a.id - b.id);
-          for (let k = 0; k < fallback.length; k++) stats[i + k] = fallback[k];
-        }
-      }
-      i = j;
-    }
-    return stats;
-  };
-
-  const sortedGroups = [...groupsList].sort((a: any, b: any) => a.id - b.id);
   let didRepair = false;
+  const seedUpdates = getThirdPlaceSeedUpdates(tpMatches as any, qualifierIds);
+  let currentTpMatches = tpMatches.map(match => ({ ...match }));
 
-  for (let gi = 0; gi < sortedGroups.length; gi++) {
-    const tpMatchIdx = Math.floor(gi / 2);
-    if (tpMatchIdx >= tpFirstMatches.length) continue;
-    const tpMatch = tpFirstMatches[tpMatchIdx];
-    const isPlayerA = gi % 2 === 0;
-    if (isPlayerA && tpMatch.playerAId) continue;
-    if (!isPlayerA && tpMatch.playerBId) continue;
-
-    const grpStandings = calcStandings(sortedGroups[gi].id);
-    const thirdPlaceId = grpStandings[2]?.id;
-    if (!thirdPlaceId) continue;
-
-    const tpUpdates: any = {};
-    if (isPlayerA) tpUpdates.playerAId = thirdPlaceId;
-    else tpUpdates.playerBId = thirdPlaceId;
-    if (nbBoards >= 2) {
-      const halfBoards = Math.floor(nbBoards / 2);
-      tpUpdates.boardNumber = (tpMatchIdx % halfBoards) + halfBoards + 1;
+  for (const seed of seedUpdates) {
+    const current = currentTpMatches.find(match => match.id === seed.matchId);
+    if (!current) continue;
+    const seededPlayerA = seed.updates.playerAId ?? null;
+    const seededPlayerB = seed.updates.playerBId ?? null;
+    const isBye = seed.updates.status === "COMPLETED";
+    const participantsChanged =
+      current.playerAId !== seededPlayerA || current.playerBId !== seededPlayerB;
+    const byeNeedsCompletion = isBye &&
+      (current.status !== "COMPLETED" || current.winnerId !== seed.updates.winnerId);
+    if (participantsChanged || byeNeedsCompletion) {
+      const updated = await storage.updateMatch(seed.matchId, seed.updates as any);
+      currentTpMatches = currentTpMatches.map(match =>
+        match.id === updated.id ? { ...match, ...updated } : match,
+      );
+      didRepair = true;
     }
-    await storage.updateMatch(tpMatch.id, tpUpdates);
+  }
+
+  const sortedTpMatches = [...currentTpMatches].sort((a, b) => a.order - b.order);
+  const roundKeys = Array.from(new Set(sortedTpMatches.map(match => match.roundKey)));
+  for (const roundKey of roundKeys) {
+    const roundMatches = sortedTpMatches
+      .filter(match => match.roundKey === roundKey)
+      .sort((a, b) => a.order - b.order);
+    for (let i = 0; i < roundMatches.length; i++) {
+      const match = roundMatches[i];
+      if (match.boardNumber) continue;
+      const boardNumber = getThirdPlaceBoardNumber(i, groupsList.length, settings || {});
+      const updated = await storage.updateMatch(match.id, { boardNumber } as any);
+      currentTpMatches = currentTpMatches.map(current =>
+        current.id === updated.id ? { ...current, ...updated } : current,
+      );
+      didRepair = true;
+    }
+  }
+
+  const byeUpdates = getThirdPlaceByeProgressionUpdates(
+    currentTpMatches as any,
+    seedUpdates.map(seed => seed.matchId),
+  );
+  for (const progression of byeUpdates) {
+    const updated = await storage.updateMatch(progression.matchId, progression.updates as any);
+    currentTpMatches = currentTpMatches.map(current =>
+      current.id === updated.id ? { ...current, ...updated } : current,
+    );
     didRepair = true;
   }
 
@@ -180,7 +138,7 @@ async function repairTpBracket(
 
 async function promoteGroupToKnockout(params: PromoteGroupParams) {
   const { tournamentId, completedGroupId, currentMatchId, currentMatchWinnerId, ptsWin, ptsLoss, shareToken, settings } = params;
-  const enableTp = !!(settings?.enableThirdPlaceBracket && settings?.groupScheduleMode === 'board_rotation');
+  const enableTp = !!settings?.enableThirdPlaceBracket;
   const nbBoards = settings?.numberOfBoards || 0;
 
   const allMatches = await storage.getMatchesByTournamentId(tournamentId);
@@ -319,6 +277,12 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
   };
 
   const groupCount = groupsList.length;
+  const hasValidBoardRotation =
+    settings?.groupScheduleMode === 'board_rotation' &&
+    nbBoards > 0 &&
+    groupCount === nbBoards * 2;
+  const splitThirdPlaceBoards = enableTp &&
+    usesThirdPlaceBoardSplit(groupCount, settings || {});
   type Pairing = { aGroupIdx: number; aPos: number; bGroupIdx: number; bPos: number };
   const pairings: Pairing[] = [];
   
@@ -394,7 +358,35 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     return [...firstMatches, ...secondMatches];
   })();
 
-  const activePairings = settings?.seeded ? seededPairings : pairings;
+  const promotedPerGroup = settings?.promotedPerGroup ?? 2;
+  const mainQualifierCount = groupCount * promotedPerGroup;
+  const hasMainBracketByes = mainQualifierCount < firstRoundMatches.length * 2;
+  let activePairings: Pairing[];
+  if (hasMainBracketByes) {
+    const fullMatchCount = mainQualifierCount - firstRoundMatches.length;
+    const fullPairings = pairings.slice(0, fullMatchCount);
+    const placedQualifiers = new Set<string>();
+    for (const pairing of fullPairings) {
+      placedQualifiers.add(`${pairing.aGroupIdx}:${pairing.aPos}`);
+      placedQualifiers.add(`${pairing.bGroupIdx}:${pairing.bPos}`);
+    }
+    const byePairings: Pairing[] = [];
+    for (let groupIdx = 0; groupIdx < groupCount; groupIdx++) {
+      for (let position = 0; position < promotedPerGroup; position++) {
+        if (!placedQualifiers.has(`${groupIdx}:${position}`)) {
+          byePairings.push({
+            aGroupIdx: groupIdx,
+            aPos: position,
+            bGroupIdx: -1,
+            bPos: -1,
+          });
+        }
+      }
+    }
+    activePairings = [...fullPairings, ...byePairings].slice(0, firstRoundMatches.length);
+  } else {
+    activePairings = settings?.seeded ? seededPairings : pairings;
+  }
 
   const groupComplete = isGroupFullyComplete(completedGroupId);
 
@@ -464,14 +456,25 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
       const finalPlayerAId = updates.playerAId ?? existingMatch.playerAId;
       const finalPlayerBId = updates.playerBId ?? existingMatch.playerBId;
       if (finalPlayerAId && finalPlayerBId && allGroupsDone && !(existingMatch as any).boardNumber) {
-        if (enableTp && nbBoards >= 2) {
-          const halfBoards = Math.floor(nbBoards / 2);
-          updates.boardNumber = i < nbBoards
-            ? i + 1
-            : ((i - nbBoards) % halfBoards) + 1;
+        if (enableTp && hasValidBoardRotation) {
+          if (splitThirdPlaceBoards) {
+            const halfBoards = nbBoards / 2;
+            updates.boardNumber = i < nbBoards
+              ? i + 1
+              : ((i - nbBoards) % halfBoards) + 1;
+          } else {
+            updates.boardNumber = (i % nbBoards) + 1;
+          }
         } else {
           updates.boardNumber = i + 1;
         }
+      }
+      if (allGroupsDone && Boolean(finalPlayerAId) !== Boolean(finalPlayerBId)) {
+        updates.scoreA = finalPlayerAId ? 1 : 0;
+        updates.scoreB = finalPlayerBId ? 1 : 0;
+        updates.bestOf = 1;
+        updates.winnerId = finalPlayerAId || finalPlayerBId;
+        updates.status = 'COMPLETED';
       }
       await storage.updateMatch(firstRoundMatches[i].id, updates);
       updatedQFIds.push(firstRoundMatches[i].id);
@@ -484,7 +487,27 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
   }
 
   if (allGroupsDone) {
-    const refreshed = await storage.getMatchesByTournamentId(tournamentId);
+    let refreshed = await storage.getMatchesByTournamentId(tournamentId);
+    const pendingMainByes = refreshed.filter(m =>
+      m.stage === 'KNOCKOUT' &&
+      m.roundKey === firstRoundKey &&
+      m.status === 'PENDING' &&
+      Boolean(m.playerAId) !== Boolean(m.playerBId),
+    );
+    for (const byeMatch of pendingMainByes) {
+      const winnerId = byeMatch.playerAId || byeMatch.playerBId;
+      if (!winnerId) continue;
+      const updated = await storage.updateMatch(byeMatch.id, {
+        scoreA: byeMatch.playerAId ? 1 : 0,
+        scoreB: byeMatch.playerBId ? 1 : 0,
+        bestOf: 1,
+        winnerId,
+        status: 'COMPLETED',
+      } as any);
+      refreshed = refreshed.map(match =>
+        match.id === updated.id ? { ...match, ...updated } : match,
+      );
+    }
     const refreshedFirst = refreshed
       .filter(m => m.stage === 'KNOCKOUT' && m.roundKey === firstRoundKey)
       .sort((a: any, b: any) => a.order - b.order);
@@ -492,15 +515,38 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
       const m = refreshedFirst[i];
       if (m.status === 'PENDING' && m.playerAId && m.playerBId && !(m as any).boardNumber) {
         let assignedBoard: number;
-        if (enableTp && nbBoards >= 2) {
-          const halfBoards = Math.floor(nbBoards / 2);
-          assignedBoard = i < nbBoards ? i + 1 : ((i - nbBoards) % halfBoards) + 1;
+        if (enableTp && hasValidBoardRotation) {
+          if (splitThirdPlaceBoards) {
+            const halfBoards = nbBoards / 2;
+            assignedBoard = i < nbBoards ? i + 1 : ((i - nbBoards) % halfBoards) + 1;
+          } else {
+            assignedBoard = (i % nbBoards) + 1;
+          }
         } else {
           assignedBoard = i + 1;
         }
         await storage.updateMatch(m.id, { boardNumber: assignedBoard } as any);
         if (!updatedQFIds.includes(m.id)) updatedQFIds.push(m.id);
       }
+    }
+
+    let refreshedKnockouts = refreshed
+      .filter(m => m.stage === 'KNOCKOUT' && !m.roundKey.startsWith('TP_'))
+      .sort((a: any, b: any) => a.order - b.order);
+    const refreshedMainFirst = refreshedKnockouts.filter(m => m.roundKey === firstRoundKey);
+    for (const byeMatch of refreshedMainFirst) {
+      if (!byeMatch.winnerId || Boolean(byeMatch.playerAId) === Boolean(byeMatch.playerBId)) continue;
+      const progression = getKnockoutProgressionUpdate(
+        refreshedKnockouts as any,
+        byeMatch.id,
+        byeMatch.winnerId,
+        false,
+      );
+      if (!progression) continue;
+      const updated = await storage.updateMatch(progression.matchId, progression.updates as any);
+      refreshedKnockouts = refreshedKnockouts.map(match =>
+        match.id === updated.id ? { ...match, ...updated } : match,
+      );
     }
   }
 
@@ -515,7 +561,7 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     }
   }
 
-  const totalBoards = enableTp && nbBoards >= 2 ? nbBoards : groupsList.length;
+  const totalBoards = enableTp && hasValidBoardRotation ? nbBoards : groupsList.length;
   for (const km of mainSorted) {
     if (km.roundKey === firstRoundKey) continue;
     if (km.boardNumber) continue;
@@ -523,20 +569,6 @@ async function promoteGroupToKnockout(params: PromoteGroupParams) {
     const idx = roundMatches.findIndex(m => m.id === km.id);
     const assignedBoard = (idx % totalBoards) + 1;
     await storage.updateMatch(km.id, { boardNumber: assignedBoard } as any);
-  }
-
-  if (allGroupsDone && enableTp && nbBoards >= 2 && tpKoMatches.length > 0) {
-    const tpSortedLate = [...tpKoMatches].sort((a: any, b: any) => a.order - b.order);
-    const tpFirstKeyLate = tpSortedLate[0]?.roundKey;
-    const halfBoards = Math.floor(nbBoards / 2);
-    for (const km of tpSortedLate) {
-      if (km.roundKey === tpFirstKeyLate) continue;
-      if (km.boardNumber) continue;
-      const roundMatches = tpSortedLate.filter(m => m.roundKey === km.roundKey);
-      const idx = roundMatches.findIndex(m => m.id === km.id);
-      const assignedBoard = (idx % halfBoards) + halfBoards + 1;
-      await storage.updateMatch(km.id, { boardNumber: assignedBoard } as any);
-    }
   }
 
   await deduplicateRoundScorers(tournamentId, shareToken);
@@ -637,6 +669,58 @@ async function pickKnockoutScorer(tournamentId: number, excludePlayerIds: number
   } catch {
     return null;
   }
+}
+
+async function advanceThirdPlaceMatch(
+  tournamentId: number,
+  matches: Array<any>,
+  sourceMatchId: number,
+  winnerId: number | null,
+  shareToken: string | null,
+): Promise<any | null> {
+  const progression = getThirdPlaceProgressionUpdate(matches, sourceMatchId, winnerId);
+  if (!progression) return null;
+
+  const target = matches.find(match => match.id === progression.matchId);
+  if (!target) return null;
+  const playerAId = progression.updates.playerAId !== undefined
+    ? progression.updates.playerAId
+    : target.playerAId;
+  const playerBId = progression.updates.playerBId !== undefined
+    ? progression.updates.playerBId
+    : target.playerBId;
+
+  let scorerId: number | null = null;
+  let scorerName: string | null = null;
+  if (playerAId || playerBId) {
+    const scorer = await pickKnockoutScorer(
+      tournamentId,
+      [playerAId, playerBId].filter(Boolean) as number[],
+      null,
+      target.id,
+    );
+    scorerId = scorer?.scorerId ?? null;
+    scorerName = scorer?.scorerName ?? null;
+  }
+
+  const updated = await storage.updateMatch(target.id, {
+    ...progression.updates,
+    scorerId,
+    scorerName,
+  } as any);
+  emitMatchUpdate(tournamentId, shareToken, updated);
+  if (updated.boardNumber) {
+    emitBoardMatchUpdate(tournamentId, updated.boardNumber, updated);
+  }
+  // A corrected/reset earlier result also invalidates any dependent winner.
+  await advanceThirdPlaceMatch(
+    tournamentId,
+    matches.map(match => match.id === updated.id ? { ...match, ...updated } : match),
+    updated.id,
+    null,
+    shareToken,
+  );
+  return updated;
 }
 
 async function deduplicateRoundScorers(tournamentId: number, shareToken: string | null) {
@@ -1694,7 +1778,7 @@ export async function registerRoutes(
     // Route-level guard uses already-loaded data to avoid extra DB reads when no repair needed.
     try {
       const tSettings = tournament.settings as TournamentSettings | undefined;
-      const tpEnabled = !!(tSettings?.enableThirdPlaceBracket && tSettings?.groupScheduleMode === 'board_rotation');
+      const tpEnabled = !!tSettings?.enableThirdPlaceBracket;
       const tpNeedsRepair = tpEnabled && matches.some(m =>
         m.stage === 'KNOCKOUT' && m.roundKey.startsWith('TP_') && (!m.playerAId || !m.playerBId)
       );
@@ -1725,6 +1809,28 @@ export async function registerRoutes(
         const league = await storage.getLeague(input.leagueId);
         if (!league || league.userId !== userId) {
           return res.status(400).json({ message: "League not found" });
+        }
+      }
+
+      if (input.type === "MULTI_STAGE" && input.settings?.enableThirdPlaceBracket) {
+        const groupCount = Number(input.settings.groupCount || 0);
+        if (!Number.isInteger(groupCount) || groupCount < 2) {
+          return res.status(400).json({
+            message: "The 3rd-place consolation bracket requires at least two groups.",
+          });
+        }
+        const playersPerGroup = Math.ceil(input.playerNames.length / groupCount);
+        const everyGroupHasThirdPlaceCandidate = Array.from(
+          { length: groupCount },
+          (_, groupIndex) => Math.max(0, Math.min(
+            playersPerGroup,
+            input.playerNames.length - groupIndex * playersPerGroup,
+          )),
+        ).every(playerCount => playerCount >= 3);
+        if (!everyGroupHasThirdPlaceCandidate) {
+          return res.status(400).json({
+            message: "Each group needs at least three players for the 3rd-place consolation bracket.",
+          });
         }
       }
 
@@ -2077,52 +2183,62 @@ export async function registerRoutes(
           if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
         }
 
-        for (let r = 0; r < roundKeys.length - 1; r++) {
-          const currentRKey = roundKeys[r];
-          const nextRKey = roundKeys[r+1];
-          const currentRMatches = sorted.filter(m => m.roundKey === currentRKey);
-          const nextRMatches = sorted.filter(m => m.roundKey === nextRKey);
+        if (isThirdPlaceMatch) {
+          await advanceThirdPlaceMatch(
+            match.tournamentId,
+            koOnly,
+            match.id,
+            winnerId,
+            tournamentData?.shareToken || null,
+          );
+        } else {
+          for (let r = 0; r < roundKeys.length - 1; r++) {
+            const currentRKey = roundKeys[r];
+            const nextRKey = roundKeys[r + 1];
+            const currentRMatches = sorted.filter(m => m.roundKey === currentRKey);
+            const nextRMatches = sorted.filter(m => m.roundKey === nextRKey);
 
-          for (let i = 0; i < currentRMatches.length; i++) {
-            const m = currentRMatches[i];
-            const mWinnerId = m.winnerId;
-            const nextMatchIdx = Math.floor(i / 2);
-            const isTop = i % 2 === 0;
+            for (let i = 0; i < currentRMatches.length; i++) {
+              const m = currentRMatches[i];
+              const mWinnerId = m.winnerId;
+              const nextMatchIdx = Math.floor(i / 2);
+              const isTop = i % 2 === 0;
 
-            if (nextMatchIdx < nextRMatches.length) {
-              const nm = nextRMatches[nextMatchIdx];
-              const currentVal = isTop ? nm.playerAId : nm.playerBId;
+              if (nextMatchIdx < nextRMatches.length) {
+                const nm = nextRMatches[nextMatchIdx];
+                const currentVal = isTop ? nm.playerAId : nm.playerBId;
 
-              if (currentVal !== mWinnerId) {
-                const nmUpdate: any = isTop ? { playerAId: mWinnerId || null } : { playerBId: mWinnerId || null };
-                nmUpdate.winnerId = null;
-                nmUpdate.status = 'PENDING';
-                nmUpdate.scoreA = 0;
-                nmUpdate.scoreB = 0;
+                if (currentVal !== mWinnerId) {
+                  const nmUpdate: any = isTop ? { playerAId: mWinnerId || null } : { playerBId: mWinnerId || null };
+                  nmUpdate.winnerId = null;
+                  nmUpdate.status = 'PENDING';
+                  nmUpdate.scoreA = 0;
+                  nmUpdate.scoreB = 0;
 
-                const otherPId = isTop ? nm.playerBId : nm.playerAId;
-                if (!mWinnerId && !otherPId) {
-                  nmUpdate.scorerId = null;
-                  nmUpdate.scorerName = null;
-                } else {
-                  const exclude = [mWinnerId, otherPId].filter(Boolean) as number[];
-                  const scorer = await pickKnockoutScorer(match.tournamentId, exclude, null, nm.id);
-                  if (scorer) {
-                    nmUpdate.scorerId = scorer.scorerId;
-                    nmUpdate.scorerName = scorer.scorerName;
-                  } else {
+                  const otherPId = isTop ? nm.playerBId : nm.playerAId;
+                  if (!mWinnerId && !otherPId) {
                     nmUpdate.scorerId = null;
                     nmUpdate.scorerName = null;
+                  } else {
+                    const exclude = [mWinnerId, otherPId].filter(Boolean) as number[];
+                    const scorer = await pickKnockoutScorer(match.tournamentId, exclude, null, nm.id);
+                    if (scorer) {
+                      nmUpdate.scorerId = scorer.scorerId;
+                      nmUpdate.scorerName = scorer.scorerName;
+                    } else {
+                      nmUpdate.scorerId = null;
+                      nmUpdate.scorerName = null;
+                    }
                   }
-                }
 
-                const updatedNm = await storage.updateMatch(nm.id, nmUpdate);
-                const sIdx = sorted.findIndex(match => match.id === nm.id);
-                if (sIdx !== -1) sorted[sIdx] = updatedNm;
-                
-                emitMatchUpdate(match.tournamentId, tournamentData?.shareToken || null, updatedNm);
-                if ((updatedNm as any).boardNumber) {
-                  emitBoardMatchUpdate(match.tournamentId, (updatedNm as any).boardNumber, updatedNm);
+                  const updatedNm = await storage.updateMatch(nm.id, nmUpdate);
+                  const sIdx = sorted.findIndex(match => match.id === nm.id);
+                  if (sIdx !== -1) sorted[sIdx] = updatedNm;
+
+                  emitMatchUpdate(match.tournamentId, tournamentData?.shareToken || null, updatedNm);
+                  if ((updatedNm as any).boardNumber) {
+                    emitBoardMatchUpdate(match.tournamentId, (updatedNm as any).boardNumber, updatedNm);
+                  }
                 }
               }
             }
@@ -2139,16 +2255,13 @@ export async function registerRoutes(
     try {
       if (winnerId && !isReset) {
         const allMatchesForComplete = await storage.getMatchesByTournamentId(match.tournamentId);
-        const isFinalMatch = (
-          (match.stage === 'KNOCKOUT' && (match.roundKey === 'F' || match.roundKey === 'GF')) ||
-          match.stage === 'GRAND_FINAL'
-        );
-
-        const allRoundRobin = allMatchesForComplete.every(m => m.stage === 'GROUP');
-        const allCompleted = allMatchesForComplete.every(m => m.status === 'COMPLETED' || m.id === id);
-
-        if (isFinalMatch || (allRoundRobin && allCompleted)) {
+        if (shouldCompleteTournament(
+          allMatchesForComplete as any,
+          !!(tournament.settings as any)?.enableThirdPlaceBracket,
+        )) {
           await storage.updateTournament(match.tournamentId, { status: "COMPLETED" });
+        } else if (match.roundKey.startsWith('TP_') && tournament.status === "COMPLETED") {
+          await storage.updateTournament(match.tournamentId, { status: "IN_PROGRESS" });
         }
       }
     } catch (completeError) {
@@ -2385,7 +2498,7 @@ export async function registerRoutes(
       let allMatches = matchesRaw;
       try {
         const tSettings = tournament.settings as TournamentSettings | undefined;
-        const tpEnabled = !!(tSettings?.enableThirdPlaceBracket && tSettings?.groupScheduleMode === 'board_rotation');
+        const tpEnabled = !!tSettings?.enableThirdPlaceBracket;
         const tpNeedsRepair = tpEnabled && allMatches.some(m =>
           m.stage === 'KNOCKOUT' && m.roundKey.startsWith('TP_') && (!m.playerAId || !m.playerBId)
         );
@@ -2402,7 +2515,10 @@ export async function registerRoutes(
       const sortedGroups = groupsList.sort((a, b) => a.name.localeCompare(b.name));
       const isKnockoutOnly = sortedGroups.length === 0;
       const boardSettings = (tournament.settings as any) || {};
-      const isBoardRotation = !isKnockoutOnly && boardSettings.groupScheduleMode === 'board_rotation';
+      const isBoardRotation = !isKnockoutOnly &&
+        boardSettings.groupScheduleMode === 'board_rotation' &&
+        boardSettings.numberOfBoards > 0 &&
+        sortedGroups.length === boardSettings.numberOfBoards * 2;
 
       // Determine the primary group for this board.
       // Board rotation: two groups per board, Board K → groups[2K-2] and groups[2K-1].
@@ -2819,52 +2935,62 @@ export async function registerRoutes(
               if (!roundKeys.includes(m.roundKey)) roundKeys.push(m.roundKey);
             }
 
-            for (let r = 0; r < roundKeys.length - 1; r++) {
-              const currentRKey = roundKeys[r];
-              const nextRKey = roundKeys[r+1];
-              const currentRMatches = sorted.filter(m => m.roundKey === currentRKey);
-              const nextRMatches = sorted.filter(m => m.roundKey === nextRKey);
+            if (isThirdPlaceMatch) {
+              await advanceThirdPlaceMatch(
+                tournamentId,
+                koOnly,
+                matchId,
+                winnerId,
+                tournament?.shareToken || null,
+              );
+            } else {
+              for (let r = 0; r < roundKeys.length - 1; r++) {
+                const currentRKey = roundKeys[r];
+                const nextRKey = roundKeys[r + 1];
+                const currentRMatches = sorted.filter(m => m.roundKey === currentRKey);
+                const nextRMatches = sorted.filter(m => m.roundKey === nextRKey);
 
-              for (let i = 0; i < currentRMatches.length; i++) {
-                const m = currentRMatches[i];
-                const mWinnerId = m.winnerId;
-                const nextMatchIdx = Math.floor(i / 2);
-                const isTop = i % 2 === 0;
+                for (let i = 0; i < currentRMatches.length; i++) {
+                  const m = currentRMatches[i];
+                  const mWinnerId = m.winnerId;
+                  const nextMatchIdx = Math.floor(i / 2);
+                  const isTop = i % 2 === 0;
 
-                if (nextMatchIdx < nextRMatches.length) {
-                  const nm = nextRMatches[nextMatchIdx];
-                  const currentVal = isTop ? nm.playerAId : nm.playerBId;
+                  if (nextMatchIdx < nextRMatches.length) {
+                    const nm = nextRMatches[nextMatchIdx];
+                    const currentVal = isTop ? nm.playerAId : nm.playerBId;
 
-                  if (currentVal !== mWinnerId) {
-                    const nmUpdate: any = isTop ? { playerAId: mWinnerId || null } : { playerBId: mWinnerId || null };
-                    nmUpdate.winnerId = null;
-                    nmUpdate.status = 'PENDING';
-                    nmUpdate.scoreA = 0;
-                    nmUpdate.scoreB = 0;
+                    if (currentVal !== mWinnerId) {
+                      const nmUpdate: any = isTop ? { playerAId: mWinnerId || null } : { playerBId: mWinnerId || null };
+                      nmUpdate.winnerId = null;
+                      nmUpdate.status = 'PENDING';
+                      nmUpdate.scoreA = 0;
+                      nmUpdate.scoreB = 0;
 
-                    const otherPId = isTop ? nm.playerBId : nm.playerAId;
-                    if (!mWinnerId && !otherPId) {
-                      nmUpdate.scorerId = null;
-                      nmUpdate.scorerName = null;
-                    } else {
-                      const exclude = [mWinnerId, otherPId].filter(Boolean) as number[];
-                      const scorer = await pickKnockoutScorer(tournamentId, exclude, null, nm.id);
-                      if (scorer) {
-                        nmUpdate.scorerId = scorer.scorerId;
-                        nmUpdate.scorerName = scorer.scorerName;
-                      } else {
+                      const otherPId = isTop ? nm.playerBId : nm.playerAId;
+                      if (!mWinnerId && !otherPId) {
                         nmUpdate.scorerId = null;
                         nmUpdate.scorerName = null;
+                      } else {
+                        const exclude = [mWinnerId, otherPId].filter(Boolean) as number[];
+                        const scorer = await pickKnockoutScorer(tournamentId, exclude, null, nm.id);
+                        if (scorer) {
+                          nmUpdate.scorerId = scorer.scorerId;
+                          nmUpdate.scorerName = scorer.scorerName;
+                        } else {
+                          nmUpdate.scorerId = null;
+                          nmUpdate.scorerName = null;
+                        }
                       }
-                    }
 
-                    const updatedNm = await storage.updateMatch(nm.id, nmUpdate);
-                    const sIdx = sorted.findIndex(match => match.id === nm.id);
-                    if (sIdx !== -1) sorted[sIdx] = updatedNm;
-                    
-                    emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedNm);
-                    if ((updatedNm as any).boardNumber) {
-                      emitBoardMatchUpdate(tournamentId, (updatedNm as any).boardNumber, updatedNm);
+                      const updatedNm = await storage.updateMatch(nm.id, nmUpdate);
+                      const sIdx = sorted.findIndex(match => match.id === nm.id);
+                      if (sIdx !== -1) sorted[sIdx] = updatedNm;
+
+                      emitMatchUpdate(tournamentId, tournament?.shareToken || null, updatedNm);
+                      if ((updatedNm as any).boardNumber) {
+                        emitBoardMatchUpdate(tournamentId, (updatedNm as any).boardNumber, updatedNm);
+                      }
                     }
                   }
                 }
@@ -2881,17 +3007,15 @@ export async function registerRoutes(
       // Auto-complete tournament when final match has a winner
       if (status === "COMPLETED" && winnerId) {
         try {
-          const isFinalMatch = (
-            (match.stage === 'KNOCKOUT' && (match.roundKey === 'F' || match.roundKey === 'GF')) ||
-            match.stage === 'GRAND_FINAL'
-          );
-
           const allMatchesCheck = await storage.getMatchesByTournamentId(tournamentId);
-          const allRoundRobin = allMatchesCheck.every(m => m.stage === 'GROUP');
-          const allDone = allMatchesCheck.every(m => m.status === 'COMPLETED' || m.id === matchId);
-
-          if (isFinalMatch || (allRoundRobin && allDone)) {
+          const settings = (tournament?.settings || {}) as any;
+          if (shouldCompleteTournament(
+            allMatchesCheck as any,
+            !!settings.enableThirdPlaceBracket,
+          )) {
             await storage.updateTournament(tournamentId, { status: "COMPLETED" });
+          } else if (match.roundKey.startsWith('TP_') && tournament?.status === "COMPLETED") {
+            await storage.updateTournament(tournamentId, { status: "IN_PROGRESS" });
           }
         } catch (completeError) {
           console.error("Scorer auto-complete error (non-fatal):", completeError);
